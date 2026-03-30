@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "build:electron": "tsc -p tsconfig.electron.json",
-    "start": "npm run build:electron && electron .",
+    "start": "npm run build && npm run build:electron && electron .",
     "dev:electron": "concurrently \"vite\" \"tsc -p tsconfig.electron.json --watch\" \"wait-on http://localhost:5173 && electron .\"",
     "test": "vitest run",
     "test:watch": "vitest"
