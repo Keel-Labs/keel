@@ -37,7 +37,7 @@ const fileManager = new FileManager(settings.brainPath);
 const llmClient = new LLMClient();
 const contextAssembler = new ContextAssembler(fileManager, false);
 
-const isDev = !app.isPackaged;
+const isDev = process.env.NODE_ENV === 'development';
 
 function createWindow() {
   mainWindow = new BrowserWindow({
