@@ -8,7 +8,7 @@
     "build": "tsc && vite build",
     "build:electron": "tsc -p tsconfig.electron.json",
     "start": "npm run build && npm run build:electron && electron .",
-    "dev:electron": "concurrently \"vite\" \"tsc -p tsconfig.electron.json --watch\" \"wait-on http://localhost:5173 && electron .\"",
+    "dev:electron": "concurrently \"vite\" \"tsc -p tsconfig.electron.json --watch\" \"wait-on http://localhost:5173 && NODE_ENV=development electron .\"",
     "test": "vitest run",
     "test:watch": "vitest"
   },
