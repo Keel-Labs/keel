@@ -43,7 +43,7 @@ function generateSessionId(): string {
   return `session-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-export default function Chat() {
+export default function Chat({ newChatSignal }: { newChatSignal: number }) {
   const [messages, setMessages] = useState<MessageType[]>([]);
   const [input, setInput] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
@@ -51,6 +51,16 @@ export default function Chat() {
   const [sessionId, setSessionId] = useState<string>(generateSessionId());
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Handle new chat signal from header
+  const isFirstRender = useRef(true);
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+    startNewChat();
+  }, [newChatSignal]);
 
   // Load the last session on mount
   useEffect(() => {
@@ -342,24 +352,6 @@ export default function Chat() {
         background: '#1a1a1a',
       }}>
         <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10 }}>
-          {messages.length > 0 && (
-            <button
-              onClick={startNewChat}
-              disabled={isStreaming}
-              title="New chat"
-              style={{
-                background: '#252525', border: '1px solid rgba(255,255,255,0.08)',
-                color: 'rgba(255,255,255,0.5)', borderRadius: 12,
-                padding: '10px 12px', cursor: 'pointer', fontSize: 14,
-                transition: 'all 0.15s', flexShrink: 0,
-                opacity: isStreaming ? 0.4 : 1,
-              }}
-              onMouseEnter={(e) => { if (!isStreaming) e.currentTarget.style.color = 'rgba(255,255,255,0.8)'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.color = 'rgba(255,255,255,0.5)'; }}
-            >
-              +
-            </button>
-          )}
           <textarea
             ref={textareaRef}
             value={input}
