@@ -62,6 +62,13 @@ const api: KeelAPI = {
     ipcRenderer.removeAllListeners('keel:scheduled-notification');
   },
 
+  createReminder: (message: string, dueAt: number, recurring?: string) =>
+    ipcRenderer.invoke('keel:create-reminder', message, dueAt, recurring),
+
+  listReminders: () => ipcRenderer.invoke('keel:list-reminders'),
+
+  deleteReminder: (id: number) => ipcRenderer.invoke('keel:delete-reminder', id),
+
   googleConnect: () => ipcRenderer.invoke('keel:google-connect'),
 
   googleDisconnect: () => ipcRenderer.invoke('keel:google-disconnect'),

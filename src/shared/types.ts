@@ -64,8 +64,17 @@ export interface ActivityLogEntry {
 
 // IPC channel types
 export interface ScheduledNotification {
-  type: 'daily-brief' | 'eod';
+  type: 'daily-brief' | 'eod' | 'reminder';
   content: string;
+}
+
+export interface Reminder {
+  id: number;
+  message: string;
+  dueAt: number;
+  recurring: string | null;
+  fired: boolean;
+  createdAt: number;
 }
 
 export type IpcChannels =
@@ -90,6 +99,9 @@ export type IpcChannels =
   | 'keel:read-file'
   | 'keel:write-file'
   | 'keel:scheduled-notification'
+  | 'keel:create-reminder'
+  | 'keel:list-reminders'
+  | 'keel:delete-reminder'
   | 'keel:google-connect'
   | 'keel:google-disconnect'
   | 'keel:google-status'
@@ -121,6 +133,10 @@ export interface KeelAPI {
   writeFile: (filePath: string, content: string) => Promise<void>;
   onScheduledNotification: (callback: (notification: ScheduledNotification) => void) => void;
   removeScheduledNotificationListener: () => void;
+  // Reminders
+  createReminder: (message: string, dueAt: number, recurring?: string) => Promise<number>;
+  listReminders: () => Promise<Reminder[]>;
+  deleteReminder: (id: number) => Promise<void>;
   // Google Integration
   googleConnect: () => Promise<void>;
   googleDisconnect: () => Promise<void>;

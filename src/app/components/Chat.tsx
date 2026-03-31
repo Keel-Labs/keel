@@ -50,8 +50,8 @@ const THINKING_MESSAGES = [
 ];
 
 function NauticalLoader() {
-  // Square wave box — 28x28, transparent bg, coral waves with splash droplets
-  const s = 28;
+  // Square wave box — 24x24, transparent bg, coral waves with splash droplets
+  const s = 24;
   return (
     <svg viewBox={`0 0 ${s} ${s}`} xmlns="http://www.w3.org/2000/svg" width={s} height={s} style={{ flexShrink: 0 }}>
       <defs>
@@ -149,7 +149,7 @@ const WELCOME_SUGGESTIONS = [
   { label: 'What am I working on?', icon: '📋' },
   { label: '/daily-brief', icon: '☀️' },
   { label: '/capture', icon: '📎' },
-  { label: '/eod', icon: '🌙' },
+  { label: '/reminders', icon: '🔔' },
 ];
 
 function isPdfCommand(text: string): boolean {
@@ -166,6 +166,76 @@ function isGoogleDocCommand(text: string): boolean {
   if (/google\s*doc/i.test(t) && /(make|create|save|export|want|need|give|get|generate|send|turn)/i.test(t)) return true;
   if (/^(export|save|send)\s.*google\s*doc/i.test(t)) return true;
   return false;
+}
+
+/**
+ * Parse reminder commands. Supports:
+ *   /remind [time] [message]
+ *   /remind 2:00 PM Call John
+ *   /remind in 30 minutes check the oven
+ *   /remind tomorrow at 9am standup
+ *   /remind every day at 9am standup  (recurring)
+ *   /reminders  (list)
+ */
+function parseReminderCommand(text: string): { dueAt: number; message: string; recurring?: string } | 'list' | null {
+  const t = text.trim();
+  if (/^\/reminders?$/i.test(t)) return 'list';
+
+  const match = t.match(/^\/remind\s+(.+)/i);
+  if (!match) return null;
+
+  const rest = match[1];
+  const now = new Date();
+
+  // "every day/weekly/monthly at HH:MM message"
+  const recurMatch = rest.match(/^every\s+(day|daily|week|weekly|month|monthly)\s+(?:at\s+)?(\d{1,2}):?(\d{2})?\s*(am|pm)?\s+(.+)/i);
+  if (recurMatch) {
+    const recur = recurMatch[1].toLowerCase();
+    const recurring = recur === 'day' || recur === 'daily' ? 'daily' : recur === 'week' || recur === 'weekly' ? 'weekly' : 'monthly';
+    const due = parseTimeToDate(now, recurMatch[2], recurMatch[3] || '00', recurMatch[4]);
+    if (due <= now) due.setDate(due.getDate() + 1);
+    return { dueAt: due.getTime(), message: recurMatch[5], recurring };
+  }
+
+  // "in X minutes/hours"
+  const inMatch = rest.match(/^in\s+(\d+)\s*(min(?:utes?)?|hrs?|hours?)\s+(.+)/i);
+  if (inMatch) {
+    const amount = parseInt(inMatch[1]);
+    const unit = inMatch[2].toLowerCase();
+    const ms = unit.startsWith('min') ? amount * 60_000 : amount * 3_600_000;
+    return { dueAt: Date.now() + ms, message: inMatch[3] };
+  }
+
+  // "tomorrow at HH:MM message"
+  const tomorrowMatch = rest.match(/^tomorrow\s+(?:at\s+)?(\d{1,2}):?(\d{2})?\s*(am|pm)?\s+(.+)/i);
+  if (tomorrowMatch) {
+    const due = parseTimeToDate(now, tomorrowMatch[1], tomorrowMatch[2] || '00', tomorrowMatch[3]);
+    due.setDate(due.getDate() + 1);
+    return { dueAt: due.getTime(), message: tomorrowMatch[4] };
+  }
+
+  // "HH:MM [am/pm] message" or "at HH:MM message"
+  const timeMatch = rest.match(/^(?:at\s+)?(\d{1,2}):?(\d{2})?\s*(am|pm)?\s+(.+)/i);
+  if (timeMatch && timeMatch[4]) {
+    const due = parseTimeToDate(now, timeMatch[1], timeMatch[2] || '00', timeMatch[3]);
+    if (due <= now) due.setDate(due.getDate() + 1); // next day if time already passed
+    return { dueAt: due.getTime(), message: timeMatch[4] };
+  }
+
+  // Fallback: treat everything as message, due in 1 hour
+  return { dueAt: Date.now() + 3_600_000, message: rest };
+}
+
+function parseTimeToDate(base: Date, hours: string, minutes: string, ampm?: string | null): Date {
+  let h = parseInt(hours);
+  const m = parseInt(minutes);
+  if (ampm) {
+    if (ampm.toLowerCase() === 'pm' && h < 12) h += 12;
+    if (ampm.toLowerCase() === 'am' && h === 12) h = 0;
+  }
+  const d = new Date(base);
+  d.setHours(h, m, 0, 0);
+  return d;
 }
 
 function generateSessionId(): string {
@@ -233,6 +303,13 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
   // Listen for scheduled notifications (daily brief / EOD)
   useEffect(() => {
     window.keel.onScheduledNotification((notification) => {
+      if (notification.type === 'reminder') {
+        setMessages((prev) => [
+          ...prev,
+          { role: 'assistant', content: notification.content, timestamp: Date.now() },
+        ]);
+        return;
+      }
       const label = notification.type === 'daily-brief' ? 'Scheduled Daily Brief' : 'Scheduled EOD Summary';
       setMessages((prev) => [
         ...prev,
@@ -428,6 +505,42 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
           ...prev,
           { role: 'assistant', content: msg, timestamp: Date.now() },
         ]);
+      }
+      setIsStreaming(false);
+      return;
+    }
+
+    // Reminder commands
+    const reminderParsed = parseReminderCommand(trimmed);
+    if (reminderParsed === 'list') {
+      try {
+        const reminders = await window.keel.listReminders();
+        if (reminders.length === 0) {
+          setMessages((prev) => [...prev, { role: 'assistant', content: 'No upcoming reminders.', timestamp: Date.now() }]);
+        } else {
+          const lines = reminders.map((r) => {
+            const when = new Date(r.dueAt).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' });
+            const recur = r.recurring ? ` (${r.recurring})` : '';
+            return `- **${when}**${recur} — ${r.message}`;
+          });
+          setMessages((prev) => [...prev, { role: 'assistant', content: `**Upcoming Reminders:**\n\n${lines.join('\n')}`, timestamp: Date.now() }]);
+        }
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : 'Failed to list reminders';
+        setMessages((prev) => [...prev, { role: 'assistant', content: msg, timestamp: Date.now() }]);
+      }
+      setIsStreaming(false);
+      return;
+    }
+    if (reminderParsed) {
+      try {
+        await window.keel.createReminder(reminderParsed.message, reminderParsed.dueAt, reminderParsed.recurring);
+        const when = new Date(reminderParsed.dueAt).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' });
+        const recur = reminderParsed.recurring ? ` Repeats ${reminderParsed.recurring}.` : '';
+        setMessages((prev) => [...prev, { role: 'assistant', content: `Reminder set for **${when}**: ${reminderParsed.message}${recur}`, timestamp: Date.now() }]);
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : 'Failed to set reminder';
+        setMessages((prev) => [...prev, { role: 'assistant', content: msg, timestamp: Date.now() }]);
       }
       setIsStreaming(false);
       return;
