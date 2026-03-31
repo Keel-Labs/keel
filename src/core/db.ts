@@ -68,6 +68,16 @@ export function getDb(brainPath: string): Database.Database {
       updated_at INTEGER NOT NULL
     );
 
+    -- Reminders / scheduled notifications
+    CREATE TABLE IF NOT EXISTS reminders (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      message    TEXT NOT NULL,
+      due_at     INTEGER NOT NULL,
+      recurring  TEXT,
+      fired      INTEGER DEFAULT 0,
+      created_at INTEGER DEFAULT (unixepoch())
+    );
+
     -- Connector sync state (Google Calendar, Gmail, etc.)
     CREATE TABLE IF NOT EXISTS sync_state (
       id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -376,4 +386,81 @@ export function upsertSyncState(
       d.prepare(`UPDATE sync_state SET ${sets.join(', ')} WHERE connector = ?`).run(...vals);
     }
   }
+}
+
+// --- Reminders ---
+
+export interface ReminderRow {
+  id: number;
+  message: string;
+  dueAt: number;       // unix ms
+  recurring: string | null;  // null, 'daily', 'weekly', 'monthly'
+  fired: boolean;
+  createdAt: number;
+}
+
+export function createReminder(
+  brainPath: string,
+  message: string,
+  dueAt: number,
+  recurring?: string
+): number {
+  const d = getDb(brainPath);
+  const result = d.prepare(
+    `INSERT INTO reminders (message, due_at, recurring, fired) VALUES (?, ?, ?, 0)`
+  ).run(message, dueAt, recurring ?? null);
+  return Number(result.lastInsertRowid);
+}
+
+export function getDueReminders(brainPath: string): ReminderRow[] {
+  const d = getDb(brainPath);
+  const now = Date.now();
+  const rows = d.prepare(
+    `SELECT * FROM reminders WHERE fired = 0 AND due_at <= ? ORDER BY due_at ASC`
+  ).all(now) as Array<{ id: number; message: string; due_at: number; recurring: string | null; fired: number; created_at: number }>;
+  return rows.map((r) => ({
+    id: r.id, message: r.message, dueAt: r.due_at,
+    recurring: r.recurring, fired: r.fired === 1, createdAt: r.created_at * 1000,
+  }));
+}
+
+export function markReminderFired(brainPath: string, id: number): void {
+  const d = getDb(brainPath);
+  d.prepare('UPDATE reminders SET fired = 1 WHERE id = ?').run(id);
+}
+
+export function rescheduleRecurring(brainPath: string, id: number): void {
+  const d = getDb(brainPath);
+  const row = d.prepare('SELECT * FROM reminders WHERE id = ?').get(id) as
+    | { due_at: number; recurring: string | null; message: string } | undefined;
+  if (!row || !row.recurring) return;
+
+  let nextDue = row.due_at;
+  const now = Date.now();
+  // Advance until next occurrence is in the future
+  while (nextDue <= now) {
+    if (row.recurring === 'daily') nextDue += 86_400_000;
+    else if (row.recurring === 'weekly') nextDue += 7 * 86_400_000;
+    else if (row.recurring === 'monthly') nextDue += 30 * 86_400_000;
+    else break;
+  }
+  d.prepare(
+    `INSERT INTO reminders (message, due_at, recurring, fired) VALUES (?, ?, ?, 0)`
+  ).run(row.message, nextDue, row.recurring);
+}
+
+export function listUpcomingReminders(brainPath: string, limit = 20): ReminderRow[] {
+  const d = getDb(brainPath);
+  const rows = d.prepare(
+    `SELECT * FROM reminders WHERE fired = 0 ORDER BY due_at ASC LIMIT ?`
+  ).all(limit) as Array<{ id: number; message: string; due_at: number; recurring: string | null; fired: number; created_at: number }>;
+  return rows.map((r) => ({
+    id: r.id, message: r.message, dueAt: r.due_at,
+    recurring: r.recurring, fired: r.fired === 1, createdAt: r.created_at * 1000,
+  }));
+}
+
+export function deleteReminder(brainPath: string, id: number): void {
+  const d = getDb(brainPath);
+  d.prepare('DELETE FROM reminders WHERE id = ?').run(id);
 }

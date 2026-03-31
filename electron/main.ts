@@ -29,6 +29,12 @@ import {
   loadChatSession,
   getLatestSessionId,
   listChatSessions,
+  createReminder,
+  getDueReminders,
+  markReminderFired,
+  rescheduleRecurring,
+  listUpcomingReminders,
+  deleteReminder,
 } from '../src/core/db';
 import { capture } from '../src/core/workflows/capture';
 import { dailyBrief } from '../src/core/workflows/dailyBrief';
@@ -547,6 +553,22 @@ function registerIpcHandlers() {
     fs.writeFileSync(fullPath, content, 'utf-8');
   });
 
+  // --- Reminders ---
+
+  ipcMain.handle('keel:create-reminder', async (_event, message: string, dueAt: number, recurring?: string) => {
+    const id = createReminder(settings.brainPath, message, dueAt, recurring);
+    logActivity(settings.brainPath, 'reminder-created', message);
+    return id;
+  });
+
+  ipcMain.handle('keel:list-reminders', async () => {
+    return listUpcomingReminders(settings.brainPath);
+  });
+
+  ipcMain.handle('keel:delete-reminder', async (_event, id: number) => {
+    deleteReminder(settings.brainPath, id);
+  });
+
   // --- Google Integration ---
 
   function getGoogleConfig(): GoogleOAuthConfig {
@@ -662,6 +684,44 @@ async function runScheduledEod(): Promise<void> {
   }
 }
 
+function checkDueReminders(): void {
+  try {
+    const due = getDueReminders(settings.brainPath);
+    for (const reminder of due) {
+      // Fire system notification
+      if (Notification.isSupported()) {
+        const notif = new Notification({
+          title: 'Keel — Reminder',
+          body: reminder.message,
+        });
+        notif.on('click', () => {
+          mainWindow?.show();
+          mainWindow?.focus();
+        });
+        notif.show();
+      }
+
+      // Send to renderer chat
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('keel:scheduled-notification', {
+          type: 'reminder',
+          content: `**Reminder:** ${reminder.message}`,
+        });
+      }
+
+      markReminderFired(settings.brainPath, reminder.id);
+      logActivity(settings.brainPath, 'reminder-fired', reminder.message);
+
+      // Reschedule if recurring
+      if (reminder.recurring) {
+        rescheduleRecurring(settings.brainPath, reminder.id);
+      }
+    }
+  } catch (error) {
+    console.error('Reminder check failed:', error);
+  }
+}
+
 function startScheduler(): void {
   if (schedulerInterval) clearInterval(schedulerInterval);
 
@@ -686,6 +746,9 @@ function startScheduler(): void {
         runScheduledEod();
       }
     }
+
+    // Check for due reminders
+    checkDueReminders();
   }, 30_000);
 }
 
