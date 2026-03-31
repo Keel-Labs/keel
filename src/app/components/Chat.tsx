@@ -49,60 +49,72 @@ const THINKING_MESSAGES = [
   'Preparing for the long winter...',
 ];
 
-function NauticalLoader({ size = 36 }: { size?: number }) {
+function NauticalLoader({ size = 40 }: { size?: number }) {
   return (
     <svg viewBox="0 0 140 140" xmlns="http://www.w3.org/2000/svg" width={size} height={size}>
       <defs>
         <clipPath id="loader-clip">
-          <circle cx="70" cy="70" r="67"/>
+          <circle cx="70" cy="70" r="70"/>
         </clipPath>
       </defs>
-      <circle cx="70" cy="70" r="67" fill="#0F2040" stroke="#CF7A5C" strokeWidth="3"/>
-      {/* Static water body */}
-      <rect x="0" y="80" width="140" height="70" fill="#CF7A5C" opacity="0.18" clipPath="url(#loader-clip)"/>
-      {/* Wave layer 1 */}
-      <path clipPath="url(#loader-clip)" fill="#CF7A5C" opacity="0.55">
-        <animate
-          attributeName="d"
-          dur="2.8s"
-          repeatCount="indefinite"
-          calcMode="spline"
-          keySplines="0.45 0 0.55 1; 0.45 0 0.55 1"
-          values="
-            M-20 80 Q0 70 20 80 Q40 90 60 80 Q80 70 100 80 Q120 90 140 80 Q160 70 180 80 L180 140 L-20 140 Z;
-            M-20 80 Q0 90 20 80 Q40 70 60 80 Q80 90 100 80 Q120 70 140 80 Q160 90 180 80 L180 140 L-20 140 Z;
-            M-20 80 Q0 70 20 80 Q40 90 60 80 Q80 70 100 80 Q120 90 140 80 Q160 70 180 80 L180 140 L-20 140 Z
-          "/>
-      </path>
-      {/* Wave layer 2 */}
-      <path clipPath="url(#loader-clip)" fill="#CF7A5C" opacity="0.30">
-        <animate
-          attributeName="d"
-          dur="2s"
-          begin="-1s"
-          repeatCount="indefinite"
-          calcMode="spline"
-          keySplines="0.45 0 0.55 1; 0.45 0 0.55 1"
-          values="
-            M-20 84 Q0 76 20 84 Q40 92 60 84 Q80 76 100 84 Q120 92 140 84 Q160 76 180 84 L180 140 L-20 140 Z;
-            M-20 84 Q0 92 20 84 Q40 76 60 84 Q80 92 100 84 Q120 76 140 84 Q160 92 180 84 L180 140 L-20 140 Z;
-            M-20 84 Q0 76 20 84 Q40 92 60 84 Q80 76 100 84 Q120 92 140 84 Q160 76 180 84 L180 140 L-20 140 Z
-          "/>
-      </path>
-      {/* Wave crest highlight */}
-      <path clipPath="url(#loader-clip)" fill="none" stroke="#CF7A5C" strokeWidth="1.5" opacity="0.6">
-        <animate
-          attributeName="d"
-          dur="2.8s"
-          repeatCount="indefinite"
-          calcMode="spline"
-          keySplines="0.45 0 0.55 1; 0.45 0 0.55 1"
-          values="
-            M-20 80 Q0 70 20 80 Q40 90 60 80 Q80 70 100 80 Q120 90 140 80 Q160 70 180 80;
-            M-20 80 Q0 90 20 80 Q40 70 60 80 Q80 90 100 80 Q120 70 140 80 Q160 90 180 80;
-            M-20 80 Q0 70 20 80 Q40 90 60 80 Q80 70 100 80 Q120 90 140 80 Q160 70 180 80
-          "/>
-      </path>
+      {/* Dark ocean backdrop — no border */}
+      <circle cx="70" cy="70" r="70" fill="#0F2040"/>
+      {/* Rising wave group — starts low, rises over 6s */}
+      <g clipPath="url(#loader-clip)">
+        <animateTransform
+          attributeName="transform"
+          type="translate"
+          from="0 30"
+          to="0 0"
+          dur="6s"
+          fill="freeze"
+        />
+        {/* Static water body */}
+        <rect x="0" y="80" width="140" height="70" fill="#CF7A5C" opacity="0.2"/>
+        {/* Wave layer 1 — primary */}
+        <path fill="#CF7A5C" opacity="0.65">
+          <animate
+            attributeName="d"
+            dur="2.4s"
+            repeatCount="indefinite"
+            calcMode="spline"
+            keySplines="0.45 0 0.55 1; 0.45 0 0.55 1"
+            values="
+              M-20 80 Q0 65 20 80 Q40 95 60 80 Q80 65 100 80 Q120 95 140 80 Q160 65 180 80 L180 140 L-20 140 Z;
+              M-20 80 Q0 95 20 80 Q40 65 60 80 Q80 95 100 80 Q120 65 140 80 Q160 95 180 80 L180 140 L-20 140 Z;
+              M-20 80 Q0 65 20 80 Q40 95 60 80 Q80 65 100 80 Q120 95 140 80 Q160 65 180 80 L180 140 L-20 140 Z
+            "/>
+        </path>
+        {/* Wave layer 2 — secondary, offset */}
+        <path fill="#CF7A5C" opacity="0.40">
+          <animate
+            attributeName="d"
+            dur="1.8s"
+            begin="-0.9s"
+            repeatCount="indefinite"
+            calcMode="spline"
+            keySplines="0.45 0 0.55 1; 0.45 0 0.55 1"
+            values="
+              M-20 84 Q0 70 20 84 Q40 98 60 84 Q80 70 100 84 Q120 98 140 84 Q160 70 180 84 L180 140 L-20 140 Z;
+              M-20 84 Q0 98 20 84 Q40 70 60 84 Q80 98 100 84 Q120 70 140 84 Q160 98 180 84 L180 140 L-20 140 Z;
+              M-20 84 Q0 70 20 84 Q40 98 60 84 Q80 70 100 84 Q120 98 140 84 Q160 70 180 84 L180 140 L-20 140 Z
+            "/>
+        </path>
+        {/* Wave crest highlight */}
+        <path fill="none" stroke="#CF7A5C" strokeWidth="1.5" opacity="0.7">
+          <animate
+            attributeName="d"
+            dur="2.4s"
+            repeatCount="indefinite"
+            calcMode="spline"
+            keySplines="0.45 0 0.55 1; 0.45 0 0.55 1"
+            values="
+              M-20 80 Q0 65 20 80 Q40 95 60 80 Q80 65 100 80 Q120 95 140 80 Q160 65 180 80;
+              M-20 80 Q0 95 20 80 Q40 65 60 80 Q80 95 100 80 Q120 65 140 80 Q160 95 180 80;
+              M-20 80 Q0 65 20 80 Q40 95 60 80 Q80 65 100 80 Q120 95 140 80 Q160 65 180 80
+            "/>
+        </path>
+      </g>
     </svg>
   );
 }
