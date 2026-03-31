@@ -16,7 +16,7 @@ export async function eod(
 
   // Today's daily log (morning brief section)
   try {
-    const todayLog = await fileManager.readFile(`daily_log/${today}.md`);
+    const todayLog = await fileManager.readFile(`daily-log/${today}.md`);
     parts.push(`## Today's Morning Brief\n${todayLog}`);
   } catch {
     parts.push("## Today's Morning Brief\nNo morning brief found for today.");
@@ -55,7 +55,7 @@ Be concise and actionable. Use markdown formatting.`
   );
 
   // Append to daily log
-  const logPath = `daily_log/${today}.md`;
+  const logPath = `daily-log/${today}.md`;
   const eodContent = `\n\n## EOD Summary\n\n${summary}\n`;
 
   if (await fileManager.fileExists(logPath)) {

@@ -3,12 +3,22 @@ import * as path from 'path';
 import { glob as globFn } from 'glob';
 
 const PARA_DIRS = [
-  '00_inbox',
-  '01_projects',
-  '02_areas',
-  '03_resources',
-  '04_archives',
-  'daily_log',
+  'inbox',
+  'projects',
+  'ongoing',
+  'reference',
+  'archive',
+  'daily-log',
+];
+
+// Old folder names → new folder names for one-time migration
+const PARA_MIGRATIONS: [string, string][] = [
+  ['00_inbox',    'inbox'],
+  ['01_projects', 'projects'],
+  ['02_areas',    'ongoing'],
+  ['03_resources','reference'],
+  ['04_archives', 'archive'],
+  ['daily_log',   'daily-log'],
 ];
 
 const KEEL_MD_TEMPLATE = `# Profile
@@ -37,14 +47,14 @@ This is an example project to show you how Keel organizes information.
 Replace this file with your own project context.
 
 ## Goals
-- Demonstrate the PARA folder structure
+- Demonstrate the projects folder structure
 - Show how Keel reads project context files
 
 ## Status
 Just getting started!
 
 ## Notes
-- Keel reads all \`context.md\` files in \`01_projects/*/\` to understand your work
+- Keel reads all \`context.md\` files in \`projects/*/\` to understand your work
 - You can create new project folders and add a \`context.md\` to each one
 - Use \`tasks.md\` in each project folder to track tasks
 `;
@@ -86,6 +96,25 @@ export class FileManager {
   }
 
   async ensureDirectoryStructure(): Promise<void> {
+    // One-time migration: rename old PARA folders to new names
+    for (const [oldName, newName] of PARA_MIGRATIONS) {
+      const oldPath = this.resolve(oldName);
+      const newPath = this.resolve(newName);
+      try {
+        await fs.access(oldPath);
+        // Old folder exists — rename it (only if new name doesn't exist yet)
+        try {
+          await fs.access(newPath);
+          // New folder already exists — skip
+        } catch {
+          await fs.rename(oldPath, newPath);
+        }
+      } catch {
+        // Old folder doesn't exist — nothing to migrate
+      }
+    }
+
+    // Ensure all new directories exist
     for (const dir of PARA_DIRS) {
       await fs.mkdir(this.resolve(dir), { recursive: true });
     }
@@ -99,7 +128,7 @@ export class FileManager {
     }
 
     // Create example project if it doesn't exist
-    const exampleDir = this.resolve('01_projects/example-project');
+    const exampleDir = this.resolve('projects/example-project');
     const exampleContext = path.join(exampleDir, 'context.md');
     try {
       await fs.access(exampleContext);
@@ -115,7 +144,7 @@ export class FileManager {
 
     // Remove all daily logs (they contain hallucinated data)
     try {
-      const dailyLogs = await this.listFiles('daily_log/*.md');
+      const dailyLogs = await this.listFiles('daily-log/*.md');
       for (const log of dailyLogs) {
         await fs.unlink(this.resolve(log));
       }

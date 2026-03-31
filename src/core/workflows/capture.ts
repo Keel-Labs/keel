@@ -62,7 +62,7 @@ export async function capture(
     // Find the most common project folder from results
     const projectCounts = new Map<string, number>();
     for (const r of results) {
-      const match = r.chunk.filePath.match(/^01_projects\/([^/]+)\//);
+      const match = r.chunk.filePath.match(/^projects\/([^/]+)\//);
       if (match) {
         const count = projectCounts.get(match[1]) || 0;
         projectCounts.set(match[1], count + 1);
@@ -88,7 +88,7 @@ export async function capture(
     .replace(/^-|-$/g, '')
     .slice(0, 40);
 
-  const fileName = `00_inbox/${date}-${slug}.md`;
+  const fileName = `inbox/${date}-${slug}.md`;
   const fileContent = `# ${sourceLabel}
 
 **Captured:** ${new Date().toISOString()}
