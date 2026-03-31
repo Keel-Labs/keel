@@ -33,10 +33,17 @@ const WELCOME_SUGGESTIONS = [
   { label: '/eod', icon: '🌙' },
 ];
 
-const PDF_COMMAND_RE = /^(make|export|save|create|generate)\s+(a\s+|to\s+|as\s+|it\s+as\s+)?a?\s*pdf$/i;
-
 function isPdfCommand(text: string): boolean {
-  return PDF_COMMAND_RE.test(text.trim());
+  const t = text.trim().toLowerCase();
+  // Direct commands
+  if (/^(make|export|save|create|generate|give me|get me|download)\s.*(pdf|document)$/i.test(t)) return true;
+  // Short forms
+  if (/^(pdf|save pdf|export pdf|make pdf|to pdf|as pdf)$/i.test(t)) return true;
+  // "turn (that|this|it) into a pdf"
+  if (/^turn\s.*(pdf|document)$/i.test(t)) return true;
+  // "I want a pdf" / "can you make a pdf"
+  if (/pdf/i.test(t) && /(make|create|save|export|want|need|give|get|generate|download)/i.test(t)) return true;
+  return false;
 }
 
 function generateSessionId(): string {
