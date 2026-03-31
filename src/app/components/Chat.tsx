@@ -151,6 +151,15 @@ export default function Chat() {
     }
 
     // /capture command
+    if (trimmed === '/capture') {
+      setMessages((prev) => [
+        ...prev,
+        { role: 'assistant', content: '**Usage:** `/capture [text or URL]`\n\nExamples:\n- `/capture https://interesting-article.com`\n- `/capture Meeting notes: decided to push launch to April 20`', timestamp: Date.now() },
+      ]);
+      setIsStreaming(false);
+      return;
+    }
+
     if (trimmed.startsWith('/capture ')) {
       try {
         const result = await window.keel.capture(trimmed.slice(9));
