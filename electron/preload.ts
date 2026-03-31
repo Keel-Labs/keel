@@ -35,6 +35,8 @@ const api: KeelAPI = {
   dailyBrief: () => ipcRenderer.invoke('keel:daily-brief'),
 
   eod: (chatHistory) => ipcRenderer.invoke('keel:eod', chatHistory),
+
+  exportPdf: (markdownContent, title) => ipcRenderer.invoke('keel:export-pdf', markdownContent, title),
 };
 
 contextBridge.exposeInMainWorld('keel', api);

@@ -50,7 +50,8 @@ export type IpcChannels =
   | 'keel:ensure-brain'
   | 'keel:capture'
   | 'keel:daily-brief'
-  | 'keel:eod';
+  | 'keel:eod'
+  | 'keel:export-pdf';
 
 // Preload API exposed to renderer
 export interface KeelAPI {
@@ -66,6 +67,7 @@ export interface KeelAPI {
   capture: (input: string) => Promise<string>;
   dailyBrief: () => Promise<string>;
   eod: (chatHistory: Message[]) => Promise<string>;
+  exportPdf: (markdownContent: string, title?: string) => Promise<string>;
 }
 
 declare global {
