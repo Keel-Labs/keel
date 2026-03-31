@@ -88,16 +88,33 @@ body {
 
 .markdown-body ul,
 .markdown-body ol {
-  padding-left: 1.25em;
-  margin: 0 0 0.5em 0;
+  padding-left: 1.5em;
+  margin: 0.25em 0 0.5em 0;
+  list-style-position: outside;
+}
+
+.markdown-body ul {
+  list-style-type: disc;
+}
+
+.markdown-body ol {
+  list-style-type: decimal;
 }
 
 .markdown-body li {
-  margin-bottom: 0.15em;
+  margin-bottom: 0.2em;
+  display: list-item;
 }
 
-.markdown-body li > ul,
-.markdown-body li > ol {
+.markdown-body li > ul {
+  list-style-type: circle;
+  margin-top: 0.15em;
+  margin-bottom: 0;
+}
+
+.markdown-body li > ol,
+.markdown-body li > ul > li > ul {
+  list-style-type: square;
   margin-top: 0.15em;
   margin-bottom: 0;
 }

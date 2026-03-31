@@ -20,6 +20,12 @@ export interface Settings {
   ollamaModel: string;
   // General
   brainPath: string;
+  // Scheduler
+  dailyBriefTime: string;  // HH:MM format, e.g. "09:00". Empty = disabled.
+  eodTime: string;         // HH:MM format, e.g. "17:30". Empty = disabled.
+  // Google Integration
+  googleClientId: string;
+  googleClientSecret: string;
 }
 
 export interface EmbeddedChunk {
@@ -57,6 +63,11 @@ export interface ActivityLogEntry {
 }
 
 // IPC channel types
+export interface ScheduledNotification {
+  type: 'daily-brief' | 'eod';
+  content: string;
+}
+
 export type IpcChannels =
   | 'keel:chat'
   | 'keel:chat-stream'
@@ -77,7 +88,13 @@ export type IpcChannels =
   | 'keel:list-sessions'
   | 'keel:list-files'
   | 'keel:read-file'
-  | 'keel:write-file';
+  | 'keel:write-file'
+  | 'keel:scheduled-notification'
+  | 'keel:google-connect'
+  | 'keel:google-disconnect'
+  | 'keel:google-status'
+  | 'keel:google-sync-calendar'
+  | 'keel:google-export-doc';
 
 // Preload API exposed to renderer
 export interface KeelAPI {
@@ -102,6 +119,14 @@ export interface KeelAPI {
   listFiles: (dirPath: string) => Promise<FileEntry[]>;
   readFile: (filePath: string) => Promise<string>;
   writeFile: (filePath: string, content: string) => Promise<void>;
+  onScheduledNotification: (callback: (notification: ScheduledNotification) => void) => void;
+  removeScheduledNotificationListener: () => void;
+  // Google Integration
+  googleConnect: () => Promise<void>;
+  googleDisconnect: () => Promise<void>;
+  googleStatus: () => Promise<{ connected: boolean }>;
+  googleSyncCalendar: () => Promise<{ eventCount: number; filesWritten: number }>;
+  googleExportDoc: (markdownContent: string, title?: string) => Promise<string>;
 }
 
 declare global {

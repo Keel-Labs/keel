@@ -103,14 +103,17 @@ const WELCOME_SUGGESTIONS = [
 
 function isPdfCommand(text: string): boolean {
   const t = text.trim().toLowerCase();
-  // Direct commands
-  if (/^(make|export|save|create|generate|give me|get me|download)\s.*(pdf|document)$/i.test(t)) return true;
-  // Short forms
+  if (/^(make|export|save|create|generate|give me|get me|download)\s.*(pdf)$/i.test(t)) return true;
   if (/^(pdf|save pdf|export pdf|make pdf|to pdf|as pdf)$/i.test(t)) return true;
-  // "turn (that|this|it) into a pdf"
-  if (/^turn\s.*(pdf|document)$/i.test(t)) return true;
-  // "I want a pdf" / "can you make a pdf"
+  if (/^turn\s.*(pdf)$/i.test(t)) return true;
   if (/pdf/i.test(t) && /(make|create|save|export|want|need|give|get|generate|download)/i.test(t)) return true;
+  return false;
+}
+
+function isGoogleDocCommand(text: string): boolean {
+  const t = text.trim().toLowerCase();
+  if (/google\s*doc/i.test(t) && /(make|create|save|export|want|need|give|get|generate|send|turn)/i.test(t)) return true;
+  if (/^(export|save|send)\s.*google\s*doc/i.test(t)) return true;
   return false;
 }
 
@@ -176,6 +179,20 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
     })();
   }, []);
 
+  // Listen for scheduled notifications (daily brief / EOD)
+  useEffect(() => {
+    window.keel.onScheduledNotification((notification) => {
+      const label = notification.type === 'daily-brief' ? 'Scheduled Daily Brief' : 'Scheduled EOD Summary';
+      setMessages((prev) => [
+        ...prev,
+        { role: 'assistant', content: `**${label}**\n\n${notification.content}`, timestamp: Date.now() },
+      ]);
+    });
+    return () => {
+      window.keel.removeScheduledNotificationListener();
+    };
+  }, []);
+
   // Auto-save messages whenever they change
   useEffect(() => {
     if (messages.length > 0) {
@@ -228,6 +245,33 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
     setInput('');
     setIsStreaming(true);
     setStreamingContent('');
+
+    // Google Doc export command
+    if (isGoogleDocCommand(trimmed)) {
+      const lastContent = getLastAssistantMessage();
+      if (!lastContent) {
+        setMessages((prev) => [
+          ...prev,
+          { role: 'assistant', content: 'Nothing to export yet — ask me something first.', timestamp: Date.now() },
+        ]);
+      } else {
+        try {
+          const url = await window.keel.googleExportDoc(lastContent, 'Keel Export');
+          setMessages((prev) => [
+            ...prev,
+            { role: 'assistant', content: `Exported to Google Doc: [Open document](${url})`, timestamp: Date.now() },
+          ]);
+        } catch (error) {
+          const msg = error instanceof Error ? error.message : 'Google Doc export failed';
+          setMessages((prev) => [
+            ...prev,
+            { role: 'assistant', content: msg, timestamp: Date.now() },
+          ]);
+        }
+      }
+      setIsStreaming(false);
+      return;
+    }
 
     // PDF export command
     if (isPdfCommand(trimmed)) {
