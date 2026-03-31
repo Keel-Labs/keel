@@ -27,6 +27,7 @@ import {
   saveChatSession,
   loadChatSession,
   getLatestSessionId,
+  listChatSessions,
 } from '../src/core/db';
 import { capture } from '../src/core/workflows/capture';
 import { dailyBrief } from '../src/core/workflows/dailyBrief';
@@ -64,6 +65,21 @@ function createWindow() {
   } else {
     mainWindow.loadFile(path.join(__dirname, '../../renderer/index.html'));
   }
+
+  // Open external links in system browser
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    const { shell } = require('electron');
+    shell.openExternal(url);
+    return { action: 'deny' };
+  });
+
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    if (!url.startsWith('file://') && !url.startsWith('http://localhost')) {
+      event.preventDefault();
+      const { shell } = require('electron');
+      shell.openExternal(url);
+    }
+  });
 
   mainWindow.on('closed', () => {
     mainWindow = null;
@@ -416,6 +432,23 @@ function registerIpcHandlers() {
 
   ipcMain.handle('keel:get-latest-session', async () => {
     return getLatestSessionId(settings.brainPath);
+  });
+
+  ipcMain.handle('keel:list-sessions', async () => {
+    const sessions = listChatSessions(settings.brainPath, 50);
+    return sessions.map((s) => {
+      let title = 'New Chat';
+      try {
+        const msgs = JSON.parse(
+          (getDb(settings.brainPath)
+            .prepare('SELECT messages FROM chat_sessions WHERE id = ?')
+            .get(s.id) as any)?.messages || '[]'
+        );
+        const firstUser = msgs.find((m: any) => m.role === 'user');
+        if (firstUser) title = firstUser.content.slice(0, 60);
+      } catch {}
+      return { id: s.id, title, updatedAt: s.updatedAt };
+    });
   });
 }
 
