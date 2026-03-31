@@ -5,6 +5,12 @@ import type { Settings } from '../shared/types';
 const DEFAULT_SETTINGS: Settings = {
   provider: 'claude',
   anthropicApiKey: '',
+  claudeModel: 'claude-sonnet-4-20250514',
+  openaiApiKey: '',
+  openaiModel: 'gpt-4o',
+  openrouterApiKey: '',
+  openrouterModel: '',
+  openrouterBaseUrl: 'https://openrouter.ai/api/v1',
   ollamaModel: 'llama3.2',
   brainPath: path.join(process.env.HOME || '~', 'Keel'),
 };

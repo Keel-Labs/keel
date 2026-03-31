@@ -7,14 +7,51 @@ interface Session {
   updatedAt: number;
 }
 
+type ActiveView = 'chat' | 'settings' | 'knowledge';
+
 interface Props {
   currentSessionId: string;
   onSelectSession: (id: string) => void;
   onNewChat: () => void;
   refreshSignal: number;
+  activeView: ActiveView;
+  onNavigate: (view: ActiveView) => void;
 }
 
-export default function Sidebar({ currentSessionId, onSelectSession, onNewChat, refreshSignal }: Props) {
+function NavButton({ icon, label, active, onClick }: {
+  icon: string; label: string; active: boolean; onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      title={label}
+      style={{
+        width: 36, height: 36, borderRadius: 8, border: 'none',
+        background: active ? 'rgba(207,122,92,0.15)' : 'transparent',
+        color: active ? '#CF7A5C' : 'rgba(255,255,255,0.4)',
+        fontSize: 16, cursor: 'pointer', display: 'flex',
+        alignItems: 'center', justifyContent: 'center',
+        transition: 'all 0.15s',
+      }}
+      onMouseEnter={(e) => {
+        if (!active) {
+          e.currentTarget.style.background = 'rgba(255,255,255,0.06)';
+          e.currentTarget.style.color = 'rgba(255,255,255,0.7)';
+        }
+      }}
+      onMouseLeave={(e) => {
+        if (!active) {
+          e.currentTarget.style.background = 'transparent';
+          e.currentTarget.style.color = 'rgba(255,255,255,0.4)';
+        }
+      }}
+    >
+      {icon}
+    </button>
+  );
+}
+
+export default function Sidebar({ currentSessionId, onSelectSession, onNewChat, refreshSignal, activeView, onNavigate }: Props) {
   const [sessions, setSessions] = useState<Session[]>([]);
 
   useEffect(() => {
@@ -78,7 +115,7 @@ export default function Sidebar({ currentSessionId, onSelectSession, onNewChat, 
         )}
 
         {sessions.map((s) => {
-          const isActive = s.id === currentSessionId;
+          const isActive = s.id === currentSessionId && activeView === 'chat';
           return (
             <button
               key={s.id}
@@ -115,6 +152,26 @@ export default function Sidebar({ currentSessionId, onSelectSession, onNewChat, 
             No conversations yet
           </div>
         )}
+      </div>
+
+      {/* Bottom nav: Knowledge + Settings */}
+      <div style={{
+        padding: '8px 12px 12px',
+        borderTop: '1px solid rgba(255,255,255,0.06)',
+        display: 'flex', gap: 4,
+      }}>
+        <NavButton
+          icon="📁"
+          label="Knowledge Browser"
+          active={activeView === 'knowledge'}
+          onClick={() => onNavigate('knowledge')}
+        />
+        <NavButton
+          icon="⚙"
+          label="Settings"
+          active={activeView === 'settings'}
+          onClick={() => onNavigate('settings')}
+        />
       </div>
     </div>
   );

@@ -450,6 +450,54 @@ function registerIpcHandlers() {
       return { id: s.id, title, updatedAt: s.updatedAt };
     });
   });
+
+  // --- Knowledge Browser file operations ---
+
+  ipcMain.handle('keel:list-files', async (_event, dirPath: string) => {
+    // Security: reject paths that escape brain directory
+    if (dirPath.includes('..') || dirPath.startsWith('.config')) {
+      throw new Error('Access denied');
+    }
+    const fullPath = path.join(settings.brainPath, dirPath);
+    try {
+      const entries = fs.readdirSync(fullPath, { withFileTypes: true });
+      return entries
+        .filter((e) => !e.name.startsWith('.'))
+        .map((e) => {
+          const filePath = path.join(fullPath, e.name);
+          const stat = fs.statSync(filePath);
+          return {
+            name: e.name,
+            path: dirPath ? `${dirPath}/${e.name}` : e.name,
+            isDirectory: e.isDirectory(),
+            updatedAt: stat.mtimeMs,
+          };
+        })
+        .sort((a, b) => {
+          // Directories first, then alphabetical
+          if (a.isDirectory !== b.isDirectory) return a.isDirectory ? -1 : 1;
+          return a.name.localeCompare(b.name);
+        });
+    } catch {
+      return [];
+    }
+  });
+
+  ipcMain.handle('keel:read-file', async (_event, filePath: string) => {
+    if (filePath.includes('..') || filePath.startsWith('.config')) {
+      throw new Error('Access denied');
+    }
+    const fullPath = path.join(settings.brainPath, filePath);
+    return fs.readFileSync(fullPath, 'utf-8');
+  });
+
+  ipcMain.handle('keel:write-file', async (_event, filePath: string, content: string) => {
+    if (filePath.includes('..') || filePath.startsWith('.config')) {
+      throw new Error('Access denied');
+    }
+    const fullPath = path.join(settings.brainPath, filePath);
+    fs.writeFileSync(fullPath, content, 'utf-8');
+  });
 }
 
 // --- App Lifecycle ---
