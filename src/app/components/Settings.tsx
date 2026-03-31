@@ -302,28 +302,14 @@ export default function Settings({ onBack }: Props) {
 
           {/* Google Integration */}
           <div style={sectionStyle}>
-            <div style={{ fontSize: 14, fontWeight: 600, color: 'rgba(255,255,255,0.85)', marginBottom: 14 }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: 'rgba(255,255,255,0.85)', marginBottom: 6 }}>
               Google Integration
             </div>
-
-            {/* Client credentials */}
-            <div style={{ marginBottom: 16 }}>
-              <label style={labelStyle}>Google Client ID</label>
-              <input
-                type="text"
-                value={settings.googleClientId || ''}
-                onChange={(e) => update({ googleClientId: e.target.value })}
-                placeholder="your-client-id.apps.googleusercontent.com"
-                style={inputStyle}
-              />
-            </div>
-            {renderApiKeyInput('Google Client Secret', settings.googleClientSecret || '', 'googleClientSecret', 'google')}
-
-            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', marginBottom: 16 }}>
-              Create OAuth credentials at console.cloud.google.com. Enable Calendar and Docs APIs.
+            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', marginBottom: 14 }}>
+              Connect your Google account to sync Calendar events and export to Google Docs.
             </div>
 
-            {/* Connection status + actions */}
+            {/* Connection status */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
               <div style={{
                 width: 8, height: 8, borderRadius: '50%',
@@ -347,12 +333,9 @@ export default function Settings({ onBack }: Props) {
                       setGoogleMessage(err instanceof Error ? err.message : 'Connection failed');
                     }
                   }}
-                  disabled={!settings.googleClientId || !settings.googleClientSecret}
                   style={{
                     padding: '8px 16px', borderRadius: 8, border: 'none',
-                    background: settings.googleClientId && settings.googleClientSecret ? '#CF7A5C' : '#333',
-                    color: 'white', fontSize: 13, cursor: settings.googleClientId && settings.googleClientSecret ? 'pointer' : 'default',
-                    opacity: settings.googleClientId && settings.googleClientSecret ? 1 : 0.5,
+                    background: '#CF7A5C', color: 'white', fontSize: 13, cursor: 'pointer',
                   }}
                 >
                   Connect Google Account

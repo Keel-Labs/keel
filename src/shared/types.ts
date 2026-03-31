@@ -23,9 +23,6 @@ export interface Settings {
   // Scheduler
   dailyBriefTime: string;  // HH:MM format, e.g. "09:00". Empty = disabled.
   eodTime: string;         // HH:MM format, e.g. "17:30". Empty = disabled.
-  // Google Integration
-  googleClientId: string;
-  googleClientSecret: string;
 }
 
 export interface EmbeddedChunk {
