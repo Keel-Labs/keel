@@ -49,30 +49,20 @@ const THINKING_MESSAGES = [
   'Preparing for the long winter...',
 ];
 
-function NauticalLoader({ size = 40 }: { size?: number }) {
+function NauticalLoader() {
+  // Rectangular wave strip — transparent bg, coral waves, matches text height
   return (
-    <svg viewBox="0 0 140 140" xmlns="http://www.w3.org/2000/svg" width={size} height={size}>
+    <svg viewBox="0 0 60 18" xmlns="http://www.w3.org/2000/svg" width={60} height={18} style={{ flexShrink: 0 }}>
       <defs>
-        <clipPath id="loader-clip">
-          <circle cx="70" cy="70" r="70"/>
+        <clipPath id="wave-clip">
+          <rect x="0" y="0" width="60" height="18" rx="3"/>
         </clipPath>
       </defs>
-      {/* Dark ocean backdrop — no border */}
-      <circle cx="70" cy="70" r="70" fill="#0F2040"/>
-      {/* Rising wave group — starts low, rises over 6s */}
-      <g clipPath="url(#loader-clip)">
-        <animateTransform
-          attributeName="transform"
-          type="translate"
-          from="0 30"
-          to="0 0"
-          dur="6s"
-          fill="freeze"
-        />
-        {/* Static water body */}
-        <rect x="0" y="80" width="140" height="70" fill="#CF7A5C" opacity="0.2"/>
-        {/* Wave layer 1 — primary */}
-        <path fill="#CF7A5C" opacity="0.65">
+      <g clipPath="url(#wave-clip)">
+        {/* Water body */}
+        <rect x="0" y="10" width="60" height="8" fill="#CF7A5C" opacity="0.15"/>
+        {/* Wave layer 1 */}
+        <path fill="#CF7A5C" opacity="0.6">
           <animate
             attributeName="d"
             dur="2.4s"
@@ -80,13 +70,13 @@ function NauticalLoader({ size = 40 }: { size?: number }) {
             calcMode="spline"
             keySplines="0.45 0 0.55 1; 0.45 0 0.55 1"
             values="
-              M-20 80 Q0 65 20 80 Q40 95 60 80 Q80 65 100 80 Q120 95 140 80 Q160 65 180 80 L180 140 L-20 140 Z;
-              M-20 80 Q0 95 20 80 Q40 65 60 80 Q80 95 100 80 Q120 65 140 80 Q160 95 180 80 L180 140 L-20 140 Z;
-              M-20 80 Q0 65 20 80 Q40 95 60 80 Q80 65 100 80 Q120 95 140 80 Q160 65 180 80 L180 140 L-20 140 Z
+              M-10 10 Q0 3 10 10 Q20 17 30 10 Q40 3 50 10 Q60 17 70 10 L70 18 L-10 18 Z;
+              M-10 10 Q0 17 10 10 Q20 3 30 10 Q40 17 50 10 Q60 3 70 10 L70 18 L-10 18 Z;
+              M-10 10 Q0 3 10 10 Q20 17 30 10 Q40 3 50 10 Q60 17 70 10 L70 18 L-10 18 Z
             "/>
         </path>
-        {/* Wave layer 2 — secondary, offset */}
-        <path fill="#CF7A5C" opacity="0.40">
+        {/* Wave layer 2 */}
+        <path fill="#CF7A5C" opacity="0.35">
           <animate
             attributeName="d"
             dur="1.8s"
@@ -95,13 +85,13 @@ function NauticalLoader({ size = 40 }: { size?: number }) {
             calcMode="spline"
             keySplines="0.45 0 0.55 1; 0.45 0 0.55 1"
             values="
-              M-20 84 Q0 70 20 84 Q40 98 60 84 Q80 70 100 84 Q120 98 140 84 Q160 70 180 84 L180 140 L-20 140 Z;
-              M-20 84 Q0 98 20 84 Q40 70 60 84 Q80 98 100 84 Q120 70 140 84 Q160 98 180 84 L180 140 L-20 140 Z;
-              M-20 84 Q0 70 20 84 Q40 98 60 84 Q80 70 100 84 Q120 98 140 84 Q160 70 180 84 L180 140 L-20 140 Z
+              M-10 11 Q0 5 10 11 Q20 17 30 11 Q40 5 50 11 Q60 17 70 11 L70 18 L-10 18 Z;
+              M-10 11 Q0 17 10 11 Q20 5 30 11 Q40 17 50 11 Q60 5 70 11 L70 18 L-10 18 Z;
+              M-10 11 Q0 5 10 11 Q20 17 30 11 Q40 5 50 11 Q60 17 70 11 L70 18 L-10 18 Z
             "/>
         </path>
-        {/* Wave crest highlight */}
-        <path fill="none" stroke="#CF7A5C" strokeWidth="1.5" opacity="0.7">
+        {/* Crest line */}
+        <path fill="none" stroke="#CF7A5C" strokeWidth="0.8" opacity="0.5">
           <animate
             attributeName="d"
             dur="2.4s"
@@ -109,9 +99,9 @@ function NauticalLoader({ size = 40 }: { size?: number }) {
             calcMode="spline"
             keySplines="0.45 0 0.55 1; 0.45 0 0.55 1"
             values="
-              M-20 80 Q0 65 20 80 Q40 95 60 80 Q80 65 100 80 Q120 95 140 80 Q160 65 180 80;
-              M-20 80 Q0 95 20 80 Q40 65 60 80 Q80 95 100 80 Q120 65 140 80 Q160 95 180 80;
-              M-20 80 Q0 65 20 80 Q40 95 60 80 Q80 65 100 80 Q120 95 140 80 Q160 65 180 80
+              M-10 10 Q0 3 10 10 Q20 17 30 10 Q40 3 50 10 Q60 17 70 10;
+              M-10 10 Q0 17 10 10 Q20 3 30 10 Q40 17 50 10 Q60 3 70 10;
+              M-10 10 Q0 3 10 10 Q20 17 30 10 Q40 3 50 10 Q60 17 70 10
             "/>
         </path>
       </g>
@@ -145,7 +135,7 @@ function ThinkingIndicator() {
         borderRadius: '16px 16px 16px 4px', padding: '12px 16px',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <NauticalLoader size={36} />
+          <NauticalLoader />
           <span className="thinking-text" style={{
             fontSize: 13, color: 'rgba(255,255,255,0.4)',
             fontStyle: 'italic',
