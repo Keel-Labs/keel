@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { KeelIcon, KeelWordmark } from './KeelIcon';
 
 interface Session {
   id: string;
@@ -31,13 +32,8 @@ export default function Sidebar({ currentSessionId, onSelectSession, onNewChat, 
         display: 'flex', alignItems: 'center', padding: '16px 16px 12px',
         borderBottom: '1px solid rgba(255,255,255,0.06)',
       }}>
-        <div style={{
-          width: 30, height: 30, borderRadius: 8,
-          background: 'linear-gradient(135deg, #3b82f6, #2dd4bf)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 13, fontWeight: 700, color: 'white', marginRight: 10,
-        }}>K</div>
-        <span style={{ fontSize: 15, fontWeight: 600, color: 'rgba(255,255,255,0.85)', letterSpacing: '0.01em' }}>Keel</span>
+        <div style={{ marginRight: 10, flexShrink: 0 }}><KeelIcon size={30} /></div>
+        <KeelWordmark height={18} />
       </div>
 
       {/* New Chat button */}
