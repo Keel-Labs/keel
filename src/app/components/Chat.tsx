@@ -49,6 +49,64 @@ const THINKING_MESSAGES = [
   'Preparing for the long winter...',
 ];
 
+function NauticalLoader({ size = 36 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 140 140" xmlns="http://www.w3.org/2000/svg" width={size} height={size}>
+      <defs>
+        <clipPath id="loader-clip">
+          <circle cx="70" cy="70" r="67"/>
+        </clipPath>
+      </defs>
+      <circle cx="70" cy="70" r="67" fill="#0F2040" stroke="#CF7A5C" strokeWidth="3"/>
+      {/* Static water body */}
+      <rect x="0" y="80" width="140" height="70" fill="#CF7A5C" opacity="0.18" clipPath="url(#loader-clip)"/>
+      {/* Wave layer 1 */}
+      <path clipPath="url(#loader-clip)" fill="#CF7A5C" opacity="0.55">
+        <animate
+          attributeName="d"
+          dur="2.8s"
+          repeatCount="indefinite"
+          calcMode="spline"
+          keySplines="0.45 0 0.55 1; 0.45 0 0.55 1"
+          values="
+            M-20 80 Q0 70 20 80 Q40 90 60 80 Q80 70 100 80 Q120 90 140 80 Q160 70 180 80 L180 140 L-20 140 Z;
+            M-20 80 Q0 90 20 80 Q40 70 60 80 Q80 90 100 80 Q120 70 140 80 Q160 90 180 80 L180 140 L-20 140 Z;
+            M-20 80 Q0 70 20 80 Q40 90 60 80 Q80 70 100 80 Q120 90 140 80 Q160 70 180 80 L180 140 L-20 140 Z
+          "/>
+      </path>
+      {/* Wave layer 2 */}
+      <path clipPath="url(#loader-clip)" fill="#CF7A5C" opacity="0.30">
+        <animate
+          attributeName="d"
+          dur="2s"
+          begin="-1s"
+          repeatCount="indefinite"
+          calcMode="spline"
+          keySplines="0.45 0 0.55 1; 0.45 0 0.55 1"
+          values="
+            M-20 84 Q0 76 20 84 Q40 92 60 84 Q80 76 100 84 Q120 92 140 84 Q160 76 180 84 L180 140 L-20 140 Z;
+            M-20 84 Q0 92 20 84 Q40 76 60 84 Q80 92 100 84 Q120 76 140 84 Q160 92 180 84 L180 140 L-20 140 Z;
+            M-20 84 Q0 76 20 84 Q40 92 60 84 Q80 76 100 84 Q120 92 140 84 Q160 76 180 84 L180 140 L-20 140 Z
+          "/>
+      </path>
+      {/* Wave crest highlight */}
+      <path clipPath="url(#loader-clip)" fill="none" stroke="#CF7A5C" strokeWidth="1.5" opacity="0.6">
+        <animate
+          attributeName="d"
+          dur="2.8s"
+          repeatCount="indefinite"
+          calcMode="spline"
+          keySplines="0.45 0 0.55 1; 0.45 0 0.55 1"
+          values="
+            M-20 80 Q0 70 20 80 Q40 90 60 80 Q80 70 100 80 Q120 90 140 80 Q160 70 180 80;
+            M-20 80 Q0 90 20 80 Q40 70 60 80 Q80 90 100 80 Q120 70 140 80 Q160 90 180 80;
+            M-20 80 Q0 70 20 80 Q40 90 60 80 Q80 70 100 80 Q120 90 140 80 Q160 70 180 80
+          "/>
+      </path>
+    </svg>
+  );
+}
+
 function ThinkingIndicator() {
   const [messageIndex, setMessageIndex] = useState(() =>
     Math.floor(Math.random() * THINKING_MESSAGES.length)
@@ -75,13 +133,7 @@ function ThinkingIndicator() {
         borderRadius: '16px 16px 16px 4px', padding: '12px 16px',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div className="wave-container" style={{ display: 'flex', alignItems: 'end', gap: 2, height: 16, flexShrink: 0 }}>
-            <div className="wave-bar" style={{ width: 3, borderRadius: 1.5, background: '#CF7A5C', animationDelay: '0s' }} />
-            <div className="wave-bar" style={{ width: 3, borderRadius: 1.5, background: '#1A3A5C', animationDelay: '0.2s' }} />
-            <div className="wave-bar" style={{ width: 3, borderRadius: 1.5, background: '#CF7A5C', animationDelay: '0.4s' }} />
-            <div className="wave-bar" style={{ width: 3, borderRadius: 1.5, background: '#1A3A5C', animationDelay: '0.6s' }} />
-            <div className="wave-bar" style={{ width: 3, borderRadius: 1.5, background: '#CF7A5C', animationDelay: '0.8s' }} />
-          </div>
+          <NauticalLoader size={36} />
           <span className="thinking-text" style={{
             fontSize: 13, color: 'rgba(255,255,255,0.4)',
             fontStyle: 'italic',
