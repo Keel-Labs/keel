@@ -3,12 +3,19 @@ import Chat from './components/Chat';
 
 export default function App() {
   return (
-    <div className="h-screen flex flex-col bg-[#1a1a1a]">
-      <header className="flex items-center px-5 py-3 border-b border-white/[0.08] bg-[#1a1a1a]" style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}>
-        <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-blue-500 to-teal-400 flex items-center justify-center text-xs font-bold text-white mr-2.5">
-          K
-        </div>
-        <h1 className="text-sm font-semibold text-white/80 tracking-wide">Keel</h1>
+    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: '#1a1a1a' }}>
+      <header style={{
+        display: 'flex', alignItems: 'center', padding: '12px 24px',
+        borderBottom: '1px solid rgba(255,255,255,0.08)',
+        background: '#1a1a1a',
+      }}>
+        <div style={{
+          width: 28, height: 28, borderRadius: 8,
+          background: 'linear-gradient(135deg, #3b82f6, #2dd4bf)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 12, fontWeight: 700, color: 'white', marginRight: 10,
+        }}>K</div>
+        <h1 style={{ fontSize: 14, fontWeight: 600, color: 'rgba(255,255,255,0.8)', letterSpacing: '0.02em' }}>Keel</h1>
       </header>
       <Chat />
     </div>

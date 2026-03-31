@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3';
 import * as path from 'path';
 import * as fs from 'fs';
-import type { FileIndex, ActivityLogEntry } from '../shared/types';
+import type { FileIndex, ActivityLogEntry, Message } from '../shared/types';
 
 let db: Database.Database | null = null;
 
@@ -30,6 +30,13 @@ export function getDb(brainPath: string): Database.Database {
       action TEXT NOT NULL,
       detail TEXT,
       created_at INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS chat_sessions (
+      id TEXT PRIMARY KEY,
+      messages TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
     );
   `);
 
@@ -120,4 +127,60 @@ export function getRecentActivity(
     detail: r.detail || '',
     createdAt: r.created_at,
   }));
+}
+
+// --- Chat Session Persistence ---
+
+export function saveChatSession(
+  brainPath: string,
+  sessionId: string,
+  messages: Message[]
+): void {
+  const d = getDb(brainPath);
+  const now = Date.now();
+  d.prepare(
+    `INSERT OR REPLACE INTO chat_sessions (id, messages, created_at, updated_at)
+     VALUES (?, ?, COALESCE((SELECT created_at FROM chat_sessions WHERE id = ?), ?), ?)`
+  ).run(sessionId, JSON.stringify(messages), sessionId, now, now);
+}
+
+export function loadChatSession(
+  brainPath: string,
+  sessionId: string
+): Message[] | null {
+  const d = getDb(brainPath);
+  const row = d
+    .prepare('SELECT messages FROM chat_sessions WHERE id = ?')
+    .get(sessionId) as { messages: string } | undefined;
+
+  if (!row) return null;
+  try {
+    return JSON.parse(row.messages);
+  } catch {
+    return null;
+  }
+}
+
+export function getLatestSessionId(brainPath: string): string | null {
+  const d = getDb(brainPath);
+  const row = d
+    .prepare('SELECT id FROM chat_sessions ORDER BY updated_at DESC LIMIT 1')
+    .get() as { id: string } | undefined;
+  return row?.id || null;
+}
+
+export function listChatSessions(
+  brainPath: string,
+  limit: number = 20
+): Array<{ id: string; messageCount: number; updatedAt: number }> {
+  const d = getDb(brainPath);
+  const rows = d
+    .prepare('SELECT id, messages, updated_at FROM chat_sessions ORDER BY updated_at DESC LIMIT ?')
+    .all(limit) as Array<{ id: string; messages: string; updated_at: number }>;
+
+  return rows.map((r) => {
+    let messageCount = 0;
+    try { messageCount = JSON.parse(r.messages).length; } catch {}
+    return { id: r.id, messageCount, updatedAt: r.updated_at };
+  });
 }

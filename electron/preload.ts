@@ -37,6 +37,12 @@ const api: KeelAPI = {
   eod: (chatHistory) => ipcRenderer.invoke('keel:eod', chatHistory),
 
   exportPdf: (markdownContent, title) => ipcRenderer.invoke('keel:export-pdf', markdownContent, title),
+
+  saveChat: (sessionId, messages) => ipcRenderer.invoke('keel:save-chat', sessionId, messages),
+
+  loadChat: (sessionId) => ipcRenderer.invoke('keel:load-chat', sessionId),
+
+  getLatestSession: () => ipcRenderer.invoke('keel:get-latest-session'),
 };
 
 contextBridge.exposeInMainWorld('keel', api);
