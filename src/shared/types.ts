@@ -52,6 +52,7 @@ export type IpcChannels =
   | 'keel:daily-brief'
   | 'keel:eod'
   | 'keel:export-pdf'
+  | 'keel:reset-profile'
   | 'keel:save-chat'
   | 'keel:load-chat'
   | 'keel:get-latest-session';
@@ -71,6 +72,7 @@ export interface KeelAPI {
   dailyBrief: () => Promise<string>;
   eod: (chatHistory: Message[]) => Promise<string>;
   exportPdf: (markdownContent: string, title?: string) => Promise<string>;
+  resetProfile: () => Promise<void>;
   saveChat: (sessionId: string, messages: Message[]) => Promise<void>;
   loadChat: (sessionId: string) => Promise<Message[] | null>;
   getLatestSession: () => Promise<string | null>;

@@ -334,6 +334,11 @@ function registerIpcHandlers() {
     await fileManager.ensureDirectoryStructure();
   });
 
+  ipcMain.handle('keel:reset-profile', async () => {
+    await fileManager.resetProfile();
+    logActivity(settings.brainPath, 'reset', 'Profile and daily logs reset to clean state');
+  });
+
   ipcMain.handle('keel:get-settings', () => {
     return loadSettings();
   });

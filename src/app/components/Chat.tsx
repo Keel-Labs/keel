@@ -188,6 +188,24 @@ export default function Chat({ newChatSignal }: { newChatSignal: number }) {
       return;
     }
 
+    if (trimmed === '/reset') {
+      try {
+        await window.keel.resetProfile();
+        setMessages((prev) => [
+          ...prev,
+          { role: 'assistant', content: 'Profile reset to blank template. Your `keel.md` has been cleared — tell me about yourself and your projects to get started fresh.', timestamp: Date.now() },
+        ]);
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : 'Reset failed';
+        setMessages((prev) => [
+          ...prev,
+          { role: 'assistant', content: msg, timestamp: Date.now() },
+        ]);
+      }
+      setIsStreaming(false);
+      return;
+    }
+
     if (trimmed === '/daily-brief') {
       try {
         const result = await window.keel.dailyBrief();

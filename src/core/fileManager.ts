@@ -109,6 +109,21 @@ export class FileManager {
     }
   }
 
+  async resetProfile(): Promise<void> {
+    // Overwrite keel.md with clean template
+    await fs.writeFile(this.resolve('keel.md'), KEEL_MD_TEMPLATE, 'utf-8');
+
+    // Remove all daily logs (they contain hallucinated data)
+    try {
+      const dailyLogs = await this.listFiles('daily_log/*.md');
+      for (const log of dailyLogs) {
+        await fs.unlink(this.resolve(log));
+      }
+    } catch {
+      // no logs to delete
+    }
+  }
+
   async readSection(relativePath: string, heading: string): Promise<string> {
     const content = await this.readFile(relativePath);
     const lines = content.split('\n');
