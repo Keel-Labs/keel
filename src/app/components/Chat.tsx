@@ -119,7 +119,13 @@ function generateSessionId(): string {
   return `session-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-export default function Chat({ newChatSignal }: { newChatSignal: number }) {
+interface ChatProps {
+  newChatSignal: number;
+  loadSessionId: string | null;
+  onSessionChange: (id: string) => void;
+}
+
+export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: ChatProps) {
   const [messages, setMessages] = useState<MessageType[]>([]);
   const [input, setInput] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
@@ -128,7 +134,7 @@ export default function Chat({ newChatSignal }: { newChatSignal: number }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Handle new chat signal from header
+  // Handle new chat signal from sidebar/header
   const isFirstRender = useRef(true);
   useEffect(() => {
     if (isFirstRender.current) {
@@ -137,6 +143,20 @@ export default function Chat({ newChatSignal }: { newChatSignal: number }) {
     }
     startNewChat();
   }, [newChatSignal]);
+
+  // Load a specific session when selected from sidebar
+  useEffect(() => {
+    if (loadSessionId && loadSessionId !== sessionId) {
+      (async () => {
+        const saved = await window.keel.loadChat(loadSessionId);
+        if (saved) {
+          setSessionId(loadSessionId);
+          setMessages(saved);
+          onSessionChange(loadSessionId);
+        }
+      })();
+    }
+  }, [loadSessionId]);
 
   // Load the last session on mount
   useEffect(() => {
@@ -148,6 +168,7 @@ export default function Chat({ newChatSignal }: { newChatSignal: number }) {
           if (saved && saved.length > 0) {
             setSessionId(latestId);
             setMessages(saved);
+            onSessionChange(latestId);
           }
         }
       } catch {

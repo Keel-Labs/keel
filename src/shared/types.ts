@@ -55,7 +55,8 @@ export type IpcChannels =
   | 'keel:reset-profile'
   | 'keel:save-chat'
   | 'keel:load-chat'
-  | 'keel:get-latest-session';
+  | 'keel:get-latest-session'
+  | 'keel:list-sessions';
 
 // Preload API exposed to renderer
 export interface KeelAPI {
@@ -76,6 +77,7 @@ export interface KeelAPI {
   saveChat: (sessionId: string, messages: Message[]) => Promise<void>;
   loadChat: (sessionId: string) => Promise<Message[] | null>;
   getLatestSession: () => Promise<string | null>;
+  listSessions: () => Promise<Array<{ id: string; title: string; updatedAt: number }>>;
 }
 
 declare global {

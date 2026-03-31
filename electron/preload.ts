@@ -45,6 +45,8 @@ const api: KeelAPI = {
   loadChat: (sessionId) => ipcRenderer.invoke('keel:load-chat', sessionId),
 
   getLatestSession: () => ipcRenderer.invoke('keel:get-latest-session'),
+
+  listSessions: () => ipcRenderer.invoke('keel:list-sessions'),
 };
 
 contextBridge.exposeInMainWorld('keel', api);

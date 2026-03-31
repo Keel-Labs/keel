@@ -2,7 +2,12 @@ import React, { useMemo } from 'react';
 import { marked } from 'marked';
 import type { Message as MessageType } from '../../shared/types';
 
-marked.setOptions({ breaks: true, gfm: true });
+const renderer = new marked.Renderer();
+renderer.link = ({ href, text }) => {
+  return `<a href="${href}" target="_blank" rel="noopener noreferrer">${text}</a>`;
+};
+
+marked.setOptions({ breaks: true, gfm: true, renderer });
 
 interface Props {
   message: MessageType;
