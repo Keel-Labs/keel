@@ -324,7 +324,12 @@ async function exportToPdf(markdownContent: string, title?: string): Promise<str
 
   fs.writeFileSync(result.filePath, pdfData);
   logActivity(settings.brainPath, 'export-pdf', result.filePath);
-  return `PDF saved to **${result.filePath}**`;
+
+  // Open the PDF immediately
+  const { shell } = await import('electron');
+  shell.openPath(result.filePath);
+
+  return `PDF saved and opened: **${result.filePath}**`;
 }
 
 // --- IPC Handlers ---
