@@ -2,7 +2,68 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import type { Message as MessageType } from '../../shared/types';
 import Message from './Message';
 
+const THINKING_MESSAGES = [
+  'Moving fast and thinking things...',
+  'Double-clicking into your ask...',
+  'Finding product-market fit for this answer...',
+  'Running it up the flagpole...',
+  'Boiling the ocean...',
+  'Aligning cross-functionally...',
+  'Steeling my nerves...',
+  'Clearing my throat...',
+  'Gazing meaningfully into the distance...',
+  'Sensing the weight of this moment...',
+  'Reaching deep within...',
+  'Rising to the occasion...',
+  'Preparing for my close-up...',
+  'Composing myself...',
+  'Bracing for impact...',
+  'Mustering every ounce of courage...',
+  'Cross-referencing with the ancient texts...',
+  'Following the breadcrumbs...',
+  'Connecting the dots...',
+  'Decoding the signal...',
+  'Piecing the fragments together...',
+  'Stalking the answer through dense undergrowth...',
+  'Migrating toward a conclusion...',
+  'Foraging for ideas...',
+  'Circling overhead before landing...',
+  'Burrowing deeper into the question...',
+  'Emerging from the chrysalis...',
+  'Waiting for conditions to be just right...',
+  'Grazing on the data...',
+  'Staring at the ceiling...',
+  'Making coffee...',
+  'Rewriting the first sentence for the 8th time...',
+  'Definitely not procrastinating...',
+  'The answer is near. It can sense it.',
+  'Sniffing the wind...',
+  'Molting...',
+  'A thought stirs in the undergrowth...',
+  'Camouflaged, waiting...',
+  'Scanning the horizon...',
+  'In pursuit...',
+  'Drinking from the watering hole...',
+  'Building a nest for your answer...',
+  'Preparing for the long winter...',
+];
+
 function ThinkingIndicator() {
+  const [messageIndex, setMessageIndex] = useState(() =>
+    Math.floor(Math.random() * THINKING_MESSAGES.length)
+  );
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setMessageIndex((prev) => {
+        let next;
+        do { next = Math.floor(Math.random() * THINKING_MESSAGES.length); } while (next === prev);
+        return next;
+      });
+    }, 3000);
+    return () => clearInterval(interval);
+  }, []);
+
   return (
     <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 16, paddingRight: 48 }}>
       <div style={{
@@ -14,12 +75,20 @@ function ThinkingIndicator() {
       }}>K</div>
       <div style={{
         background: '#252525', border: '1px solid rgba(255,255,255,0.08)',
-        borderRadius: '16px 16px 16px 4px', padding: '14px 16px',
+        borderRadius: '16px 16px 16px 4px', padding: '12px 16px',
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <div className="thinking-dot" style={{ width: 6, height: 6, borderRadius: '50%', background: '#60a5fa', animationDelay: '0ms' }} />
-          <div className="thinking-dot" style={{ width: 6, height: 6, borderRadius: '50%', background: '#2dd4bf', animationDelay: '150ms' }} />
-          <div className="thinking-dot" style={{ width: 6, height: 6, borderRadius: '50%', background: '#60a5fa', animationDelay: '300ms' }} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <div className="thinking-dot" style={{ width: 5, height: 5, borderRadius: '50%', background: '#60a5fa', animationDelay: '0ms' }} />
+            <div className="thinking-dot" style={{ width: 5, height: 5, borderRadius: '50%', background: '#2dd4bf', animationDelay: '150ms' }} />
+            <div className="thinking-dot" style={{ width: 5, height: 5, borderRadius: '50%', background: '#60a5fa', animationDelay: '300ms' }} />
+          </div>
+          <span className="thinking-text" style={{
+            fontSize: 13, color: 'rgba(255,255,255,0.4)',
+            fontStyle: 'italic',
+          }}>
+            {THINKING_MESSAGES[messageIndex]}
+          </span>
         </div>
       </div>
     </div>
