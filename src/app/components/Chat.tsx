@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import type { Message as MessageType } from '../../shared/types';
 import Message from './Message';
+import { KeelIcon } from './KeelIcon';
 
 const THINKING_MESSAGES = [
   'Moving fast and thinking things...',
@@ -66,13 +67,9 @@ function ThinkingIndicator() {
 
   return (
     <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 16, paddingRight: 48 }}>
-      <div style={{
-        width: 24, height: 24, borderRadius: '50%',
-        background: 'linear-gradient(135deg, #3b82f6, #2dd4bf)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 10, fontWeight: 700, color: 'white',
-        marginRight: 10, marginTop: 4, flexShrink: 0,
-      }}>K</div>
+      <div style={{ marginRight: 10, marginTop: 4, flexShrink: 0 }}>
+        <KeelIcon size={24} />
+      </div>
       <div style={{
         background: '#252525', border: '1px solid rgba(255,255,255,0.08)',
         borderRadius: '16px 16px 16px 4px', padding: '12px 16px',
@@ -402,13 +399,9 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
         {messages.length === 0 && !isStreaming && (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
             <div style={{ textAlign: 'center', maxWidth: 360 }}>
-              <div style={{
-                width: 56, height: 56, borderRadius: 16,
-                background: 'linear-gradient(135deg, #3b82f6, #2dd4bf)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: 22, fontWeight: 700, color: 'white',
-                margin: '0 auto 20px', boxShadow: '0 8px 24px rgba(59,130,246,0.2)',
-              }}>K</div>
+              <div style={{ margin: '0 auto 20px', width: 56 }}>
+                <KeelIcon size={56} />
+              </div>
               <h2 style={{ fontSize: 18, fontWeight: 600, color: 'rgba(255,255,255,0.9)', marginBottom: 8 }}>Good to see you</h2>
               <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.4)', marginBottom: 24, lineHeight: 1.6 }}>
                 I'm Keel, your AI chief of staff. I know your projects, priorities, and people.

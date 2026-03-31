@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { marked } from 'marked';
 import type { Message as MessageType } from '../../shared/types';
+import { KeelIcon } from './KeelIcon';
 
 const renderer = new marked.Renderer();
 renderer.link = ({ href, text }) => {
@@ -38,13 +39,9 @@ export default function Message({ message }: Props) {
 
   return (
     <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 16, paddingRight: 48 }}>
-      <div style={{
-        width: 24, height: 24, borderRadius: '50%',
-        background: 'linear-gradient(135deg, #3b82f6, #2dd4bf)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 10, fontWeight: 700, color: 'white',
-        marginRight: 10, marginTop: 4, flexShrink: 0,
-      }}>K</div>
+      <div style={{ marginRight: 10, marginTop: 4, flexShrink: 0 }}>
+        <KeelIcon size={24} />
+      </div>
       <div
         className="markdown-body"
         style={{
