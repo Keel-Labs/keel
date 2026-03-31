@@ -38,6 +38,8 @@ const api: KeelAPI = {
 
   exportPdf: (markdownContent, title) => ipcRenderer.invoke('keel:export-pdf', markdownContent, title),
 
+  resetProfile: () => ipcRenderer.invoke('keel:reset-profile'),
+
   saveChat: (sessionId, messages) => ipcRenderer.invoke('keel:save-chat', sessionId, messages),
 
   loadChat: (sessionId) => ipcRenderer.invoke('keel:load-chat', sessionId),
