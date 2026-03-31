@@ -76,11 +76,11 @@ function ThinkingIndicator() {
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <div className="wave-container" style={{ display: 'flex', alignItems: 'end', gap: 2, height: 16, flexShrink: 0 }}>
-            <div className="wave-bar" style={{ width: 3, borderRadius: 1.5, background: '#3b82f6', animationDelay: '0s' }} />
-            <div className="wave-bar" style={{ width: 3, borderRadius: 1.5, background: '#2dd4bf', animationDelay: '0.2s' }} />
-            <div className="wave-bar" style={{ width: 3, borderRadius: 1.5, background: '#3b82f6', animationDelay: '0.4s' }} />
-            <div className="wave-bar" style={{ width: 3, borderRadius: 1.5, background: '#2dd4bf', animationDelay: '0.6s' }} />
-            <div className="wave-bar" style={{ width: 3, borderRadius: 1.5, background: '#3b82f6', animationDelay: '0.8s' }} />
+            <div className="wave-bar" style={{ width: 3, borderRadius: 1.5, background: '#CF7A5C', animationDelay: '0s' }} />
+            <div className="wave-bar" style={{ width: 3, borderRadius: 1.5, background: '#1A3A5C', animationDelay: '0.2s' }} />
+            <div className="wave-bar" style={{ width: 3, borderRadius: 1.5, background: '#CF7A5C', animationDelay: '0.4s' }} />
+            <div className="wave-bar" style={{ width: 3, borderRadius: 1.5, background: '#1A3A5C', animationDelay: '0.6s' }} />
+            <div className="wave-bar" style={{ width: 3, borderRadius: 1.5, background: '#CF7A5C', animationDelay: '0.8s' }} />
           </div>
           <span className="thinking-text" style={{
             fontSize: 13, color: 'rgba(255,255,255,0.4)',
@@ -479,7 +479,7 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
               opacity: isStreaming ? 0.4 : 1,
             }}
             onFocus={(e) => {
-              e.currentTarget.style.borderColor = 'rgba(59,130,246,0.4)';
+              e.currentTarget.style.borderColor = 'rgba(207,122,92,0.4)';
               e.currentTarget.style.background = '#282828';
             }}
             onBlur={(e) => {
@@ -491,7 +491,7 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
             onClick={() => sendMessage()}
             disabled={isStreaming || !input.trim()}
             style={{
-              background: isStreaming || !input.trim() ? '#252525' : '#3b82f6',
+              background: isStreaming || !input.trim() ? '#252525' : '#CF7A5C',
               border: isStreaming || !input.trim() ? '1px solid rgba(255,255,255,0.08)' : '1px solid transparent',
               color: isStreaming || !input.trim() ? 'rgba(255,255,255,0.2)' : 'white',
               fontSize: 14, fontWeight: 500, borderRadius: 12,

@@ -1,24 +1,42 @@
 import Anthropic from '@anthropic-ai/sdk';
+import OpenAI from 'openai';
 import { Ollama } from 'ollama';
 import type { Message } from '../shared/types';
 import { loadSettings } from './settings';
 
-type Provider = 'claude' | 'ollama';
+type Provider = 'claude' | 'openai' | 'openrouter' | 'ollama';
 
 export class LLMClient {
   private provider: Provider;
   private anthropic: Anthropic | null = null;
+  private openai: OpenAI | null = null;
+  private openrouter: OpenAI | null = null;
   private ollama: Ollama;
+  private claudeModel: string;
+  private openaiModel: string;
+  private openrouterModel: string;
   private ollamaModel: string;
 
   constructor() {
     const settings = loadSettings();
     this.provider = settings.provider;
+    this.claudeModel = settings.claudeModel || 'claude-sonnet-4-20250514';
+    this.openaiModel = settings.openaiModel || 'gpt-4o';
+    this.openrouterModel = settings.openrouterModel || '';
     this.ollamaModel = settings.ollamaModel || 'llama3.2';
     this.ollama = new Ollama();
 
     if (settings.anthropicApiKey) {
       this.anthropic = new Anthropic({ apiKey: settings.anthropicApiKey });
+    }
+    if (settings.openaiApiKey) {
+      this.openai = new OpenAI({ apiKey: settings.openaiApiKey });
+    }
+    if (settings.openrouterApiKey) {
+      this.openrouter = new OpenAI({
+        apiKey: settings.openrouterApiKey,
+        baseURL: settings.openrouterBaseUrl || 'https://openrouter.ai/api/v1',
+      });
     }
   }
 
@@ -29,33 +47,51 @@ export class LLMClient {
   reload(): void {
     const settings = loadSettings();
     this.provider = settings.provider;
+    this.claudeModel = settings.claudeModel || 'claude-sonnet-4-20250514';
+    this.openaiModel = settings.openaiModel || 'gpt-4o';
+    this.openrouterModel = settings.openrouterModel || '';
     this.ollamaModel = settings.ollamaModel || 'llama3.2';
+
     if (settings.anthropicApiKey) {
       this.anthropic = new Anthropic({ apiKey: settings.anthropicApiKey });
     } else {
       this.anthropic = null;
     }
+    if (settings.openaiApiKey) {
+      this.openai = new OpenAI({ apiKey: settings.openaiApiKey });
+    } else {
+      this.openai = null;
+    }
+    if (settings.openrouterApiKey) {
+      this.openrouter = new OpenAI({
+        apiKey: settings.openrouterApiKey,
+        baseURL: settings.openrouterBaseUrl || 'https://openrouter.ai/api/v1',
+      });
+    } else {
+      this.openrouter = null;
+    }
   }
 
   async chat(messages: Message[], systemPrompt: string): Promise<string> {
-    try {
-      if (this.provider === 'claude') {
-        return await this.chatClaude(messages, systemPrompt);
-      }
-      return await this.chatOllama(messages, systemPrompt);
-    } catch (error) {
-      // Fallback: try the other provider
+    const attempts: Provider[] = [this.provider];
+    // Add fallbacks
+    for (const p of ['claude', 'openai', 'openrouter', 'ollama'] as Provider[]) {
+      if (!attempts.includes(p)) attempts.push(p);
+    }
+
+    for (const provider of attempts) {
       try {
-        if (this.provider === 'claude') {
-          return await this.chatOllama(messages, systemPrompt);
+        switch (provider) {
+          case 'claude': return await this.chatClaude(messages, systemPrompt);
+          case 'openai': return await this.chatOpenAI(this.openai, this.openaiModel, messages, systemPrompt);
+          case 'openrouter': return await this.chatOpenAI(this.openrouter, this.openrouterModel, messages, systemPrompt);
+          case 'ollama': return await this.chatOllama(messages, systemPrompt);
         }
-        return await this.chatClaude(messages, systemPrompt);
       } catch {
-        throw new Error(
-          'AI provider unavailable. Check Settings to configure your AI engine.'
-        );
+        continue;
       }
     }
+    throw new Error('AI provider unavailable. Check Settings to configure your AI engine.');
   }
 
   async chatStream(
@@ -63,39 +99,36 @@ export class LLMClient {
     systemPrompt: string,
     onChunk: (chunk: string) => void
   ): Promise<void> {
-    try {
-      if (this.provider === 'claude') {
-        return await this.streamClaude(messages, systemPrompt, onChunk);
-      }
-      return await this.streamOllama(messages, systemPrompt, onChunk);
-    } catch (error) {
-      // Fallback: try the other provider
+    const attempts: Provider[] = [this.provider];
+    for (const p of ['claude', 'openai', 'openrouter', 'ollama'] as Provider[]) {
+      if (!attempts.includes(p)) attempts.push(p);
+    }
+
+    for (const provider of attempts) {
       try {
-        if (this.provider === 'claude') {
-          return await this.streamOllama(messages, systemPrompt, onChunk);
+        switch (provider) {
+          case 'claude': return await this.streamClaude(messages, systemPrompt, onChunk);
+          case 'openai': return await this.streamOpenAI(this.openai, this.openaiModel, messages, systemPrompt, onChunk);
+          case 'openrouter': return await this.streamOpenAI(this.openrouter, this.openrouterModel, messages, systemPrompt, onChunk);
+          case 'ollama': return await this.streamOllama(messages, systemPrompt, onChunk);
         }
-        return await this.streamClaude(messages, systemPrompt, onChunk);
       } catch {
-        throw new Error(
-          'AI provider unavailable. Check Settings to configure your AI engine.'
-        );
+        continue;
       }
     }
+    throw new Error('AI provider unavailable. Check Settings to configure your AI engine.');
   }
 
+  // --- Claude ---
+
   private async chatClaude(messages: Message[], systemPrompt: string): Promise<string> {
-    if (!this.anthropic) {
-      throw new Error('Anthropic API key not configured');
-    }
+    if (!this.anthropic) throw new Error('Anthropic API key not configured');
 
     const response = await this.anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
+      model: this.claudeModel,
       max_tokens: 4096,
       system: systemPrompt,
-      messages: messages.map((m) => ({
-        role: m.role,
-        content: m.content,
-      })),
+      messages: messages.map((m) => ({ role: m.role, content: m.content })),
     });
 
     const textBlock = response.content.find((b) => b.type === 'text');
@@ -107,39 +140,75 @@ export class LLMClient {
     systemPrompt: string,
     onChunk: (chunk: string) => void
   ): Promise<void> {
-    if (!this.anthropic) {
-      throw new Error('Anthropic API key not configured');
-    }
+    if (!this.anthropic) throw new Error('Anthropic API key not configured');
 
     const stream = this.anthropic.messages.stream({
-      model: 'claude-sonnet-4-20250514',
+      model: this.claudeModel,
       max_tokens: 4096,
       system: systemPrompt,
-      messages: messages.map((m) => ({
-        role: m.role,
-        content: m.content,
-      })),
+      messages: messages.map((m) => ({ role: m.role, content: m.content })),
     });
 
     for await (const event of stream) {
-      if (
-        event.type === 'content_block_delta' &&
-        event.delta.type === 'text_delta'
-      ) {
+      if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
         onChunk(event.delta.text);
       }
     }
   }
+
+  // --- OpenAI / OpenRouter (shared implementation) ---
+
+  private async chatOpenAI(
+    client: OpenAI | null,
+    model: string,
+    messages: Message[],
+    systemPrompt: string
+  ): Promise<string> {
+    if (!client || !model) throw new Error('OpenAI client not configured');
+
+    const response = await client.chat.completions.create({
+      model,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        ...messages.map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content })),
+      ],
+    });
+
+    return response.choices[0]?.message?.content || '';
+  }
+
+  private async streamOpenAI(
+    client: OpenAI | null,
+    model: string,
+    messages: Message[],
+    systemPrompt: string,
+    onChunk: (chunk: string) => void
+  ): Promise<void> {
+    if (!client || !model) throw new Error('OpenAI client not configured');
+
+    const stream = await client.chat.completions.create({
+      model,
+      stream: true,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        ...messages.map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content })),
+      ],
+    });
+
+    for await (const chunk of stream) {
+      const content = chunk.choices[0]?.delta?.content;
+      if (content) onChunk(content);
+    }
+  }
+
+  // --- Ollama ---
 
   private async chatOllama(messages: Message[], systemPrompt: string): Promise<string> {
     const response = await this.ollama.chat({
       model: this.ollamaModel,
       messages: [
         { role: 'system', content: systemPrompt },
-        ...messages.map((m) => ({
-          role: m.role as 'user' | 'assistant',
-          content: m.content,
-        })),
+        ...messages.map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content })),
       ],
     });
 
@@ -156,10 +225,7 @@ export class LLMClient {
       stream: true,
       messages: [
         { role: 'system', content: systemPrompt },
-        ...messages.map((m) => ({
-          role: m.role as 'user' | 'assistant',
-          content: m.content,
-        })),
+        ...messages.map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content })),
       ],
     });
 

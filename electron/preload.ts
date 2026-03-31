@@ -47,6 +47,12 @@ const api: KeelAPI = {
   getLatestSession: () => ipcRenderer.invoke('keel:get-latest-session'),
 
   listSessions: () => ipcRenderer.invoke('keel:list-sessions'),
+
+  listFiles: (dirPath: string) => ipcRenderer.invoke('keel:list-files', dirPath),
+
+  readFile: (filePath: string) => ipcRenderer.invoke('keel:read-file', filePath),
+
+  writeFile: (filePath: string, content: string) => ipcRenderer.invoke('keel:write-file', filePath, content),
 };
 
 contextBridge.exposeInMainWorld('keel', api);

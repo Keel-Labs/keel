@@ -5,9 +5,20 @@ export interface Message {
 }
 
 export interface Settings {
-  provider: 'claude' | 'ollama';
+  provider: 'claude' | 'openai' | 'openrouter' | 'ollama';
+  // Claude
   anthropicApiKey: string;
+  claudeModel: string;
+  // OpenAI
+  openaiApiKey: string;
+  openaiModel: string;
+  // OpenRouter / custom OpenAI-compatible endpoint
+  openrouterApiKey: string;
+  openrouterModel: string;
+  openrouterBaseUrl: string;
+  // Ollama
   ollamaModel: string;
+  // General
   brainPath: string;
 }
 
@@ -29,6 +40,13 @@ export interface FileIndex {
   filePath: string;
   lastIndexedAt: number;
   chunkCount: number;
+}
+
+export interface FileEntry {
+  name: string;
+  path: string;
+  isDirectory: boolean;
+  updatedAt: number;
 }
 
 export interface ActivityLogEntry {
@@ -56,7 +74,10 @@ export type IpcChannels =
   | 'keel:save-chat'
   | 'keel:load-chat'
   | 'keel:get-latest-session'
-  | 'keel:list-sessions';
+  | 'keel:list-sessions'
+  | 'keel:list-files'
+  | 'keel:read-file'
+  | 'keel:write-file';
 
 // Preload API exposed to renderer
 export interface KeelAPI {
@@ -78,6 +99,9 @@ export interface KeelAPI {
   loadChat: (sessionId: string) => Promise<Message[] | null>;
   getLatestSession: () => Promise<string | null>;
   listSessions: () => Promise<Array<{ id: string; title: string; updatedAt: number }>>;
+  listFiles: (dirPath: string) => Promise<FileEntry[]>;
+  readFile: (filePath: string) => Promise<string>;
+  writeFile: (filePath: string, content: string) => Promise<void>;
 }
 
 declare global {

@@ -127,7 +127,7 @@ body {
 }
 
 .markdown-body blockquote {
-  border-left: 3px solid rgba(96, 165, 250, 0.4);
+  border-left: 3px solid rgba(207, 122, 92, 0.4);
   padding-left: 0.8em;
   margin: 0 0 0.5em 0;
   color: rgba(255, 255, 255, 0.6);
@@ -153,7 +153,7 @@ body {
 }
 
 .markdown-body a {
-  color: #60a5fa;
+  color: #E09A80;
   text-decoration: none;
 }
 
