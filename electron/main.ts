@@ -24,10 +24,14 @@ import {
   updateFileIndex,
   removeFileIndex,
   logActivity,
+  saveChatSession,
+  loadChatSession,
+  getLatestSessionId,
 } from '../src/core/db';
 import { capture } from '../src/core/workflows/capture';
 import { dailyBrief } from '../src/core/workflows/dailyBrief';
 import { eod } from '../src/core/workflows/eod';
+import { extractAndSaveMemory } from '../src/core/workflows/memoryExtract';
 import type { Message, Settings } from '../src/shared/types';
 
 let mainWindow: BrowserWindow | null = null;
@@ -354,7 +358,9 @@ function registerIpcHandlers() {
     logActivity(settings.brainPath, 'chat', lastMessage?.slice(0, 200));
 
     try {
+      let fullResponse = '';
       await llmClient.chatStream(messages, systemPrompt, (chunk: string) => {
+        fullResponse += chunk;
         if (!sender.isDestroyed()) {
           sender.send('keel:chat-stream-chunk', chunk);
         }
@@ -362,6 +368,10 @@ function registerIpcHandlers() {
       if (!sender.isDestroyed()) {
         sender.send('keel:chat-stream-done');
       }
+
+      // Extract and save memory in background (don't block the response)
+      const allMessages = [...messages, { role: 'assistant' as const, content: fullResponse, timestamp: Date.now() }];
+      extractAndSaveMemory(allMessages, fileManager, llmClient).catch(() => {});
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       if (!sender.isDestroyed()) {
@@ -384,6 +394,18 @@ function registerIpcHandlers() {
 
   ipcMain.handle('keel:export-pdf', async (_event, markdownContent: string, title?: string) => {
     return exportToPdf(markdownContent, title);
+  });
+
+  ipcMain.handle('keel:save-chat', async (_event, sessionId: string, messages: Message[]) => {
+    saveChatSession(settings.brainPath, sessionId, messages);
+  });
+
+  ipcMain.handle('keel:load-chat', async (_event, sessionId: string) => {
+    return loadChatSession(settings.brainPath, sessionId);
+  });
+
+  ipcMain.handle('keel:get-latest-session', async () => {
+    return getLatestSessionId(settings.brainPath);
   });
 }
 

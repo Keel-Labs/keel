@@ -4,15 +4,22 @@ import Message from './Message';
 
 function ThinkingIndicator() {
   return (
-    <div className="flex justify-start mb-4 pr-12">
-      <div className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-500 to-teal-400 flex items-center justify-center text-[10px] font-bold text-white mr-2.5 mt-1 shrink-0">
-        K
-      </div>
-      <div className="bg-[#252525] border border-white/[0.08] rounded-2xl rounded-tl-md px-4 py-3.5">
-        <div className="flex items-center gap-1.5">
-          <div className="thinking-dot w-1.5 h-1.5 rounded-full bg-blue-400" style={{ animationDelay: '0ms' }} />
-          <div className="thinking-dot w-1.5 h-1.5 rounded-full bg-teal-400" style={{ animationDelay: '150ms' }} />
-          <div className="thinking-dot w-1.5 h-1.5 rounded-full bg-blue-400" style={{ animationDelay: '300ms' }} />
+    <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 16, paddingRight: 48 }}>
+      <div style={{
+        width: 24, height: 24, borderRadius: '50%',
+        background: 'linear-gradient(135deg, #3b82f6, #2dd4bf)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: 10, fontWeight: 700, color: 'white',
+        marginRight: 10, marginTop: 4, flexShrink: 0,
+      }}>K</div>
+      <div style={{
+        background: '#252525', border: '1px solid rgba(255,255,255,0.08)',
+        borderRadius: '16px 16px 16px 4px', padding: '14px 16px',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div className="thinking-dot" style={{ width: 6, height: 6, borderRadius: '50%', background: '#60a5fa', animationDelay: '0ms' }} />
+          <div className="thinking-dot" style={{ width: 6, height: 6, borderRadius: '50%', background: '#2dd4bf', animationDelay: '150ms' }} />
+          <div className="thinking-dot" style={{ width: 6, height: 6, borderRadius: '50%', background: '#60a5fa', animationDelay: '300ms' }} />
         </div>
       </div>
     </div>
@@ -26,11 +33,14 @@ const WELCOME_SUGGESTIONS = [
   { label: '/eod', icon: '🌙' },
 ];
 
-// Matches "make a pdf", "export to pdf", "save as pdf", "create a pdf", etc.
 const PDF_COMMAND_RE = /^(make|export|save|create|generate)\s+(a\s+|to\s+|as\s+|it\s+as\s+)?a?\s*pdf$/i;
 
 function isPdfCommand(text: string): boolean {
   return PDF_COMMAND_RE.test(text.trim());
+}
+
+function generateSessionId(): string {
+  return `session-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
 export default function Chat() {
@@ -38,10 +48,35 @@ export default function Chat() {
   const [input, setInput] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingContent, setStreamingContent] = useState('');
+  const [sessionId, setSessionId] = useState<string>(generateSessionId());
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Auto-scroll to bottom
+  // Load the last session on mount
+  useEffect(() => {
+    (async () => {
+      try {
+        const latestId = await window.keel.getLatestSession();
+        if (latestId) {
+          const saved = await window.keel.loadChat(latestId);
+          if (saved && saved.length > 0) {
+            setSessionId(latestId);
+            setMessages(saved);
+          }
+        }
+      } catch {
+        // First launch, no sessions yet
+      }
+    })();
+  }, []);
+
+  // Auto-save messages whenever they change
+  useEffect(() => {
+    if (messages.length > 0) {
+      window.keel.saveChat(sessionId, messages).catch(() => {});
+    }
+  }, [messages, sessionId]);
+
   const scrollToBottom = useCallback(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -52,7 +87,6 @@ export default function Chat() {
     scrollToBottom();
   }, [messages, streamingContent, scrollToBottom]);
 
-  // Auto-resize textarea
   useEffect(() => {
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
@@ -66,6 +100,11 @@ export default function Chat() {
       if (messages[i].role === 'assistant') return messages[i].content;
     }
     return null;
+  };
+
+  const startNewChat = () => {
+    setMessages([]);
+    setSessionId(generateSessionId());
   };
 
   const sendMessage = async (overrideText?: string) => {
@@ -221,25 +260,45 @@ export default function Chat() {
   };
 
   return (
-    <div className="flex-1 flex flex-col min-h-0">
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
       {/* Message list */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto px-6 py-5">
+      <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', padding: '20px 24px' }}>
         {messages.length === 0 && !isStreaming && (
-          <div className="flex items-center justify-center h-full">
-            <div className="text-center max-w-sm">
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-teal-400 flex items-center justify-center text-xl font-bold text-white mx-auto mb-5 shadow-lg shadow-blue-500/20">
-                K
-              </div>
-              <h2 className="text-lg font-semibold text-white/90 mb-2">Good to see you</h2>
-              <p className="text-sm text-white/40 mb-6 leading-relaxed">
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+            <div style={{ textAlign: 'center', maxWidth: 360 }}>
+              <div style={{
+                width: 56, height: 56, borderRadius: 16,
+                background: 'linear-gradient(135deg, #3b82f6, #2dd4bf)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 22, fontWeight: 700, color: 'white',
+                margin: '0 auto 20px', boxShadow: '0 8px 24px rgba(59,130,246,0.2)',
+              }}>K</div>
+              <h2 style={{ fontSize: 18, fontWeight: 600, color: 'rgba(255,255,255,0.9)', marginBottom: 8 }}>Good to see you</h2>
+              <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.4)', marginBottom: 24, lineHeight: 1.6 }}>
                 I'm Keel, your AI chief of staff. I know your projects, priorities, and people.
               </p>
-              <div className="grid grid-cols-2 gap-2">
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                 {WELCOME_SUGGESTIONS.map((s) => (
                   <button
                     key={s.label}
                     onClick={() => sendMessage(s.label)}
-                    className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-[#252525] border border-white/[0.08] hover:bg-[#2a2a2a] hover:border-white/[0.15] text-white/60 hover:text-white/80 text-xs transition-all text-left"
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 8,
+                      padding: '10px 12px', borderRadius: 12,
+                      background: '#252525', border: '1px solid rgba(255,255,255,0.08)',
+                      color: 'rgba(255,255,255,0.6)', fontSize: 12,
+                      cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = '#2a2a2a';
+                      e.currentTarget.style.borderColor = 'rgba(255,255,255,0.15)';
+                      e.currentTarget.style.color = 'rgba(255,255,255,0.8)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = '#252525';
+                      e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)';
+                      e.currentTarget.style.color = 'rgba(255,255,255,0.6)';
+                    }}
                   >
                     <span>{s.icon}</span>
                     <span>{s.label}</span>
@@ -254,7 +313,6 @@ export default function Chat() {
           <Message key={i} message={msg} />
         ))}
 
-        {/* Streaming message */}
         {isStreaming && streamingContent && (
           <Message
             message={{
@@ -265,13 +323,34 @@ export default function Chat() {
           />
         )}
 
-        {/* Thinking indicator */}
         {isStreaming && !streamingContent && <ThinkingIndicator />}
       </div>
 
       {/* Input area */}
-      <div className="border-t border-white/[0.08] px-6 py-3 bg-[#1a1a1a]">
-        <div className="flex items-end gap-2.5">
+      <div style={{
+        borderTop: '1px solid rgba(255,255,255,0.08)',
+        padding: '12px 24px',
+        background: '#1a1a1a',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10 }}>
+          {messages.length > 0 && (
+            <button
+              onClick={startNewChat}
+              disabled={isStreaming}
+              title="New chat"
+              style={{
+                background: '#252525', border: '1px solid rgba(255,255,255,0.08)',
+                color: 'rgba(255,255,255,0.5)', borderRadius: 12,
+                padding: '10px 12px', cursor: 'pointer', fontSize: 14,
+                transition: 'all 0.15s', flexShrink: 0,
+                opacity: isStreaming ? 0.4 : 1,
+              }}
+              onMouseEnter={(e) => { if (!isStreaming) e.currentTarget.style.color = 'rgba(255,255,255,0.8)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = 'rgba(255,255,255,0.5)'; }}
+            >
+              +
+            </button>
+          )}
           <textarea
             ref={textareaRef}
             value={input}
@@ -280,12 +359,33 @@ export default function Chat() {
             placeholder="Message Keel..."
             disabled={isStreaming}
             rows={1}
-            className="flex-1 bg-[#252525] border border-white/[0.08] text-white/90 text-sm rounded-xl px-4 py-2.5 resize-none outline-none placeholder:text-white/25 focus:border-blue-500/40 focus:bg-[#282828] disabled:opacity-40 transition-all"
+            style={{
+              flex: 1, background: '#252525', border: '1px solid rgba(255,255,255,0.08)',
+              color: 'rgba(255,255,255,0.9)', fontSize: 14, borderRadius: 12,
+              padding: '10px 16px', resize: 'none', outline: 'none',
+              fontFamily: 'inherit', transition: 'all 0.15s',
+              opacity: isStreaming ? 0.4 : 1,
+            }}
+            onFocus={(e) => {
+              e.currentTarget.style.borderColor = 'rgba(59,130,246,0.4)';
+              e.currentTarget.style.background = '#282828';
+            }}
+            onBlur={(e) => {
+              e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)';
+              e.currentTarget.style.background = '#252525';
+            }}
           />
           <button
             onClick={() => sendMessage()}
             disabled={isStreaming || !input.trim()}
-            className="bg-blue-600 hover:bg-blue-500 disabled:bg-[#252525] disabled:border disabled:border-white/[0.08] disabled:text-white/20 text-white text-sm font-medium rounded-xl px-4 py-2.5 transition-all active:scale-95"
+            style={{
+              background: isStreaming || !input.trim() ? '#252525' : '#3b82f6',
+              border: isStreaming || !input.trim() ? '1px solid rgba(255,255,255,0.08)' : '1px solid transparent',
+              color: isStreaming || !input.trim() ? 'rgba(255,255,255,0.2)' : 'white',
+              fontSize: 14, fontWeight: 500, borderRadius: 12,
+              padding: '10px 16px', cursor: isStreaming || !input.trim() ? 'default' : 'pointer',
+              transition: 'all 0.15s', flexShrink: 0,
+            }}
           >
             Send
           </button>

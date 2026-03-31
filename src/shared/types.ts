@@ -51,7 +51,10 @@ export type IpcChannels =
   | 'keel:capture'
   | 'keel:daily-brief'
   | 'keel:eod'
-  | 'keel:export-pdf';
+  | 'keel:export-pdf'
+  | 'keel:save-chat'
+  | 'keel:load-chat'
+  | 'keel:get-latest-session';
 
 // Preload API exposed to renderer
 export interface KeelAPI {
@@ -68,6 +71,9 @@ export interface KeelAPI {
   dailyBrief: () => Promise<string>;
   eod: (chatHistory: Message[]) => Promise<string>;
   exportPdf: (markdownContent: string, title?: string) => Promise<string>;
+  saveChat: (sessionId: string, messages: Message[]) => Promise<void>;
+  loadChat: (sessionId: string) => Promise<Message[] | null>;
+  getLatestSession: () => Promise<string | null>;
 }
 
 declare global {
