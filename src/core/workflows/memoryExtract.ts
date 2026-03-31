@@ -3,31 +3,35 @@ import { LLMClient } from '../llmClient';
 import { logActivity } from '../db';
 import type { Message } from '../../shared/types';
 
-const EXTRACT_PROMPT = `You are a memory extraction system. Analyze the conversation and determine if the user shared any important personal or professional information that should be remembered.
+const EXTRACT_PROMPT = `You are a memory extraction system. Analyze the conversation and extract ONLY facts the user explicitly stated.
 
-Extract ONLY new factual information that was explicitly stated by the user (not asked as a question). Categories:
-- Profile info: name, role, company, team
-- Projects: project names, descriptions, status, deadlines
-- People: names, roles, relationships
-- Priorities: goals, current focus areas
-- Preferences: communication style, tools, conventions
+CRITICAL RULES:
+- NEVER invent, assume, or infer details the user did not say.
+- If the user says "my projects are: music, sports" — save the names ONLY. Do NOT make up descriptions, deadlines, or statuses.
+- Leave fields as empty strings if the user did not provide that information.
+- Only extract from the USER's messages, never from the assistant's responses.
 
-If there IS new info to remember, respond with a JSON object:
+Categories to extract:
+- Profile: name, role, company
+- Projects: names (and only details the user explicitly provided)
+- People: names and roles (only if stated)
+- Priorities: only if explicitly listed
+
+If there IS new info, respond with JSON:
 {
   "hasUpdates": true,
   "profile": { "name": "...", "role": "..." },
-  "projects": [{ "name": "...", "status": "...", "summary": "...", "deadline": "..." }],
-  "people": [{ "name": "...", "role": "...", "notes": "..." }],
-  "priorities": ["..."],
-  "conventions": ["..."]
+  "projects": [{ "name": "...", "status": "", "summary": "", "deadline": "" }],
+  "people": [{ "name": "...", "role": "", "notes": "" }],
+  "priorities": ["..."]
 }
 
-Only include fields that have new information. Omit empty fields.
+Only include fields with new info. Use empty strings for unknown fields — NEVER guess.
 
-If there is NO new info to remember (general questions, casual chat, commands), respond with:
+If there is NO new info (questions, casual chat, commands), respond:
 {"hasUpdates": false}
 
-Respond ONLY with valid JSON, nothing else.`;
+Respond ONLY with valid JSON.`;
 
 interface MemoryUpdate {
   hasUpdates: boolean;
