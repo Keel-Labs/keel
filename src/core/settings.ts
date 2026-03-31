@@ -15,8 +15,6 @@ const DEFAULT_SETTINGS: Settings = {
   brainPath: path.join(process.env.HOME || '~', 'Keel'),
   dailyBriefTime: '',
   eodTime: '',
-  googleClientId: '',
-  googleClientSecret: '',
 };
 
 function getConfigPath(brainPath?: string): string {

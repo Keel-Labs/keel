@@ -47,6 +47,7 @@ import {
   disconnectGoogle,
   type GoogleOAuthConfig,
 } from '../src/core/connectors/googleAuth';
+import { GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_SCOPES } from '../src/core/connectors/googleConfig';
 import { syncCalendar } from '../src/core/connectors/googleCalendar';
 import { exportToGoogleDoc } from '../src/core/connectors/googleDocs';
 import type { Message, Settings } from '../src/shared/types';
@@ -572,17 +573,13 @@ function registerIpcHandlers() {
   // --- Google Integration ---
 
   function getGoogleConfig(): GoogleOAuthConfig {
-    const currentSettings = loadSettings();
-    if (!currentSettings.googleClientId || !currentSettings.googleClientSecret) {
-      throw new Error('Google Client ID and Secret must be configured in Settings before connecting.');
+    if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
+      throw new Error('Google integration is not configured. Set KEEL_GOOGLE_CLIENT_ID and KEEL_GOOGLE_CLIENT_SECRET environment variables.');
     }
     return {
-      clientId: currentSettings.googleClientId,
-      clientSecret: currentSettings.googleClientSecret,
-      scopes: [
-        'https://www.googleapis.com/auth/calendar.readonly',
-        'https://www.googleapis.com/auth/documents',
-      ],
+      clientId: GOOGLE_CLIENT_ID,
+      clientSecret: GOOGLE_CLIENT_SECRET,
+      scopes: GOOGLE_SCOPES,
     };
   }
 
