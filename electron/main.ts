@@ -7,6 +7,7 @@ import {
   Menu,
   nativeImage,
   dialog,
+  Notification,
 } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -33,6 +34,15 @@ import { capture } from '../src/core/workflows/capture';
 import { dailyBrief } from '../src/core/workflows/dailyBrief';
 import { eod } from '../src/core/workflows/eod';
 import { extractAndSaveMemory } from '../src/core/workflows/memoryExtract';
+import {
+  startOAuthFlow,
+  saveTokens,
+  isGoogleConnected,
+  disconnectGoogle,
+  type GoogleOAuthConfig,
+} from '../src/core/connectors/googleAuth';
+import { syncCalendar } from '../src/core/connectors/googleCalendar';
+import { exportToGoogleDoc } from '../src/core/connectors/googleDocs';
 import type { Message, Settings } from '../src/shared/types';
 
 let mainWindow: BrowserWindow | null = null;
@@ -536,6 +546,147 @@ function registerIpcHandlers() {
     const fullPath = path.join(settings.brainPath, filePath);
     fs.writeFileSync(fullPath, content, 'utf-8');
   });
+
+  // --- Google Integration ---
+
+  function getGoogleConfig(): GoogleOAuthConfig {
+    const currentSettings = loadSettings();
+    if (!currentSettings.googleClientId || !currentSettings.googleClientSecret) {
+      throw new Error('Google Client ID and Secret must be configured in Settings before connecting.');
+    }
+    return {
+      clientId: currentSettings.googleClientId,
+      clientSecret: currentSettings.googleClientSecret,
+      scopes: [
+        'https://www.googleapis.com/auth/calendar.readonly',
+        'https://www.googleapis.com/auth/documents',
+      ],
+    };
+  }
+
+  ipcMain.handle('keel:google-connect', async () => {
+    const config = getGoogleConfig();
+    const tokens = await startOAuthFlow(config, BrowserWindow);
+    saveTokens(settings.brainPath, tokens);
+    logActivity(settings.brainPath, 'google-connect', 'Connected to Google');
+  });
+
+  ipcMain.handle('keel:google-disconnect', async () => {
+    disconnectGoogle(settings.brainPath);
+    logActivity(settings.brainPath, 'google-disconnect', 'Disconnected from Google');
+  });
+
+  ipcMain.handle('keel:google-status', async () => {
+    return { connected: isGoogleConnected(settings.brainPath) };
+  });
+
+  ipcMain.handle('keel:google-sync-calendar', async () => {
+    const config = getGoogleConfig();
+    return syncCalendar(fileManager, settings.brainPath, config);
+  });
+
+  ipcMain.handle('keel:google-export-doc', async (_event, markdownContent: string, title?: string) => {
+    const config = getGoogleConfig();
+    return exportToGoogleDoc(settings.brainPath, config, markdownContent, title);
+  });
+}
+
+// --- Scheduler for Timed Briefs/EOD ---
+
+let schedulerInterval: ReturnType<typeof setInterval> | null = null;
+let lastTriggered: { brief?: string; eod?: string } = {};
+
+function getCurrentHHMM(): string {
+  const now = new Date();
+  return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+}
+
+function getTodayKey(): string {
+  return new Date().toISOString().split('T')[0];
+}
+
+async function runScheduledBrief(): Promise<void> {
+  try {
+    const result = await dailyBrief(fileManager, llmClient);
+    logActivity(settings.brainPath, 'scheduled-brief', 'Auto-triggered daily brief');
+
+    if (Notification.isSupported()) {
+      const notif = new Notification({
+        title: 'Keel — Daily Brief',
+        body: result.slice(0, 200).replace(/[#*_`]/g, ''),
+      });
+      notif.on('click', () => {
+        mainWindow?.show();
+        mainWindow?.focus();
+      });
+      notif.show();
+    }
+
+    // Send to renderer if window is open
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('keel:scheduled-notification', {
+        type: 'daily-brief',
+        content: result,
+      });
+    }
+  } catch (error) {
+    console.error('Scheduled brief failed:', error);
+  }
+}
+
+async function runScheduledEod(): Promise<void> {
+  try {
+    const result = await eod(fileManager, llmClient, []);
+    logActivity(settings.brainPath, 'scheduled-eod', 'Auto-triggered EOD summary');
+
+    if (Notification.isSupported()) {
+      const notif = new Notification({
+        title: 'Keel — End of Day',
+        body: result.slice(0, 200).replace(/[#*_`]/g, ''),
+      });
+      notif.on('click', () => {
+        mainWindow?.show();
+        mainWindow?.focus();
+      });
+      notif.show();
+    }
+
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('keel:scheduled-notification', {
+        type: 'eod',
+        content: result,
+      });
+    }
+  } catch (error) {
+    console.error('Scheduled EOD failed:', error);
+  }
+}
+
+function startScheduler(): void {
+  if (schedulerInterval) clearInterval(schedulerInterval);
+
+  // Check every 30 seconds
+  schedulerInterval = setInterval(() => {
+    const currentSettings = loadSettings();
+    const now = getCurrentHHMM();
+    const todayKey = getTodayKey();
+
+    // Daily brief
+    if (currentSettings.dailyBriefTime && now === currentSettings.dailyBriefTime) {
+      if (lastTriggered.brief !== todayKey) {
+        lastTriggered.brief = todayKey;
+        runScheduledBrief();
+      }
+    }
+
+    // EOD
+    if (currentSettings.eodTime && now === currentSettings.eodTime) {
+      if (lastTriggered.eod !== todayKey) {
+        lastTriggered.eod = todayKey;
+        runScheduledEod();
+      }
+    }
+  }, 30_000);
 }
 
 // --- App Lifecycle ---
@@ -554,6 +705,9 @@ app.whenReady().then(async () => {
 
   // Start file watcher
   startFileWatcher();
+
+  // Start scheduler for timed briefs/EOD
+  startScheduler();
 
   // Run startup indexing in background
   startupIndex();

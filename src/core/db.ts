@@ -67,6 +67,16 @@ export function getDb(brainPath: string): Database.Database {
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
     );
+
+    -- Connector sync state (Google Calendar, Gmail, etc.)
+    CREATE TABLE IF NOT EXISTS sync_state (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      connector  TEXT UNIQUE NOT NULL,
+      cursor     TEXT,
+      last_sync  INTEGER,
+      status     TEXT DEFAULT 'idle',
+      meta       TEXT
+    );
   `);
 
   // Migrate file_index: add hash column if missing
@@ -322,4 +332,48 @@ export function listChatSessions(
     try { messageCount = JSON.parse(r.messages).length; } catch {}
     return { id: r.id, messageCount, updatedAt: r.updated_at };
   });
+}
+
+// --- Sync State ---
+
+export interface SyncStateRow {
+  connector: string;
+  cursor: string | null;
+  lastSync: number | null;
+  status: string;
+  meta: string | null;
+}
+
+export function getSyncState(brainPath: string, connector: string): SyncStateRow | null {
+  const d = getDb(brainPath);
+  const row = d.prepare('SELECT * FROM sync_state WHERE connector = ?').get(connector) as
+    | { connector: string; cursor: string | null; last_sync: number | null; status: string; meta: string | null }
+    | undefined;
+  if (!row) return null;
+  return { connector: row.connector, cursor: row.cursor, lastSync: row.last_sync, status: row.status, meta: row.meta };
+}
+
+export function upsertSyncState(
+  brainPath: string,
+  connector: string,
+  updates: { cursor?: string | null; lastSync?: number; status?: string; meta?: string | null }
+): void {
+  const d = getDb(brainPath);
+  const existing = getSyncState(brainPath, connector);
+  if (!existing) {
+    d.prepare(
+      `INSERT INTO sync_state (connector, cursor, last_sync, status, meta) VALUES (?, ?, ?, ?, ?)`
+    ).run(connector, updates.cursor ?? null, updates.lastSync ?? null, updates.status ?? 'idle', updates.meta ?? null);
+  } else {
+    const sets: string[] = [];
+    const vals: any[] = [];
+    if (updates.cursor !== undefined) { sets.push('cursor = ?'); vals.push(updates.cursor); }
+    if (updates.lastSync !== undefined) { sets.push('last_sync = ?'); vals.push(updates.lastSync); }
+    if (updates.status !== undefined) { sets.push('status = ?'); vals.push(updates.status); }
+    if (updates.meta !== undefined) { sets.push('meta = ?'); vals.push(updates.meta); }
+    if (sets.length > 0) {
+      vals.push(connector);
+      d.prepare(`UPDATE sync_state SET ${sets.join(', ')} WHERE connector = ?`).run(...vals);
+    }
+  }
 }

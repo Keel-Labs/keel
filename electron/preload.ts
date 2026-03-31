@@ -53,6 +53,24 @@ const api: KeelAPI = {
   readFile: (filePath: string) => ipcRenderer.invoke('keel:read-file', filePath),
 
   writeFile: (filePath: string, content: string) => ipcRenderer.invoke('keel:write-file', filePath, content),
+
+  onScheduledNotification: (callback) => {
+    ipcRenderer.on('keel:scheduled-notification', (_event, notification) => callback(notification));
+  },
+
+  removeScheduledNotificationListener: () => {
+    ipcRenderer.removeAllListeners('keel:scheduled-notification');
+  },
+
+  googleConnect: () => ipcRenderer.invoke('keel:google-connect'),
+
+  googleDisconnect: () => ipcRenderer.invoke('keel:google-disconnect'),
+
+  googleStatus: () => ipcRenderer.invoke('keel:google-status'),
+
+  googleSyncCalendar: () => ipcRenderer.invoke('keel:google-sync-calendar'),
+
+  googleExportDoc: (markdownContent: string, title?: string) => ipcRenderer.invoke('keel:google-export-doc', markdownContent, title),
 };
 
 contextBridge.exposeInMainWorld('keel', api);
