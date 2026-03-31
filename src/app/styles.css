@@ -62,51 +62,60 @@ body {
 }
 
 /* Markdown body styles for assistant messages */
-.markdown-body p {
-  margin-bottom: 0.75em;
+.markdown-body > *:first-child {
+  margin-top: 0;
 }
 
-.markdown-body p:last-child {
+.markdown-body > *:last-child {
   margin-bottom: 0;
+}
+
+.markdown-body p {
+  margin: 0 0 0.5em 0;
 }
 
 .markdown-body h1,
 .markdown-body h2,
 .markdown-body h3 {
   font-weight: 600;
-  margin-top: 1em;
-  margin-bottom: 0.5em;
+  margin: 0.8em 0 0.3em 0;
   color: rgba(255, 255, 255, 0.95);
 }
 
-.markdown-body h1 { font-size: 1.25em; }
-.markdown-body h2 { font-size: 1.1em; }
+.markdown-body h1 { font-size: 1.15em; }
+.markdown-body h2 { font-size: 1.05em; }
 .markdown-body h3 { font-size: 1em; }
 
 .markdown-body ul,
 .markdown-body ol {
-  padding-left: 1.5em;
-  margin-bottom: 0.75em;
+  padding-left: 1.25em;
+  margin: 0 0 0.5em 0;
 }
 
 .markdown-body li {
-  margin-bottom: 0.25em;
+  margin-bottom: 0.15em;
+}
+
+.markdown-body li > ul,
+.markdown-body li > ol {
+  margin-top: 0.15em;
+  margin-bottom: 0;
 }
 
 .markdown-body code {
   background: rgba(255, 255, 255, 0.1);
-  padding: 0.15em 0.4em;
+  padding: 0.1em 0.35em;
   border-radius: 4px;
-  font-size: 0.9em;
+  font-size: 0.88em;
   font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
 }
 
 .markdown-body pre {
   background: rgba(0, 0, 0, 0.4);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 8px;
-  padding: 0.75em 1em;
-  margin-bottom: 0.75em;
+  border-radius: 6px;
+  padding: 0.6em 0.8em;
+  margin: 0 0 0.5em 0;
   overflow-x: auto;
 }
 
@@ -119,22 +128,22 @@ body {
 
 .markdown-body blockquote {
   border-left: 3px solid rgba(96, 165, 250, 0.4);
-  padding-left: 1em;
-  margin-bottom: 0.75em;
+  padding-left: 0.8em;
+  margin: 0 0 0.5em 0;
   color: rgba(255, 255, 255, 0.6);
 }
 
 .markdown-body table {
   border-collapse: collapse;
   width: 100%;
-  margin-bottom: 0.75em;
+  margin: 0 0 0.5em 0;
   font-size: 0.9em;
 }
 
 .markdown-body th,
 .markdown-body td {
   border: 1px solid rgba(255, 255, 255, 0.1);
-  padding: 0.4em 0.75em;
+  padding: 0.3em 0.6em;
   text-align: left;
 }
 
@@ -159,5 +168,5 @@ body {
 .markdown-body hr {
   border: none;
   border-top: 1px solid rgba(255, 255, 255, 0.1);
-  margin: 1em 0;
+  margin: 0.6em 0;
 }
