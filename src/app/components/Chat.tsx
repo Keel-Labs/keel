@@ -364,6 +364,7 @@ export default function Chat() {
               color: 'rgba(255,255,255,0.9)', fontSize: 14, borderRadius: 12,
               padding: '10px 16px', resize: 'none', outline: 'none',
               fontFamily: 'inherit', transition: 'all 0.15s',
+              overflow: 'hidden',
               opacity: isStreaming ? 0.4 : 1,
             }}
             onFocus={(e) => {
