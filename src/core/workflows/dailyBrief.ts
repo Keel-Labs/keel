@@ -15,7 +15,7 @@ export async function dailyBrief(
 
   // Yesterday's daily log
   try {
-    const yesterdayLog = await fileManager.readFile(`daily_log/${yesterday}.md`);
+    const yesterdayLog = await fileManager.readFile(`daily-log/${yesterday}.md`);
     parts.push(`## Yesterday's Log (${yesterday})\n${yesterdayLog}`);
   } catch {
     parts.push("## Yesterday's Log\nNo log found for yesterday.");
@@ -23,7 +23,7 @@ export async function dailyBrief(
 
   // All project task files
   try {
-    const taskFiles = await fileManager.listFiles('01_projects/*/tasks.md');
+    const taskFiles = await fileManager.listFiles('projects/*/tasks.md');
     for (const file of taskFiles) {
       try {
         const content = await fileManager.readFile(file);
@@ -76,7 +76,7 @@ Be concise and actionable. Use markdown formatting.`
   );
 
   // Write to daily log
-  const logPath = `daily_log/${today}.md`;
+  const logPath = `daily-log/${today}.md`;
   const logContent = `## Morning Brief\n\n${brief}\n\n`;
 
   if (await fileManager.fileExists(logPath)) {

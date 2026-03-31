@@ -1,7 +1,8 @@
 import { FileManager } from './fileManager';
 import { embedText } from './embeddings';
 import * as vectorStore from './vectorStore';
-import { logActivity } from './db';
+import { logActivity, searchChunksFts, type ChunkRow } from './db';
+import { rerank, type RankableChunk } from './reranker';
 
 const MAX_CONTEXT_CHARS_V1 = 80_000;
 const MAX_CONTEXT_CHARS_V2 = 60_000;
@@ -84,7 +85,7 @@ export class ContextAssembler {
 
     // 2. All project context files
     try {
-      const projectFiles = await this.fileManager.listFiles('01_projects/*/context.md');
+      const projectFiles = await this.fileManager.listFiles('projects/*/context.md');
       for (const file of projectFiles) {
         try {
           const content = await this.fileManager.readFile(file);
@@ -99,7 +100,7 @@ export class ContextAssembler {
 
     // 3. Last 2 daily logs
     try {
-      const dailyLogs = await this.fileManager.listFiles('daily_log/*.md');
+      const dailyLogs = await this.fileManager.listFiles('daily-log/*.md');
       const recent = dailyLogs.sort().reverse().slice(0, 2);
       for (const file of recent) {
         try {
@@ -145,23 +146,70 @@ export class ContextAssembler {
 
     for (const date of [today, yesterday]) {
       try {
-        const content = await this.fileManager.readFile(`daily_log/${date}.md`);
-        addSection(`daily_log/${date}.md`, content);
+        const content = await this.fileManager.readFile(`daily-log/${date}.md`);
+        addSection(`daily-log/${date}.md`, content);
       } catch {
         // log doesn't exist
       }
     }
 
-    // 3. Semantic search for relevant chunks
-    const queryVector = await embedText(userMessage);
-    const results = await vectorStore.search(brainPath, queryVector, TOP_K);
+    // 3. Retrieve: vector search (top-20) + FTS5 keyword search (top-10), then re-rank
 
-    // Group chunks by file for cleaner display
+    // Collect candidates from both sources
+    const candidateMap = new Map<string, RankableChunk>();
+
+    // Vector search
+    try {
+      const queryVector = await embedText(userMessage);
+      const vectorResults = await vectorStore.search(brainPath, queryVector, 20);
+      for (const r of vectorResults) {
+        const similarity = 1 - (r.score ?? 0); // convert distance to similarity
+        if (!candidateMap.has(r.chunk.id)) {
+          candidateMap.set(r.chunk.id, {
+            id: r.chunk.id,
+            filePath: r.chunk.filePath,
+            text: r.chunk.text,
+            score: Math.max(0, similarity),
+            updatedAt: undefined,
+          });
+        }
+      }
+    } catch {
+      // Embeddings not available
+    }
+
+    // FTS5 keyword search
+    try {
+      const ftsResults = searchChunksFts(brainPath, userMessage, 10);
+      for (const row of ftsResults) {
+        const key = `fts-${row.id}`;
+        if (!candidateMap.has(key)) {
+          candidateMap.set(key, {
+            id: key,
+            filePath: row.filePath,
+            text: row.content,
+            score: 0.5, // moderate base score for keyword matches
+            updatedAt: row.updatedAt,
+          });
+        } else {
+          // Boost chunks found in both vector + FTS results
+          const existing = candidateMap.get(key)!;
+          candidateMap.set(key, { ...existing, score: existing.score * 1.3 });
+        }
+      }
+    } catch {
+      // FTS not available
+    }
+
+    const candidates = Array.from(candidateMap.values());
+    const reranked = rerank(candidates, TOP_K);
+
+    // Group by file and add to context
     const byFile = new Map<string, string[]>();
-    for (const result of results) {
-      const existing = byFile.get(result.chunk.filePath) || [];
-      existing.push(result.chunk.text);
-      byFile.set(result.chunk.filePath, existing);
+    for (const chunk of reranked) {
+      const existing = byFile.get(chunk.filePath) || [];
+      existing.push(chunk.text);
+      byFile.set(chunk.filePath, existing);
     }
 
     for (const [filePath, texts] of byFile) {
@@ -174,7 +222,7 @@ export class ContextAssembler {
       logActivity(
         brainPath,
         'context-assembly',
-        `Query: "${userMessage.slice(0, 100)}" | Chunks: ${results.length} | Files: ${byFile.size}`
+        `Query: "${userMessage.slice(0, 100)}" | Candidates: ${candidates.length} | Kept: ${reranked.length}`
       );
     } catch {
       // Don't fail if logging fails

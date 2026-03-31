@@ -129,13 +129,30 @@ function registerShortcuts() {
 // --- File Watcher & Indexing ---
 
 let debounceTimers = new Map<string, ReturnType<typeof setTimeout>>();
+// Self-write flag: prevents Keel's own file writes from triggering re-indexing
+let selfWriting = false;
+let selfWriteTimer: ReturnType<typeof setTimeout> | null = null;
+
+export function setSelfWriting(): void {
+  selfWriting = true;
+  if (selfWriteTimer) clearTimeout(selfWriteTimer);
+  selfWriteTimer = setTimeout(() => { selfWriting = false; }, 500);
+}
 
 async function indexFile(filePath: string): Promise<void> {
   try {
+    // Hash check: skip if content unchanged since last index
+    const fullPath = path.join(settings.brainPath, filePath);
+    const raw = fs.readFileSync(fullPath, 'utf-8');
+    const crypto = await import('crypto');
+    const hash = crypto.createHash('sha256').update(raw).digest('hex');
+    const existing = getFileIndex(settings.brainPath, filePath);
+    if (existing && (existing as any).hash === hash) return;
+
     const chunks = await embedFile(fileManager, filePath);
     if (chunks.length > 0) {
       await upsertChunks(settings.brainPath, chunks);
-      updateFileIndex(settings.brainPath, filePath, chunks.length);
+      updateFileIndex(settings.brainPath, filePath, chunks.length, hash);
     }
   } catch (error) {
     // Embedding service might not be available — that's ok
@@ -144,13 +161,13 @@ async function indexFile(filePath: string): Promise<void> {
 }
 
 function handleFileChange(fullPath: string): void {
-  // Convert to relative path within brain/
+  // Skip if Keel itself is writing this file
+  if (selfWriting) return;
+
   const relativePath = path.relative(settings.brainPath, fullPath);
   if (!relativePath.endsWith('.md')) return;
-  // Skip hidden/config files
   if (relativePath.startsWith('.')) return;
 
-  // Debounce: wait 2 seconds after last change
   const existing = debounceTimers.get(relativePath);
   if (existing) clearTimeout(existing);
 
@@ -385,12 +402,33 @@ function registerIpcHandlers() {
 
     try {
       let fullResponse = '';
+      let buffer = '';
+      let flushTimer: ReturnType<typeof setTimeout> | null = null;
+
+      const flush = () => {
+        if (buffer && !sender.isDestroyed()) {
+          sender.send('keel:chat-stream-chunk', buffer);
+          buffer = '';
+        }
+        flushTimer = null;
+      };
+
       await llmClient.chatStream(messages, systemPrompt, (chunk: string) => {
         fullResponse += chunk;
-        if (!sender.isDestroyed()) {
-          sender.send('keel:chat-stream-chunk', chunk);
+        buffer += chunk;
+        // Flush immediately if buffer hits 100 chars, otherwise batch at 50ms
+        if (buffer.length >= 100) {
+          if (flushTimer) { clearTimeout(flushTimer); flushTimer = null; }
+          flush();
+        } else if (!flushTimer) {
+          flushTimer = setTimeout(flush, 50);
         }
       });
+
+      // Final flush
+      if (flushTimer) clearTimeout(flushTimer);
+      flush();
+
       if (!sender.isDestroyed()) {
         sender.send('keel:chat-stream-done');
       }
