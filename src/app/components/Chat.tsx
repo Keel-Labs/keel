@@ -78,10 +78,12 @@ function ThinkingIndicator() {
         borderRadius: '16px 16px 16px 4px', padding: '12px 16px',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <div className="thinking-dot" style={{ width: 5, height: 5, borderRadius: '50%', background: '#60a5fa', animationDelay: '0ms' }} />
-            <div className="thinking-dot" style={{ width: 5, height: 5, borderRadius: '50%', background: '#2dd4bf', animationDelay: '150ms' }} />
-            <div className="thinking-dot" style={{ width: 5, height: 5, borderRadius: '50%', background: '#60a5fa', animationDelay: '300ms' }} />
+          <div className="wave-container" style={{ display: 'flex', alignItems: 'end', gap: 2, height: 16, flexShrink: 0 }}>
+            <div className="wave-bar" style={{ width: 3, borderRadius: 1.5, background: '#3b82f6', animationDelay: '0s' }} />
+            <div className="wave-bar" style={{ width: 3, borderRadius: 1.5, background: '#2dd4bf', animationDelay: '0.2s' }} />
+            <div className="wave-bar" style={{ width: 3, borderRadius: 1.5, background: '#3b82f6', animationDelay: '0.4s' }} />
+            <div className="wave-bar" style={{ width: 3, borderRadius: 1.5, background: '#2dd4bf', animationDelay: '0.6s' }} />
+            <div className="wave-bar" style={{ width: 3, borderRadius: 1.5, background: '#3b82f6', animationDelay: '0.8s' }} />
           </div>
           <span className="thinking-text" style={{
             fontSize: 13, color: 'rgba(255,255,255,0.4)',
