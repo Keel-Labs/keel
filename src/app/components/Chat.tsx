@@ -49,6 +49,63 @@ const THINKING_MESSAGES = [
   'Preparing for the long winter...',
 ];
 
+function NauticalLoader() {
+  // Square wave box — 28x28, transparent bg, coral waves with splash droplets
+  const s = 28;
+  return (
+    <svg viewBox={`0 0 ${s} ${s}`} xmlns="http://www.w3.org/2000/svg" width={s} height={s} style={{ flexShrink: 0 }}>
+      <defs>
+        <clipPath id="wave-clip">
+          <rect x="0" y="0" width={s} height={s} rx="4"/>
+        </clipPath>
+      </defs>
+      <g clipPath="url(#wave-clip)">
+        {/* Water body */}
+        <rect x="0" y="16" width={s} height="12" fill="#CF7A5C" opacity="0.15"/>
+        {/* Wave layer 1 */}
+        <path fill="#CF7A5C" opacity="0.55">
+          <animate
+            attributeName="d"
+            dur="2.4s"
+            repeatCount="indefinite"
+            calcMode="spline"
+            keySplines="0.45 0 0.55 1; 0.45 0 0.55 1"
+            values="
+              M-5 16 Q3 6 11 16 Q19 26 27 16 L28 28 L-5 28 Z;
+              M-5 16 Q3 26 11 16 Q19 6 27 16 L28 28 L-5 28 Z;
+              M-5 16 Q3 6 11 16 Q19 26 27 16 L28 28 L-5 28 Z
+            "/>
+        </path>
+        {/* Wave layer 2 */}
+        <path fill="#CF7A5C" opacity="0.3">
+          <animate
+            attributeName="d"
+            dur="1.8s"
+            begin="-0.9s"
+            repeatCount="indefinite"
+            calcMode="spline"
+            keySplines="0.45 0 0.55 1; 0.45 0 0.55 1"
+            values="
+              M-5 18 Q3 9 11 18 Q19 27 27 18 L28 28 L-5 28 Z;
+              M-5 18 Q3 27 11 18 Q19 9 27 18 L28 28 L-5 28 Z;
+              M-5 18 Q3 9 11 18 Q19 27 27 18 L28 28 L-5 28 Z
+            "/>
+        </path>
+        {/* Splash droplet at first crest */}
+        <circle cx="11" r="1.5" fill="#CF7A5C" opacity="0">
+          <animate attributeName="cy" dur="2.4s" repeatCount="indefinite" values="6;1;6" calcMode="spline" keySplines="0.3 0 0.7 1; 0.3 0 0.7 1"/>
+          <animate attributeName="opacity" dur="2.4s" repeatCount="indefinite" values="0;0.6;0" calcMode="spline" keySplines="0.3 0 0.7 1; 0.3 0 0.7 1"/>
+        </circle>
+        {/* Splash droplet at second crest */}
+        <circle cx="20" r="1" fill="#CF7A5C" opacity="0">
+          <animate attributeName="cy" dur="1.8s" begin="-0.9s" repeatCount="indefinite" values="9;3;9" calcMode="spline" keySplines="0.3 0 0.7 1; 0.3 0 0.7 1"/>
+          <animate attributeName="opacity" dur="1.8s" begin="-0.9s" repeatCount="indefinite" values="0;0.45;0" calcMode="spline" keySplines="0.3 0 0.7 1; 0.3 0 0.7 1"/>
+        </circle>
+      </g>
+    </svg>
+  );
+}
+
 function ThinkingIndicator() {
   const [messageIndex, setMessageIndex] = useState(() =>
     Math.floor(Math.random() * THINKING_MESSAGES.length)
@@ -65,10 +122,6 @@ function ThinkingIndicator() {
     return () => clearInterval(interval);
   }, []);
 
-  const text = THINKING_MESSAGES[messageIndex];
-  // Approximate width: ~7px per char + padding
-  const svgWidth = Math.max(180, text.length * 6.5 + 32);
-
   return (
     <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 16, paddingRight: 48 }}>
       <div style={{ marginRight: 10, marginTop: 4, flexShrink: 0 }}>
@@ -76,109 +129,17 @@ function ThinkingIndicator() {
       </div>
       <div style={{
         background: '#252525', border: '1px solid rgba(255,255,255,0.08)',
-        borderRadius: '16px 16px 16px 4px', padding: '10px 14px',
+        borderRadius: '16px 16px 16px 4px', padding: '12px 16px',
       }}>
-        <svg
-          viewBox={`0 0 ${svgWidth} 28`}
-          xmlns="http://www.w3.org/2000/svg"
-          width={svgWidth}
-          height={28}
-          style={{ display: 'block' }}
-        >
-          <defs>
-            <clipPath id="wave-clip">
-              <rect x="0" y="0" width={svgWidth} height="28" rx="4"/>
-            </clipPath>
-          </defs>
-          <g clipPath="url(#wave-clip)">
-            {/* Water body */}
-            <rect x="0" y="16" width={svgWidth} height="12" fill="#CF7A5C" opacity="0.12"/>
-            {/* Wave layer 1 */}
-            <path fill="#CF7A5C" opacity="0.5">
-              <animate
-                attributeName="d"
-                dur="2.4s"
-                repeatCount="indefinite"
-                calcMode="spline"
-                keySplines="0.45 0 0.55 1; 0.45 0 0.55 1"
-                values={`
-                  M-10 16 Q${svgWidth*0.1} 7 ${svgWidth*0.2} 16 Q${svgWidth*0.3} 25 ${svgWidth*0.4} 16 Q${svgWidth*0.5} 7 ${svgWidth*0.6} 16 Q${svgWidth*0.7} 25 ${svgWidth*0.8} 16 Q${svgWidth*0.9} 7 ${svgWidth} 16 L${svgWidth} 28 L-10 28 Z;
-                  M-10 16 Q${svgWidth*0.1} 25 ${svgWidth*0.2} 16 Q${svgWidth*0.3} 7 ${svgWidth*0.4} 16 Q${svgWidth*0.5} 25 ${svgWidth*0.6} 16 Q${svgWidth*0.7} 7 ${svgWidth*0.8} 16 Q${svgWidth*0.9} 25 ${svgWidth} 16 L${svgWidth} 28 L-10 28 Z;
-                  M-10 16 Q${svgWidth*0.1} 7 ${svgWidth*0.2} 16 Q${svgWidth*0.3} 25 ${svgWidth*0.4} 16 Q${svgWidth*0.5} 7 ${svgWidth*0.6} 16 Q${svgWidth*0.7} 25 ${svgWidth*0.8} 16 Q${svgWidth*0.9} 7 ${svgWidth} 16 L${svgWidth} 28 L-10 28 Z
-                `}/>
-            </path>
-            {/* Wave layer 2 */}
-            <path fill="#CF7A5C" opacity="0.3">
-              <animate
-                attributeName="d"
-                dur="1.8s"
-                begin="-0.9s"
-                repeatCount="indefinite"
-                calcMode="spline"
-                keySplines="0.45 0 0.55 1; 0.45 0 0.55 1"
-                values={`
-                  M-10 18 Q${svgWidth*0.1} 10 ${svgWidth*0.2} 18 Q${svgWidth*0.3} 26 ${svgWidth*0.4} 18 Q${svgWidth*0.5} 10 ${svgWidth*0.6} 18 Q${svgWidth*0.7} 26 ${svgWidth*0.8} 18 Q${svgWidth*0.9} 10 ${svgWidth} 18 L${svgWidth} 28 L-10 28 Z;
-                  M-10 18 Q${svgWidth*0.1} 26 ${svgWidth*0.2} 18 Q${svgWidth*0.3} 10 ${svgWidth*0.4} 18 Q${svgWidth*0.5} 26 ${svgWidth*0.6} 18 Q${svgWidth*0.7} 10 ${svgWidth*0.8} 18 Q${svgWidth*0.9} 26 ${svgWidth} 18 L${svgWidth} 28 L-10 28 Z;
-                  M-10 18 Q${svgWidth*0.1} 10 ${svgWidth*0.2} 18 Q${svgWidth*0.3} 26 ${svgWidth*0.4} 18 Q${svgWidth*0.5} 10 ${svgWidth*0.6} 18 Q${svgWidth*0.7} 26 ${svgWidth*0.8} 18 Q${svgWidth*0.9} 10 ${svgWidth} 18 L${svgWidth} 28 L-10 28 Z
-                `}/>
-            </path>
-            {/* Splash droplets — appear at wave peaks */}
-            {[0.2, 0.6].map((xPct, i) => (
-              <circle key={i} cx={svgWidth * xPct} r="1.5" fill="#CF7A5C" opacity="0">
-                <animate
-                  attributeName="cy"
-                  dur="2.4s"
-                  repeatCount="indefinite"
-                  values="7;2;7"
-                  calcMode="spline"
-                  keySplines="0.3 0 0.7 1; 0.3 0 0.7 1"
-                />
-                <animate
-                  attributeName="opacity"
-                  dur="2.4s"
-                  repeatCount="indefinite"
-                  values="0;0.6;0"
-                  calcMode="spline"
-                  keySplines="0.3 0 0.7 1; 0.3 0 0.7 1"
-                />
-              </circle>
-            ))}
-            {[0.4, 0.8].map((xPct, i) => (
-              <circle key={i} cx={svgWidth * xPct} r="1" fill="#CF7A5C" opacity="0">
-                <animate
-                  attributeName="cy"
-                  dur="1.8s"
-                  begin="-0.9s"
-                  repeatCount="indefinite"
-                  values="10;4;10"
-                  calcMode="spline"
-                  keySplines="0.3 0 0.7 1; 0.3 0 0.7 1"
-                />
-                <animate
-                  attributeName="opacity"
-                  dur="1.8s"
-                  begin="-0.9s"
-                  repeatCount="indefinite"
-                  values="0;0.45;0"
-                  calcMode="spline"
-                  keySplines="0.3 0 0.7 1; 0.3 0 0.7 1"
-                />
-              </circle>
-            ))}
-          </g>
-          {/* Text overlaid on the wave */}
-          <text
-            x={svgWidth / 2}
-            y="17"
-            textAnchor="middle"
-            fontFamily="-apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif"
-            fontSize="12"
-            fontStyle="italic"
-            fill="rgba(255,255,255,0.5)"
-          >
-            {text}
-          </text>
-        </svg>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <NauticalLoader />
+          <span className="thinking-text" style={{
+            fontSize: 13, color: 'rgba(255,255,255,0.4)',
+            fontStyle: 'italic',
+          }}>
+            {THINKING_MESSAGES[messageIndex]}
+          </span>
+        </div>
       </div>
     </div>
   );
