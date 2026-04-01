@@ -506,6 +506,18 @@ function registerIpcHandlers() {
     });
   });
 
+  // --- Folder Picker ---
+
+  ipcMain.handle('keel:pick-folder', async (_event, defaultPath?: string) => {
+    const result = await dialog.showOpenDialog(mainWindow!, {
+      title: 'Choose Brain Folder',
+      defaultPath: defaultPath || undefined,
+      properties: ['openDirectory', 'createDirectory'],
+    });
+    if (result.canceled || result.filePaths.length === 0) return null;
+    return result.filePaths[0];
+  });
+
   // --- Knowledge Browser file operations ---
 
   ipcMain.handle('keel:list-files', async (_event, dirPath: string) => {

@@ -48,6 +48,8 @@ const api: KeelAPI = {
 
   listSessions: () => ipcRenderer.invoke('keel:list-sessions'),
 
+  pickFolder: (defaultPath?: string) => ipcRenderer.invoke('keel:pick-folder', defaultPath),
+
   listFiles: (dirPath: string) => ipcRenderer.invoke('keel:list-files', dirPath),
 
   readFile: (filePath: string) => ipcRenderer.invoke('keel:read-file', filePath),
