@@ -194,12 +194,12 @@ function parseReminderCommand(text: string): { dueAt: number; message: string; r
     return { dueAt: due.getTime(), message: recurMatch[5], recurring };
   }
 
-  // "in X minutes/hours"
-  const inMatch = rest.match(/^in\s+(\d+)\s*(min(?:utes?)?|hrs?|hours?)\s+(.+)/i);
+  // "in X seconds/minutes/hours"
+  const inMatch = rest.match(/^in\s+(\d+)\s*(sec(?:onds?)?|min(?:utes?)?|hrs?|hours?)\s+(.+)/i);
   if (inMatch) {
     const amount = parseInt(inMatch[1]);
     const unit = inMatch[2].toLowerCase();
-    const ms = unit.startsWith('min') ? amount * 60_000 : amount * 3_600_000;
+    const ms = unit.startsWith('sec') ? amount * 1_000 : unit.startsWith('min') ? amount * 60_000 : amount * 3_600_000;
     return { dueAt: Date.now() + ms, message: inMatch[3] };
   }
 
@@ -666,32 +666,49 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
         padding: '12px 24px',
         background: '#1a1a1a',
       }}>
-        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10 }}>
-          <textarea
-            ref={textareaRef}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Message Keel..."
-            disabled={isStreaming}
-            rows={1}
-            style={{
-              flex: 1, background: '#252525', border: '1px solid rgba(255,255,255,0.08)',
-              color: 'rgba(255,255,255,0.9)', fontSize: 14, borderRadius: 12,
-              padding: '10px 16px', resize: 'none', outline: 'none',
-              fontFamily: 'inherit', transition: 'all 0.15s',
-              overflow: 'hidden',
-              opacity: isStreaming ? 0.4 : 1,
-            }}
-            onFocus={(e) => {
-              e.currentTarget.style.borderColor = 'rgba(207,122,92,0.4)';
-              e.currentTarget.style.background = '#282828';
-            }}
-            onBlur={(e) => {
-              e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)';
-              e.currentTarget.style.background = '#252525';
-            }}
-          />
+        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10, position: 'relative' }}>
+          <div style={{ flex: 1, position: 'relative' }}>
+            {input.startsWith('/') && (
+              <div style={{
+                position: 'absolute', top: -24, left: 4,
+                fontSize: 11, fontWeight: 600, color: '#CF7A5C',
+                letterSpacing: '0.03em', opacity: 0.8,
+              }}>
+                / COMMAND
+              </div>
+            )}
+            <textarea
+              ref={textareaRef}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Message Keel..."
+              disabled={isStreaming}
+              rows={1}
+              style={{
+                width: '100%', background: input.startsWith('/') ? 'rgba(207,122,92,0.06)' : '#252525',
+                border: `1px solid ${input.startsWith('/') ? 'rgba(207,122,92,0.35)' : 'rgba(255,255,255,0.08)'}`,
+                color: 'rgba(255,255,255,0.9)', fontSize: 14, borderRadius: 12,
+                padding: '10px 16px', resize: 'none', outline: 'none',
+                fontFamily: 'inherit', transition: 'all 0.15s',
+                overflow: 'hidden',
+                opacity: isStreaming ? 0.4 : 1,
+                boxSizing: 'border-box',
+              }}
+              onFocus={(e) => {
+                if (!input.startsWith('/')) {
+                  e.currentTarget.style.borderColor = 'rgba(207,122,92,0.4)';
+                  e.currentTarget.style.background = '#282828';
+                }
+              }}
+              onBlur={(e) => {
+                if (!input.startsWith('/')) {
+                  e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)';
+                  e.currentTarget.style.background = '#252525';
+                }
+              }}
+            />
+          </div>
           <button
             onClick={() => sendMessage()}
             disabled={isStreaming || !input.trim()}

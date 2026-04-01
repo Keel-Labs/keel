@@ -6,7 +6,7 @@ const PROVIDERS = [
   { value: 'claude' as const, label: 'Claude', description: 'Anthropic — best reasoning & writing', keyField: 'anthropicApiKey' as const },
   { value: 'openai' as const, label: 'OpenAI', description: 'GPT models — strong all-rounder', keyField: 'openaiApiKey' as const },
   { value: 'openrouter' as const, label: 'OpenRouter', description: 'Any model via OpenRouter', keyField: 'openrouterApiKey' as const },
-  { value: 'ollama' as const, label: 'Ollama', description: 'Local models — free, private, offline', keyField: null },
+  { value: 'ollama' as const, label: 'Ollama', description: 'Local models — free, private, offline. Requires Ollama installed on your machine.', keyField: null },
 ];
 
 interface Props {

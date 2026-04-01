@@ -41,6 +41,17 @@ Here is everything you know about the user:
 
 `;
 
+function buildSystemPrompt(): string {
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+  const timeStr = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  return SYSTEM_PROMPT_PREFIX.replace(
+    'Here is everything you know about the user:',
+    `Current date and time: ${dateStr}, ${timeStr} (${tz})\n\nHere is everything you know about the user:`
+  );
+}
+
 export class ContextAssembler {
   private fileManager: FileManager;
   private useSemanticSearch: boolean;
@@ -67,8 +78,9 @@ export class ContextAssembler {
   }
 
   private async assembleV1(): Promise<string> {
+    const systemPrompt = buildSystemPrompt();
     const sections: string[] = [];
-    let totalChars = SYSTEM_PROMPT_PREFIX.length;
+    let totalChars = systemPrompt.length;
 
     const addSection = (filename: string, content: string): boolean => {
       const section = `\n\n--- ${filename} ---\n\n${content}`;
@@ -119,13 +131,14 @@ export class ContextAssembler {
       // no daily logs
     }
 
-    return SYSTEM_PROMPT_PREFIX + sections.join('');
+    return systemPrompt + sections.join('');
   }
 
   private async assembleV2(userMessage: string): Promise<string> {
+    const systemPrompt = buildSystemPrompt();
     const brainPath = this.fileManager.getBrainPath();
     const sections: string[] = [];
-    let totalChars = SYSTEM_PROMPT_PREFIX.length;
+    let totalChars = systemPrompt.length;
 
     const addSection = (filename: string, content: string): boolean => {
       const section = `\n\n--- ${filename} ---\n\n${content}`;
@@ -233,7 +246,7 @@ export class ContextAssembler {
       // Don't fail if logging fails
     }
 
-    return SYSTEM_PROMPT_PREFIX + sections.join('');
+    return systemPrompt + sections.join('');
   }
 }
 
