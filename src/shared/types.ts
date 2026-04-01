@@ -95,6 +95,7 @@ export type IpcChannels =
   | 'keel:list-files'
   | 'keel:read-file'
   | 'keel:write-file'
+  | 'keel:pick-folder'
   | 'keel:scheduled-notification'
   | 'keel:create-reminder'
   | 'keel:list-reminders'
@@ -125,6 +126,7 @@ export interface KeelAPI {
   loadChat: (sessionId: string) => Promise<Message[] | null>;
   getLatestSession: () => Promise<string | null>;
   listSessions: () => Promise<Array<{ id: string; title: string; updatedAt: number }>>;
+  pickFolder: (defaultPath?: string) => Promise<string | null>;
   listFiles: (dirPath: string) => Promise<FileEntry[]>;
   readFile: (filePath: string) => Promise<string>;
   writeFile: (filePath: string, content: string) => Promise<void>;

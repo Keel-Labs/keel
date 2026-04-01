@@ -397,12 +397,28 @@ export default function Settings({ onBack }: Props) {
             </div>
             <div style={{ marginBottom: 16 }}>
               <label style={labelStyle}>Brain Path</label>
-              <input
-                type="text"
-                value={settings.brainPath}
-                onChange={(e) => update({ brainPath: e.target.value })}
-                style={inputStyle}
-              />
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input
+                  type="text"
+                  value={settings.brainPath}
+                  onChange={(e) => update({ brainPath: e.target.value })}
+                  style={{ ...inputStyle, flex: 1 }}
+                  readOnly
+                />
+                <button
+                  onClick={async () => {
+                    const picked = await window.keel.pickFolder(settings.brainPath);
+                    if (picked) update({ brainPath: picked });
+                  }}
+                  style={{
+                    padding: '10px 14px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.12)',
+                    background: '#303030', color: 'rgba(255,255,255,0.6)', fontSize: 13,
+                    cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
+                  }}
+                >
+                  Browse...
+                </button>
+              </div>
               <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', marginTop: 6 }}>
                 Where Keel stores your files, notes, and context.
               </div>

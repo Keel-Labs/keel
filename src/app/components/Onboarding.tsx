@@ -132,10 +132,10 @@ export default function Onboarding({ initialSettings, onComplete }: Props) {
         {/* Welcome */}
         {step === 'welcome' && (
           <>
-            <div style={{ marginBottom: 24 }}>
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
               <KeelIcon size={64} />
             </div>
-            <div style={{ marginBottom: 8 }}>
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
               <KeelWordmark height={28} />
             </div>
             <p style={{ ...subtextStyle, marginTop: 12 }}>
@@ -152,12 +152,28 @@ export default function Onboarding({ initialSettings, onComplete }: Props) {
             <p style={subtextStyle}>
               Keel keeps your notes, projects, and context as plain markdown files in a local folder.
             </p>
-            <input
-              type="text"
-              value={settings.brainPath}
-              onChange={(e) => setSettings({ ...settings, brainPath: e.target.value })}
-              style={{ ...inputStyle, marginBottom: 8 }}
-            />
+            <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+              <input
+                type="text"
+                value={settings.brainPath}
+                onChange={(e) => setSettings({ ...settings, brainPath: e.target.value })}
+                style={{ ...inputStyle, flex: 1 }}
+                readOnly
+              />
+              <button
+                onClick={async () => {
+                  const picked = await window.keel.pickFolder(settings.brainPath);
+                  if (picked) setSettings({ ...settings, brainPath: picked });
+                }}
+                style={{
+                  padding: '10px 16px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.15)',
+                  background: '#303030', color: 'rgba(255,255,255,0.7)', fontSize: 13,
+                  cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
+                }}
+              >
+                Browse...
+              </button>
+            </div>
             <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', marginBottom: 24 }}>
               Default is fine for most people. You can change this later in Settings.
             </div>
@@ -314,7 +330,7 @@ export default function Onboarding({ initialSettings, onComplete }: Props) {
         {/* Done */}
         {step === 'done' && (
           <>
-            <div style={{ marginBottom: 24 }}>
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 24 }}>
               <KeelIcon size={56} />
             </div>
             <h2 style={headingStyle}>You're all set!</h2>
