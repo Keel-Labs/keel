@@ -586,7 +586,7 @@ function registerIpcHandlers() {
 
   function getGoogleConfig(): GoogleOAuthConfig {
     if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
-      throw new Error('Google integration is not configured. Set KEEL_GOOGLE_CLIENT_ID and KEEL_GOOGLE_CLIENT_SECRET environment variables.');
+      throw new Error('Google integration is not available yet. Google OAuth credentials have not been bundled with this build.');
     }
     return {
       clientId: GOOGLE_CLIENT_ID,
