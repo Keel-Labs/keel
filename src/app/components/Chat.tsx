@@ -124,9 +124,6 @@ function ThinkingIndicator() {
 
   return (
     <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 16, paddingRight: 48 }}>
-      <div style={{ marginRight: 10, marginTop: 4, flexShrink: 0 }}>
-        <KeelIcon size={24} />
-      </div>
       <div style={{
         background: '#252525', border: '1px solid rgba(255,255,255,0.08)',
         borderRadius: '16px 16px 16px 4px', padding: '12px 16px',
