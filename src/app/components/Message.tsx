@@ -39,9 +39,6 @@ export default function Message({ message }: Props) {
 
   return (
     <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 16, paddingRight: 48 }}>
-      <div style={{ marginRight: 10, marginTop: 4, flexShrink: 0 }}>
-        <KeelIcon size={24} />
-      </div>
       <div
         className="markdown-body"
         style={{
