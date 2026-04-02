@@ -69,10 +69,10 @@ describe('FileManager', () => {
   });
 
   describe('ensureDirectoryStructure', () => {
-    it('creates PARA directories', async () => {
+    it('creates brain directories', async () => {
       await fm.ensureDirectoryStructure();
 
-      for (const dir of ['00_inbox', '01_projects', '02_areas', '03_resources', '04_archives', 'daily_log']) {
+      for (const dir of ['projects', 'daily-log']) {
         const stat = await fs.stat(path.join(tmpDir, dir));
         expect(stat.isDirectory()).toBe(true);
       }
@@ -88,7 +88,7 @@ describe('FileManager', () => {
 
     it('creates example project', async () => {
       await fm.ensureDirectoryStructure();
-      const content = await fm.readFile('01_projects/example-project/context.md');
+      const content = await fm.readFile('projects/example-project/context.md');
       expect(content).toContain('Example Project');
     });
 

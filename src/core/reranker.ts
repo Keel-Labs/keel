@@ -2,7 +2,7 @@
  * Re-rank retrieved chunks using boost factors:
  * - Recency: recent files score higher
  * - Project match: chunks from the detected project score higher
- * - Source type: structured files (context.md) score higher than inbox
+ * - Source type: structured files (context.md) score higher
  */
 
 export interface RankableChunk {
@@ -40,7 +40,6 @@ function sourceBoost(filePath: string): number {
   if (filePath.endsWith('context.md'))     return 1.3;
   if (filePath.endsWith('notes.md'))       return 1.1;
   if (filePath.startsWith('daily-log/'))   return 1.0;
-  if (filePath.startsWith('inbox/'))       return 0.8;
   return 1.0;
 }
 

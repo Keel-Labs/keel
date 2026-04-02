@@ -79,7 +79,7 @@ function FolderItem({ entry, depth, onSelect, selectedPath }: {
 
 // Only show these knowledge folders and files — not app source code
 const KNOWLEDGE_ITEMS = new Set([
-  'keel.md', 'inbox', 'projects', 'ongoing', 'reference', 'archive', 'daily-log',
+  'keel.md', 'projects', 'daily-log',
 ]);
 
 export default function KnowledgeBrowser({ onBack }: Props) {
