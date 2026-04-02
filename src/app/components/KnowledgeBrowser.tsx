@@ -77,6 +77,11 @@ function FolderItem({ entry, depth, onSelect, selectedPath }: {
   );
 }
 
+// Only show these knowledge folders and files — not app source code
+const KNOWLEDGE_ITEMS = new Set([
+  'keel.md', 'inbox', 'projects', 'ongoing', 'reference', 'archive', 'daily-log',
+]);
+
 export default function KnowledgeBrowser({ onBack }: Props) {
   const [rootEntries, setRootEntries] = useState<FileEntry[]>([]);
   const [selectedPath, setSelectedPath] = useState('');
@@ -86,7 +91,9 @@ export default function KnowledgeBrowser({ onBack }: Props) {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    window.keel.listFiles('').then(setRootEntries).catch(() => {});
+    window.keel.listFiles('').then((entries) => {
+      setRootEntries(entries.filter((e) => KNOWLEDGE_ITEMS.has(e.name)));
+    }).catch(() => {});
   }, []);
 
   const loadFile = async (filePath: string) => {
