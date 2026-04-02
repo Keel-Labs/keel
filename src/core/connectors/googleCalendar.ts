@@ -222,3 +222,53 @@ export async function getUpcomingEventsFormatted(
   }
   return lines.join('\n').trim();
 }
+
+/**
+ * Create a new event on the user's primary Google Calendar.
+ */
+export async function createCalendarEvent(
+  brainPath: string,
+  config: GoogleOAuthConfig,
+  event: {
+    summary: string;
+    startTime: string;  // ISO datetime e.g. "2026-04-02T09:00:00"
+    endTime: string;    // ISO datetime
+    description?: string;
+    attendees?: string[];  // email addresses
+    timeZone?: string;
+  }
+): Promise<{ id: string; htmlLink: string }> {
+  const accessToken = await getValidAccessToken(brainPath, config);
+  const tz = event.timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+  const body: any = {
+    summary: event.summary,
+    start: { dateTime: event.startTime, timeZone: tz },
+    end: { dateTime: event.endTime, timeZone: tz },
+  };
+  if (event.description) body.description = event.description;
+  if (event.attendees?.length) {
+    body.attendees = event.attendees.map((email) => ({ email }));
+  }
+
+  const response = await fetch(
+    'https://www.googleapis.com/calendar/v3/calendars/primary/events',
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    }
+  );
+
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(`Calendar API error: ${response.status} ${err}`);
+  }
+
+  const data = await response.json() as any;
+  logActivity(brainPath, 'calendar-create', `Created event: ${event.summary}`);
+  return { id: data.id, htmlLink: data.htmlLink };
+}

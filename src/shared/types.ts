@@ -143,6 +143,7 @@ export interface KeelAPI {
   googleStatus: () => Promise<{ connected: boolean; configured?: boolean }>;
   googleSyncCalendar: () => Promise<{ eventCount: number; filesWritten: number }>;
   googleExportDoc: (markdownContent: string, title?: string) => Promise<string>;
+  googleCreateEvent: (event: { summary: string; startTime: string; endTime: string; description?: string; attendees?: string[] }) => Promise<{ id: string; htmlLink: string }>;
 }
 
 declare global {

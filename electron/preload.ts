@@ -80,6 +80,7 @@ const api: KeelAPI = {
   googleSyncCalendar: () => ipcRenderer.invoke('keel:google-sync-calendar'),
 
   googleExportDoc: (markdownContent: string, title?: string) => ipcRenderer.invoke('keel:google-export-doc', markdownContent, title),
+  googleCreateEvent: (event) => ipcRenderer.invoke('keel:google-create-event', event),
 };
 
 contextBridge.exposeInMainWorld('keel', api);
