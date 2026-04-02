@@ -212,7 +212,18 @@ export default function Onboarding({ initialSettings, onComplete }: Props) {
                   />
                   <div>
                     <div style={{ fontSize: 14, fontWeight: 500, color: 'rgba(255,255,255,0.9)' }}>{p.label}</div>
-                    <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>{p.description}</div>
+                    <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>
+                      {p.description}
+                      {p.value === 'ollama' && (
+                        <>
+                          {' '}
+                          <a href="https://ollama.com/download" target="_blank" rel="noopener noreferrer"
+                            style={{ color: '#CF7A5C' }}>
+                            Download Ollama
+                          </a>
+                        </>
+                      )}
+                    </div>
                   </div>
                 </label>
               ))}

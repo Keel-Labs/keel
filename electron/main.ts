@@ -713,6 +713,27 @@ function registerIpcHandlers() {
       timeZone: settings.timezone || undefined,
     });
   });
+
+  ipcMain.handle('keel:ollama-list-models', async () => {
+    try {
+      const { Ollama } = await import('ollama');
+      const ollama = new Ollama();
+      const response = await ollama.list();
+      const models = response.models.map((m: any) => ({
+        name: m.name,
+        size: m.size,
+        parameterSize: m.details?.parameter_size || '',
+        quantizationLevel: m.details?.quantization_level || '',
+        family: m.details?.family || '',
+      }));
+      return { models, error: null };
+    } catch (err) {
+      return {
+        models: [],
+        error: err instanceof Error ? err.message : 'Could not connect to Ollama',
+      };
+    }
+  });
 }
 
 // --- Scheduler for Timed Briefs/EOD ---

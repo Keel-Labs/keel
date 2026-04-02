@@ -60,6 +60,19 @@ export interface ActivityLogEntry {
   createdAt: number;
 }
 
+export interface OllamaModelInfo {
+  name: string;
+  size: number;
+  parameterSize: string;
+  quantizationLevel: string;
+  family: string;
+}
+
+export interface OllamaListResult {
+  models: OllamaModelInfo[];
+  error: string | null;
+}
+
 // IPC channel types
 export interface ScheduledNotification {
   type: 'daily-brief' | 'eod' | 'reminder';
@@ -105,7 +118,8 @@ export type IpcChannels =
   | 'keel:google-disconnect'
   | 'keel:google-status'
   | 'keel:google-sync-calendar'
-  | 'keel:google-export-doc';
+  | 'keel:google-export-doc'
+  | 'keel:ollama-list-models';
 
 // Preload API exposed to renderer
 export interface KeelAPI {
@@ -145,6 +159,8 @@ export interface KeelAPI {
   googleSyncCalendar: () => Promise<{ eventCount: number; filesWritten: number }>;
   googleExportDoc: (markdownContent: string, title?: string) => Promise<string>;
   googleCreateEvent: (event: { summary: string; startTime: string; endTime: string; description?: string; attendees?: string[] }) => Promise<{ id: string; htmlLink: string }>;
+  // Ollama
+  ollamaListModels: () => Promise<OllamaListResult>;
 }
 
 declare global {
