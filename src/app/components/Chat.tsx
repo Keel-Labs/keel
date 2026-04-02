@@ -253,6 +253,18 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
   const [sessionId, setSessionId] = useState<string>(generateSessionId());
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [userTimezone, setUserTimezone] = useState<string>('');
+
+  // Load user timezone
+  useEffect(() => {
+    window.keel.getSettings().then((s) => setUserTimezone(s.timezone || '')).catch(() => {});
+  }, []);
+
+  const formatTime = (ms: number) => {
+    const opts: Intl.DateTimeFormatOptions = { dateStyle: 'medium', timeStyle: 'short' };
+    if (userTimezone) opts.timeZone = userTimezone;
+    return new Date(ms).toLocaleString('en-US', opts);
+  };
 
   // Handle new chat signal from sidebar/header
   const isFirstRender = useRef(true);
@@ -532,7 +544,7 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
     if (reminderParsed) {
       try {
         await window.keel.createReminder(reminderParsed.message, reminderParsed.dueAt, reminderParsed.recurring);
-        const when = new Date(reminderParsed.dueAt).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' });
+        const when = formatTime(reminderParsed.dueAt);
         const recur = reminderParsed.recurring ? ` Repeats ${reminderParsed.recurring}.` : '';
         setMessages((prev) => [...prev, { role: 'assistant', content: `Reminder set for **${when}**: ${reminderParsed.message}${recur}`, timestamp: Date.now() }]);
       } catch (error) {

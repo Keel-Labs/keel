@@ -58,7 +58,7 @@ let tray: Tray | null = null;
 const settings = loadSettings();
 const fileManager = new FileManager(settings.brainPath);
 const llmClient = new LLMClient();
-const contextAssembler = new ContextAssembler(fileManager, false);
+const contextAssembler = new ContextAssembler(fileManager, false, settings.timezone || undefined);
 
 const isDev = process.env.NODE_ENV === 'development';
 
@@ -400,7 +400,9 @@ function registerIpcHandlers() {
 
   ipcMain.handle('keel:save-settings', async (_event, newSettings: Settings) => {
     saveSettingsToFile(newSettings);
+    Object.assign(settings, newSettings);
     llmClient.reload();
+    contextAssembler.setTimezone(newSettings.timezone || '');
   });
 
   ipcMain.handle('keel:chat', async (_event, messages: Message[]) => {
@@ -608,7 +610,10 @@ function registerIpcHandlers() {
   });
 
   ipcMain.handle('keel:google-status', async () => {
-    return { connected: isGoogleConnected(settings.brainPath) };
+    return {
+      connected: isGoogleConnected(settings.brainPath),
+      configured: !!(GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET),
+    };
   });
 
   ipcMain.handle('keel:google-sync-calendar', async () => {
@@ -629,11 +634,15 @@ let lastTriggered: { brief?: string; eod?: string } = {};
 
 function getCurrentHHMM(): string {
   const now = new Date();
-  return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+  const tz = settings.timezone || undefined;
+  const h = parseInt(now.toLocaleString('en-US', { hour: '2-digit', hour12: false, timeZone: tz }));
+  const m = parseInt(now.toLocaleString('en-US', { minute: '2-digit', timeZone: tz }));
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 }
 
 function getTodayKey(): string {
-  return new Date().toISOString().split('T')[0];
+  const tz = settings.timezone || undefined;
+  return new Date().toLocaleDateString('en-CA', { timeZone: tz }); // YYYY-MM-DD format
 }
 
 async function runScheduledBrief(): Promise<void> {

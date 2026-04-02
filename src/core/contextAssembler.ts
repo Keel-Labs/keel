@@ -41,11 +41,11 @@ Here is everything you know about the user:
 
 `;
 
-function buildSystemPrompt(): string {
+function buildSystemPrompt(timezone?: string): string {
   const now = new Date();
-  const dateStr = now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-  const timeStr = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
-  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const tz = timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const dateStr = now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: tz });
+  const timeStr = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: tz });
   return SYSTEM_PROMPT_PREFIX.replace(
     'Here is everything you know about the user:',
     `Current date and time: ${dateStr}, ${timeStr} (${tz})\n\nHere is everything you know about the user:`
@@ -55,10 +55,16 @@ function buildSystemPrompt(): string {
 export class ContextAssembler {
   private fileManager: FileManager;
   private useSemanticSearch: boolean;
+  private timezone?: string;
 
-  constructor(fileManager: FileManager, useSemanticSearch: boolean = false) {
+  constructor(fileManager: FileManager, useSemanticSearch: boolean = false, timezone?: string) {
     this.fileManager = fileManager;
     this.useSemanticSearch = useSemanticSearch;
+    this.timezone = timezone;
+  }
+
+  setTimezone(tz: string): void {
+    this.timezone = tz || undefined;
   }
 
   enableSemanticSearch(): void {
@@ -78,7 +84,7 @@ export class ContextAssembler {
   }
 
   private async assembleV1(): Promise<string> {
-    const systemPrompt = buildSystemPrompt();
+    const systemPrompt = buildSystemPrompt(this.timezone);
     const sections: string[] = [];
     let totalChars = systemPrompt.length;
 
@@ -135,7 +141,7 @@ export class ContextAssembler {
   }
 
   private async assembleV2(userMessage: string): Promise<string> {
-    const systemPrompt = buildSystemPrompt();
+    const systemPrompt = buildSystemPrompt(this.timezone);
     const brainPath = this.fileManager.getBrainPath();
     const sections: string[] = [];
     let totalChars = systemPrompt.length;

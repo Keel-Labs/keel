@@ -23,6 +23,7 @@ export interface Settings {
   // Scheduler
   dailyBriefTime: string;  // HH:MM format, e.g. "09:00". Empty = disabled.
   eodTime: string;         // HH:MM format, e.g. "17:30". Empty = disabled.
+  timezone: string;        // IANA timezone, e.g. "America/New_York". Empty = auto-detect.
 }
 
 export interface EmbeddedChunk {
@@ -139,7 +140,7 @@ export interface KeelAPI {
   // Google Integration
   googleConnect: () => Promise<void>;
   googleDisconnect: () => Promise<void>;
-  googleStatus: () => Promise<{ connected: boolean }>;
+  googleStatus: () => Promise<{ connected: boolean; configured?: boolean }>;
   googleSyncCalendar: () => Promise<{ eventCount: number; filesWritten: number }>;
   googleExportDoc: (markdownContent: string, title?: string) => Promise<string>;
 }
