@@ -18,10 +18,15 @@ const api: KeelAPI = {
     ipcRenderer.on('keel:chat-stream-error', (_event, error) => callback(error));
   },
 
+  onThinkingStep: (callback: (step: string) => void) => {
+    ipcRenderer.on('keel:thinking-step', (_event, step) => callback(step));
+  },
+
   removeStreamListeners: () => {
     ipcRenderer.removeAllListeners('keel:chat-stream-chunk');
     ipcRenderer.removeAllListeners('keel:chat-stream-done');
     ipcRenderer.removeAllListeners('keel:chat-stream-error');
+    ipcRenderer.removeAllListeners('keel:thinking-step');
   },
 
   getSettings: () => ipcRenderer.invoke('keel:get-settings'),
