@@ -166,6 +166,52 @@ function isGoogleDocCommand(text: string): boolean {
 }
 
 /**
+ * Parse /schedule command for creating calendar events.
+ * /schedule tomorrow at 9am Meeting with Alex
+ * /schedule 2026-04-03 2:00 PM Team standup
+ * /schedule today at 3pm for 2 hours Design review
+ */
+function parseScheduleCommand(text: string): { summary: string; startTime: string; endTime: string } | null {
+  const t = text.trim();
+  const match = t.match(/^\/schedule\s+(.+)/i);
+  if (!match) return null;
+
+  const rest = match[1];
+  const now = new Date();
+
+  // "tomorrow at HH:MM [am/pm] [for N hours] message"
+  const tomorrowMatch = rest.match(/^tomorrow\s+(?:at\s+)?(\d{1,2}):?(\d{2})?\s*(am|pm)?\s+(?:for\s+(\d+)\s*(?:hours?|hrs?)\s+)?(.+)/i);
+  if (tomorrowMatch) {
+    const due = parseTimeToDate(now, tomorrowMatch[1], tomorrowMatch[2] || '00', tomorrowMatch[3]);
+    due.setDate(due.getDate() + 1);
+    const durationHrs = tomorrowMatch[4] ? parseInt(tomorrowMatch[4]) : 1;
+    const end = new Date(due.getTime() + durationHrs * 3_600_000);
+    return { summary: tomorrowMatch[5], startTime: due.toISOString(), endTime: end.toISOString() };
+  }
+
+  // "today at HH:MM [am/pm] [for N hours] message"
+  const todayMatch = rest.match(/^today\s+(?:at\s+)?(\d{1,2}):?(\d{2})?\s*(am|pm)?\s+(?:for\s+(\d+)\s*(?:hours?|hrs?)\s+)?(.+)/i);
+  if (todayMatch) {
+    const due = parseTimeToDate(now, todayMatch[1], todayMatch[2] || '00', todayMatch[3]);
+    const durationHrs = todayMatch[4] ? parseInt(todayMatch[4]) : 1;
+    const end = new Date(due.getTime() + durationHrs * 3_600_000);
+    return { summary: todayMatch[5], startTime: due.toISOString(), endTime: end.toISOString() };
+  }
+
+  // "HH:MM [am/pm] [for N hours] message" or "at HH:MM message"
+  const timeMatch = rest.match(/^(?:at\s+)?(\d{1,2}):?(\d{2})?\s*(am|pm)?\s+(?:for\s+(\d+)\s*(?:hours?|hrs?)\s+)?(.+)/i);
+  if (timeMatch && timeMatch[5]) {
+    const due = parseTimeToDate(now, timeMatch[1], timeMatch[2] || '00', timeMatch[3]);
+    if (due <= now) due.setDate(due.getDate() + 1);
+    const durationHrs = timeMatch[4] ? parseInt(timeMatch[4]) : 1;
+    const end = new Date(due.getTime() + durationHrs * 3_600_000);
+    return { summary: timeMatch[5], startTime: due.toISOString(), endTime: end.toISOString() };
+  }
+
+  return null;
+}
+
+/**
  * Parse reminder commands. Supports:
  *   /remind [time] [message]
  *   /remind 2:00 PM Call John
@@ -550,6 +596,22 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
       } catch (error) {
         const msg = error instanceof Error ? error.message : 'Failed to set reminder';
         setMessages((prev) => [...prev, { role: 'assistant', content: msg, timestamp: Date.now() }]);
+      }
+      setIsStreaming(false);
+      return;
+    }
+
+    // Schedule command
+    const scheduleParsed = parseScheduleCommand(trimmed);
+    if (scheduleParsed) {
+      try {
+        const result = await window.keel.googleCreateEvent(scheduleParsed);
+        const start = new Date(scheduleParsed.startTime);
+        const when = formatTime(start.getTime());
+        setMessages((prev) => [...prev, { role: 'assistant', content: `Meeting scheduled: **${scheduleParsed.summary}** on **${when}**`, timestamp: Date.now() }]);
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : 'Failed to create event';
+        setMessages((prev) => [...prev, { role: 'assistant', content: `Could not schedule event: ${msg}`, timestamp: Date.now() }]);
       }
       setIsStreaming(false);
       return;

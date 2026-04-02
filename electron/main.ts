@@ -48,7 +48,7 @@ import {
   type GoogleOAuthConfig,
 } from '../src/core/connectors/googleAuth';
 import { GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_SCOPES } from '../src/core/connectors/googleConfig';
-import { syncCalendar, getUpcomingEventsFormatted } from '../src/core/connectors/googleCalendar';
+import { syncCalendar, getUpcomingEventsFormatted, createCalendarEvent } from '../src/core/connectors/googleCalendar';
 import { exportToGoogleDoc, readGoogleDoc, extractDocId } from '../src/core/connectors/googleDocs';
 import type { Message, Settings } from '../src/shared/types';
 
@@ -678,6 +678,20 @@ function registerIpcHandlers() {
   ipcMain.handle('keel:google-export-doc', async (_event, markdownContent: string, title?: string) => {
     const config = getGoogleConfig();
     return exportToGoogleDoc(settings.brainPath, config, markdownContent, title);
+  });
+
+  ipcMain.handle('keel:google-create-event', async (_event, eventData: {
+    summary: string;
+    startTime: string;
+    endTime: string;
+    description?: string;
+    attendees?: string[];
+  }) => {
+    const config = getGoogleConfig();
+    return createCalendarEvent(settings.brainPath, config, {
+      ...eventData,
+      timeZone: settings.timezone || undefined,
+    });
   });
 }
 
