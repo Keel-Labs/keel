@@ -31,12 +31,16 @@ export default function Settings({ onBack }: Props) {
   const [saved, setSaved] = useState(false);
   const [showApiKey, setShowApiKey] = useState<Record<string, boolean>>({});
   const [googleConnected, setGoogleConnected] = useState(false);
+  const [googleConfigured, setGoogleConfigured] = useState(false);
   const [googleSyncing, setGoogleSyncing] = useState(false);
   const [googleMessage, setGoogleMessage] = useState('');
 
   useEffect(() => {
     window.keel.getSettings().then(setSettings).catch(() => {});
-    window.keel.googleStatus().then((s) => setGoogleConnected(s.connected)).catch(() => {});
+    window.keel.googleStatus().then((s) => {
+      setGoogleConnected(s.connected);
+      setGoogleConfigured(s.configured ?? false);
+    }).catch(() => {});
   }, []);
 
   if (!settings) return null;
@@ -259,6 +263,38 @@ export default function Settings({ onBack }: Props) {
             )}
           </div>
 
+          {/* Timezone */}
+          <div style={sectionStyle}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: 'rgba(255,255,255,0.85)', marginBottom: 14 }}>
+              Timezone
+            </div>
+            <div style={{ marginBottom: 16 }}>
+              <select
+                value={settings.timezone || ''}
+                onChange={(e) => update({ timezone: e.target.value })}
+                style={selectStyle}
+              >
+                <option value="">Auto-detect ({Intl.DateTimeFormat().resolvedOptions().timeZone})</option>
+                {[
+                  'America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles',
+                  'America/Anchorage', 'Pacific/Honolulu', 'America/Phoenix',
+                  'America/Toronto', 'America/Vancouver',
+                  'Europe/London', 'Europe/Paris', 'Europe/Berlin', 'Europe/Amsterdam',
+                  'Europe/Zurich', 'Europe/Rome', 'Europe/Madrid', 'Europe/Dublin',
+                  'Asia/Tokyo', 'Asia/Shanghai', 'Asia/Singapore', 'Asia/Dubai',
+                  'Asia/Kolkata', 'Asia/Seoul', 'Asia/Hong_Kong',
+                  'Australia/Sydney', 'Australia/Melbourne', 'Pacific/Auckland',
+                  'America/Sao_Paulo', 'America/Mexico_City', 'Africa/Lagos', 'Africa/Cairo',
+                ].map((tz) => (
+                  <option key={tz} value={tz}>{tz.replace(/_/g, ' ')}</option>
+                ))}
+              </select>
+              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', marginTop: 6 }}>
+                Used for reminders, scheduled briefs, and the time shown to your AI.
+              </div>
+            </div>
+          </div>
+
           {/* Scheduler */}
           <div style={sectionStyle}>
             <div style={{ fontSize: 14, fontWeight: 600, color: 'rgba(255,255,255,0.85)', marginBottom: 14 }}>
@@ -309,6 +345,15 @@ export default function Settings({ onBack }: Props) {
               Connect your Google account to sync Calendar events and export to Google Docs.
             </div>
 
+            {!googleConfigured ? (
+              <div style={{
+                padding: '12px 16px', borderRadius: 10,
+                background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)',
+                fontSize: 13, color: 'rgba(255,255,255,0.4)',
+              }}>
+                Coming soon — Google integration will be available in a future release.
+              </div>
+            ) : (<>
             {/* Connection status */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
               <div style={{
@@ -388,6 +433,7 @@ export default function Settings({ onBack }: Props) {
                 {googleMessage}
               </div>
             )}
+            </>)}
           </div>
 
           {/* Brain Path */}
