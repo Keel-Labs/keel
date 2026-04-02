@@ -2,23 +2,9 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import { glob as globFn } from 'glob';
 
-const PARA_DIRS = [
-  'inbox',
+const BRAIN_DIRS = [
   'projects',
-  'ongoing',
-  'reference',
-  'archive',
   'daily-log',
-];
-
-// Old folder names → new folder names for one-time migration
-const PARA_MIGRATIONS: [string, string][] = [
-  ['00_inbox',    'inbox'],
-  ['01_projects', 'projects'],
-  ['02_areas',    'ongoing'],
-  ['03_resources','reference'],
-  ['04_archives', 'archive'],
-  ['daily_log',   'daily-log'],
 ];
 
 const KEEL_MD_TEMPLATE = `# Profile
@@ -96,26 +82,8 @@ export class FileManager {
   }
 
   async ensureDirectoryStructure(): Promise<void> {
-    // One-time migration: rename old PARA folders to new names
-    for (const [oldName, newName] of PARA_MIGRATIONS) {
-      const oldPath = this.resolve(oldName);
-      const newPath = this.resolve(newName);
-      try {
-        await fs.access(oldPath);
-        // Old folder exists — rename it (only if new name doesn't exist yet)
-        try {
-          await fs.access(newPath);
-          // New folder already exists — skip
-        } catch {
-          await fs.rename(oldPath, newPath);
-        }
-      } catch {
-        // Old folder doesn't exist — nothing to migrate
-      }
-    }
-
-    // Ensure all new directories exist
-    for (const dir of PARA_DIRS) {
+    // Ensure core directories exist
+    for (const dir of BRAIN_DIRS) {
       await fs.mkdir(this.resolve(dir), { recursive: true });
     }
 

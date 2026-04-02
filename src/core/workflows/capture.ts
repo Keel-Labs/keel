@@ -77,10 +77,10 @@ export async function capture(
       }
     }
   } catch {
-    // No embeddings available — file to inbox
+    // No embeddings available — file to general captures
   }
 
-  // Write to inbox
+  // Write to the matched project, or projects/captures/ as fallback
   const date = new Date().toISOString().split('T')[0];
   const slug = sourceLabel
     .toLowerCase()
@@ -88,7 +88,8 @@ export async function capture(
     .replace(/^-|-$/g, '')
     .slice(0, 40);
 
-  const fileName = `inbox/${date}-${slug}.md`;
+  const folder = projectFolder ? `projects/${projectFolder}` : 'projects/captures';
+  const fileName = `${folder}/${date}-${slug}.md`;
   const fileContent = `# ${sourceLabel}
 
 **Captured:** ${new Date().toISOString()}
