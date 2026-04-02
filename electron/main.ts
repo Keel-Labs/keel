@@ -48,7 +48,7 @@ import {
   type GoogleOAuthConfig,
 } from '../src/core/connectors/googleAuth';
 import { GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_SCOPES } from '../src/core/connectors/googleConfig';
-import { syncCalendar } from '../src/core/connectors/googleCalendar';
+import { syncCalendar, getUpcomingEventsFormatted } from '../src/core/connectors/googleCalendar';
 import { exportToGoogleDoc, readGoogleDoc, extractDocId } from '../src/core/connectors/googleDocs';
 import type { Message, Settings } from '../src/shared/types';
 
@@ -405,7 +405,7 @@ function registerIpcHandlers() {
     contextAssembler.setTimezone(newSettings.timezone || '');
   });
 
-  // Enrich messages: auto-fetch Google Doc content when URLs are detected
+  // Enrich messages: auto-fetch Google Docs and Calendar events
   async function enrichMessages(messages: Message[]): Promise<Message[]> {
     if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) return messages;
     if (!isGoogleConnected(settings.brainPath)) return messages;
@@ -414,29 +414,43 @@ function registerIpcHandlers() {
     const last = enriched[enriched.length - 1];
     if (!last || last.role !== 'user') return enriched;
 
-    // Find all Google Doc URLs in the message
+    const config = { clientId: GOOGLE_CLIENT_ID, clientSecret: GOOGLE_CLIENT_SECRET, scopes: GOOGLE_SCOPES };
+    const appendParts: string[] = [];
+
+    // 1. Auto-fetch Google Doc URLs
     const docUrlPattern = /https?:\/\/docs\.google\.com\/document\/d\/[a-zA-Z0-9_-]+[^\s)"]*/g;
     const urls = last.content.match(docUrlPattern);
-    if (!urls || urls.length === 0) return enriched;
-
-    const config = { clientId: GOOGLE_CLIENT_ID, clientSecret: GOOGLE_CLIENT_SECRET, scopes: GOOGLE_SCOPES };
-    const docContents: string[] = [];
-
-    for (const url of urls) {
-      const docId = extractDocId(url);
-      if (!docId) continue;
-      try {
-        const { title, content } = await readGoogleDoc(settings.brainPath, config, docId);
-        docContents.push(`\n\n--- Google Doc: "${title}" ---\n\n${content.slice(0, 15000)}`);
-      } catch (err) {
-        docContents.push(`\n\n[Could not read Google Doc: ${err instanceof Error ? err.message : 'unknown error'}]`);
+    if (urls) {
+      for (const url of urls) {
+        const docId = extractDocId(url);
+        if (!docId) continue;
+        try {
+          const { title, content } = await readGoogleDoc(settings.brainPath, config, docId);
+          appendParts.push(`\n\n--- Google Doc: "${title}" ---\n\n${content.slice(0, 15000)}`);
+        } catch (err) {
+          appendParts.push(`\n\n[Could not read Google Doc: ${err instanceof Error ? err.message : 'unknown error'}]`);
+        }
       }
     }
 
-    if (docContents.length > 0) {
+    // 2. Auto-fetch Calendar events when user asks about schedule/meetings
+    const msg = last.content.toLowerCase();
+    const calendarKeywords = /\b(meeting|meetings|calendar|schedule|scheduled|agenda|event|events|busy|free|available|appointment|appointments)\b/;
+    const timeKeywords = /\b(today|tomorrow|this week|next week|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/;
+    if (calendarKeywords.test(msg) && (timeKeywords.test(msg) || /\b(what|when|do i have|check|show|any)\b/.test(msg))) {
+      const daysAhead = /tomorrow/.test(msg) ? 2 : /this week|next week/.test(msg) ? 7 : 1;
+      try {
+        const events = await getUpcomingEventsFormatted(settings.brainPath, config, daysAhead);
+        appendParts.push(`\n\n--- Google Calendar (next ${daysAhead} day${daysAhead > 1 ? 's' : ''}) ---\n\n${events}`);
+      } catch (err) {
+        appendParts.push(`\n\n[Could not fetch calendar: ${err instanceof Error ? err.message : 'unknown error'}]`);
+      }
+    }
+
+    if (appendParts.length > 0) {
       enriched[enriched.length - 1] = {
         ...last,
-        content: last.content + docContents.join(''),
+        content: last.content + appendParts.join(''),
       };
     }
 

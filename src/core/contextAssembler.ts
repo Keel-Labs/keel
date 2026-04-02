@@ -39,6 +39,8 @@ IMPORTANT: When the user asks you to set a reminder, schedule something, or noti
 
 IMPORTANT: When the user shares a Google Docs URL, you CAN read it. The document content will be automatically fetched and included in the message. Do NOT say you cannot access external links or Google Docs — if the content appears after the URL, you have it. Read and respond to it directly.
 
+IMPORTANT: You have access to the user's Google Calendar. When the user asks about meetings, schedule, or events, the calendar data will be automatically fetched and included in the message. Do NOT say you don't have access to their calendar — if calendar data appears in the message, use it to answer directly. Present meetings in a clear, organized format.
+
 Here is everything you know about the user:
 
 `;
