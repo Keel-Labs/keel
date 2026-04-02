@@ -18,35 +18,35 @@ interface Props {
   onNavigate: (view: ActiveView) => void;
 }
 
-function NavButton({ icon, label, active, onClick }: {
+function NavItem({ icon, label, active, onClick }: {
   icon: string; label: string; active: boolean; onClick: () => void;
 }) {
   return (
     <button
       onClick={onClick}
-      title={label}
       style={{
-        width: 36, height: 36, borderRadius: 8, border: 'none',
-        background: active ? 'rgba(207,122,92,0.15)' : 'transparent',
-        color: active ? '#CF7A5C' : 'rgba(255,255,255,0.4)',
-        fontSize: 16, cursor: 'pointer', display: 'flex',
-        alignItems: 'center', justifyContent: 'center',
-        transition: 'all 0.15s',
+        width: '100%', display: 'flex', alignItems: 'center', gap: 10,
+        padding: '8px 10px', borderRadius: 8, border: 'none',
+        background: active ? 'rgba(207,122,92,0.12)' : 'transparent',
+        color: active ? '#CF7A5C' : 'rgba(255,255,255,0.55)',
+        fontSize: 13, cursor: 'pointer', transition: 'all 0.12s',
+        textAlign: 'left',
       }}
       onMouseEnter={(e) => {
         if (!active) {
           e.currentTarget.style.background = 'rgba(255,255,255,0.06)';
-          e.currentTarget.style.color = 'rgba(255,255,255,0.7)';
+          e.currentTarget.style.color = 'rgba(255,255,255,0.8)';
         }
       }}
       onMouseLeave={(e) => {
         if (!active) {
           e.currentTarget.style.background = 'transparent';
-          e.currentTarget.style.color = 'rgba(255,255,255,0.4)';
+          e.currentTarget.style.color = 'rgba(255,255,255,0.55)';
         }
       }}
     >
-      {icon}
+      <span style={{ fontSize: 15, width: 20, textAlign: 'center', flexShrink: 0 }}>{icon}</span>
+      <span>{label}</span>
     </button>
   );
 }
@@ -73,34 +73,41 @@ export default function Sidebar({ currentSessionId, onSelectSession, onNewChat, 
         <KeelWordmark height={18} />
       </div>
 
-      {/* New Chat button */}
-      <div style={{ padding: '12px 12px 4px' }}>
+      {/* Top nav */}
+      <div style={{ padding: '12px 8px 0', display: 'flex', flexDirection: 'column', gap: 1 }}>
         <button
           onClick={onNewChat}
           style={{
             width: '100%', display: 'flex', alignItems: 'center', gap: 10,
-            padding: '11px 14px', borderRadius: 10,
-            background: 'transparent', border: '1px solid rgba(255,255,255,0.12)',
-            color: 'rgba(255,255,255,0.7)', fontSize: 14, cursor: 'pointer',
-            transition: 'all 0.15s',
+            padding: '8px 10px', borderRadius: 8,
+            background: 'transparent', border: 'none',
+            color: 'rgba(255,255,255,0.55)', fontSize: 13, cursor: 'pointer',
+            transition: 'all 0.12s', textAlign: 'left',
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.background = 'rgba(255,255,255,0.06)';
-            e.currentTarget.style.color = 'rgba(255,255,255,0.9)';
+            e.currentTarget.style.color = 'rgba(255,255,255,0.8)';
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.background = 'transparent';
-            e.currentTarget.style.color = 'rgba(255,255,255,0.7)';
+            e.currentTarget.style.color = 'rgba(255,255,255,0.55)';
           }}
         >
-          <span style={{
-            width: 22, height: 22, borderRadius: '50%',
-            border: '1.5px solid rgba(255,255,255,0.3)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 15, lineHeight: 1, flexShrink: 0,
-          }}>+</span>
+          <span style={{ fontSize: 15, width: 20, textAlign: 'center', flexShrink: 0 }}>+</span>
           <span>New session</span>
         </button>
+        <NavItem
+          icon="📁"
+          label="Knowledge Browser"
+          active={activeView === 'knowledge'}
+          onClick={() => onNavigate('knowledge')}
+        />
+        <NavItem
+          icon="⚙"
+          label="Settings"
+          active={activeView === 'settings'}
+          onClick={() => onNavigate('settings')}
+        />
       </div>
 
       {/* Session list */}
@@ -154,25 +161,6 @@ export default function Sidebar({ currentSessionId, onSelectSession, onNewChat, 
         )}
       </div>
 
-      {/* Bottom nav: Knowledge + Settings */}
-      <div style={{
-        padding: '8px 12px 12px',
-        borderTop: '1px solid rgba(255,255,255,0.06)',
-        display: 'flex', gap: 4,
-      }}>
-        <NavButton
-          icon="📁"
-          label="Knowledge Browser"
-          active={activeView === 'knowledge'}
-          onClick={() => onNavigate('knowledge')}
-        />
-        <NavButton
-          icon="⚙"
-          label="Settings"
-          active={activeView === 'settings'}
-          onClick={() => onNavigate('settings')}
-        />
-      </div>
     </div>
   );
 }
