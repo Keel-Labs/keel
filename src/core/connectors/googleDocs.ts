@@ -168,6 +168,78 @@ async function insertContent(
 }
 
 /**
+ * Extract a Google Doc ID from a URL.
+ * Supports formats like:
+ *   https://docs.google.com/document/d/DOC_ID/edit
+ *   https://docs.google.com/document/d/DOC_ID/
+ *   https://docs.google.com/document/d/DOC_ID
+ */
+export function extractDocId(url: string): string | null {
+  const match = url.match(/docs\.google\.com\/document\/d\/([a-zA-Z0-9_-]+)/);
+  return match ? match[1] : null;
+}
+
+/**
+ * Read the text content of a Google Doc by its ID.
+ * Returns the document title and plain text body.
+ */
+export async function readGoogleDoc(
+  brainPath: string,
+  config: GoogleOAuthConfig,
+  docId: string
+): Promise<{ title: string; content: string }> {
+  const accessToken = await getValidAccessToken(brainPath, config);
+
+  const response = await fetch(
+    `https://docs.googleapis.com/v1/documents/${docId}`,
+    { headers: { Authorization: `Bearer ${accessToken}` } }
+  );
+
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(`Docs API error: ${response.status} ${err}`);
+  }
+
+  const doc = await response.json() as any;
+  const title = doc.title || 'Untitled';
+
+  // Extract plain text from the document body
+  let text = '';
+  if (doc.body?.content) {
+    for (const element of doc.body.content) {
+      if (element.paragraph?.elements) {
+        for (const el of element.paragraph.elements) {
+          if (el.textRun?.content) {
+            text += el.textRun.content;
+          }
+        }
+      }
+      if (element.table) {
+        for (const row of element.table.tableRows || []) {
+          const cells: string[] = [];
+          for (const cell of row.tableCells || []) {
+            let cellText = '';
+            for (const content of cell.content || []) {
+              if (content.paragraph?.elements) {
+                for (const el of content.paragraph.elements) {
+                  if (el.textRun?.content) cellText += el.textRun.content;
+                }
+              }
+            }
+            cells.push(cellText.trim());
+          }
+          text += cells.join(' | ') + '\n';
+        }
+      }
+    }
+  }
+
+  logActivity(brainPath, 'read-gdoc', `Read Google Doc: ${title}`);
+
+  return { title, content: text.trim() };
+}
+
+/**
  * Export markdown content to a new Google Doc.
  * Returns the URL of the created document.
  */
