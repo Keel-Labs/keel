@@ -518,7 +518,10 @@ function registerIpcHandlers() {
   });
 
   ipcMain.handle('keel:capture', async (_event, input: string) => {
-    return capture(input, fileManager, llmClient);
+    const googleConfig = (GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET)
+      ? { clientId: GOOGLE_CLIENT_ID, clientSecret: GOOGLE_CLIENT_SECRET, scopes: GOOGLE_SCOPES }
+      : undefined;
+    return capture(input, fileManager, llmClient, googleConfig);
   });
 
   ipcMain.handle('keel:daily-brief', async () => {

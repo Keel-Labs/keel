@@ -5,31 +5,53 @@ import { LLMClient } from '../llmClient';
 import { embedText } from '../embeddings';
 import * as vectorStore from '../vectorStore';
 import { logActivity } from '../db';
+import { readGoogleDoc, extractDocId } from '../connectors/googleDocs';
+import { isGoogleConnected } from '../connectors/googleAuth';
+import type { GoogleOAuthConfig } from '../connectors/googleAuth';
 
 const URL_PATTERN = /^https?:\/\//;
+const GDOC_PATTERN = /docs\.google\.com\/document\/d\//;
 
 export async function capture(
   input: string,
   fileManager: FileManager,
-  llmClient: LLMClient
+  llmClient: LLMClient,
+  googleConfig?: GoogleOAuthConfig
 ): Promise<string> {
   const brainPath = fileManager.getBrainPath();
   let content: string;
   let sourceLabel: string;
 
   if (URL_PATTERN.test(input.trim())) {
-    // Fetch and extract URL content
     const url = input.trim();
-    try {
-      const response = await fetch(url);
-      const html = await response.text();
-      const dom = new JSDOM(html, { url });
-      const reader = new Readability(dom.window.document);
-      const article = reader.parse();
-      content = article?.textContent || html.slice(0, 5000);
-      sourceLabel = article?.title || url;
-    } catch (error) {
-      return `Failed to fetch URL: ${error instanceof Error ? error.message : 'Unknown error'}`;
+
+    // Google Docs — use the API instead of HTTP fetch
+    if (GDOC_PATTERN.test(url) && googleConfig && isGoogleConnected(brainPath)) {
+      const docId = extractDocId(url);
+      if (docId) {
+        try {
+          const { title, content: docContent } = await readGoogleDoc(brainPath, googleConfig, docId);
+          content = docContent;
+          sourceLabel = title;
+        } catch (error) {
+          return `Failed to read Google Doc: ${error instanceof Error ? error.message : 'Unknown error'}`;
+        }
+      } else {
+        return 'Could not extract document ID from the Google Docs URL.';
+      }
+    } else {
+      // Regular URL — fetch and extract with Readability
+      try {
+        const response = await fetch(url);
+        const html = await response.text();
+        const dom = new JSDOM(html, { url });
+        const reader = new Readability(dom.window.document);
+        const article = reader.parse();
+        content = article?.textContent || html.slice(0, 5000);
+        sourceLabel = article?.title || url;
+      } catch (error) {
+        return `Failed to fetch URL: ${error instanceof Error ? error.message : 'Unknown error'}`;
+      }
     }
   } else {
     content = input;
