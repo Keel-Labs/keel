@@ -86,6 +86,13 @@ describe('FileManager', () => {
       expect(content).toContain('# Current Priorities');
     });
 
+    it('creates tasks.md template', async () => {
+      await fm.ensureDirectoryStructure();
+      const content = await fm.readFile('tasks.md');
+      expect(content).toContain('# Tasks');
+      expect(content).toContain('- [ ]');
+    });
+
     it('creates example project', async () => {
       await fm.ensureDirectoryStructure();
       const content = await fm.readFile('projects/example-project/context.md');
