@@ -183,3 +183,42 @@ export async function getTodayEvents(
   }
   return lines.join('\n');
 }
+
+/**
+ * Get upcoming events as a formatted string for a given number of days.
+ * Used for auto-enriching chat messages when users ask about their schedule.
+ */
+export async function getUpcomingEventsFormatted(
+  brainPath: string,
+  config: GoogleOAuthConfig,
+  daysAhead: number = 7
+): Promise<string> {
+  const accessToken = await getValidAccessToken(brainPath, config);
+  const events = await fetchUpcomingEvents(accessToken, daysAhead);
+
+  if (events.length === 0) return `No events scheduled in the next ${daysAhead} day(s).`;
+
+  // Group by date
+  const byDate = new Map<string, CalendarEvent[]>();
+  for (const event of events) {
+    const date = event.start.split('T')[0] || event.start;
+    const existing = byDate.get(date) || [];
+    existing.push(event);
+    byDate.set(date, existing);
+  }
+
+  const lines: string[] = [];
+  for (const [date, dayEvents] of byDate) {
+    const d = new Date(date + 'T00:00:00');
+    const label = d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+    lines.push(`**${label}:**`);
+    for (const event of dayEvents) {
+      const startDate = new Date(event.start);
+      const time = startDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+      const attendeeStr = event.attendees.length > 0 ? ` (with ${event.attendees.join(', ')})` : '';
+      lines.push(`- ${time} — ${event.summary}${attendeeStr}`);
+    }
+    lines.push('');
+  }
+  return lines.join('\n').trim();
+}
