@@ -1,5 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { marked } from 'marked';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import type { FileEntry } from '../../shared/types';
 
 interface Props {
@@ -79,16 +78,15 @@ function FolderItem({ entry, depth, onSelect, selectedPath }: {
 
 // Only show these knowledge folders and files — not app source code
 const KNOWLEDGE_ITEMS = new Set([
-  'keel.md', 'projects', 'daily-log',
+  'keel.md', 'tasks.md', 'projects', 'daily-log',
 ]);
 
 export default function KnowledgeBrowser({ onBack }: Props) {
   const [rootEntries, setRootEntries] = useState<FileEntry[]>([]);
   const [selectedPath, setSelectedPath] = useState('');
   const [content, setContent] = useState('');
-  const [editing, setEditing] = useState(false);
-  const [editContent, setEditContent] = useState('');
-  const [saving, setSaving] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'idle'>('idle');
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     window.keel.listFiles('').then((entries) => {
@@ -97,41 +95,57 @@ export default function KnowledgeBrowser({ onBack }: Props) {
   }, []);
 
   const loadFile = async (filePath: string) => {
+    // Save current file before switching
+    if (selectedPath && content) {
+      await window.keel.writeFile(selectedPath, content).catch(() => {});
+    }
     try {
       const text = await window.keel.readFile(filePath);
       setSelectedPath(filePath);
       setContent(text);
-      setEditing(false);
+      setSaveStatus('idle');
     } catch {
       setContent('Failed to load file.');
     }
   };
 
-  const startEdit = () => {
-    setEditContent(content);
-    setEditing(true);
+  const autoSave = useCallback((newContent: string) => {
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    setSaveStatus('idle');
+    saveTimerRef.current = setTimeout(async () => {
+      if (!selectedPath) return;
+      setSaveStatus('saving');
+      try {
+        await window.keel.writeFile(selectedPath, newContent);
+        setSaveStatus('saved');
+        setTimeout(() => setSaveStatus('idle'), 1500);
+      } catch {
+        setSaveStatus('idle');
+      }
+    }, 800);
+  }, [selectedPath]);
+
+  const handleChange = (newContent: string) => {
+    setContent(newContent);
+    autoSave(newContent);
   };
 
-  const cancelEdit = () => {
-    setEditing(false);
-  };
-
-  const saveFile = async () => {
-    setSaving(true);
-    try {
-      await window.keel.writeFile(selectedPath, editContent);
-      setContent(editContent);
-      setEditing(false);
-    } catch {
-      // silently fail
+  // Toggle a checkbox in the markdown content
+  const toggleCheckbox = (lineIndex: number) => {
+    const lines = content.split('\n');
+    const line = lines[lineIndex];
+    if (/- \[ \]/.test(line)) {
+      lines[lineIndex] = line.replace('- [ ]', '- [x]');
+    } else if (/- \[x\]/i.test(line)) {
+      lines[lineIndex] = line.replace(/- \[x\]/i, '- [ ]');
     }
-    setSaving(false);
+    const newContent = lines.join('\n');
+    setContent(newContent);
+    autoSave(newContent);
   };
 
-  const renderedMarkdown = useMemo(() => {
-    if (!content || editing) return '';
-    return marked.parse(content) as string;
-  }, [content, editing]);
+  // Render content as editable lines with interactive checkboxes for task files
+  const isTaskFile = selectedPath.endsWith('tasks.md');
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
@@ -177,13 +191,13 @@ export default function KnowledgeBrowser({ onBack }: Props) {
           )}
         </div>
 
-        {/* File viewer/editor */}
+        {/* File editor */}
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
           {!selectedPath ? (
             <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <div style={{ textAlign: 'center', color: 'rgba(255,255,255,0.3)' }}>
                 <div style={{ fontSize: 32, marginBottom: 12 }}>📂</div>
-                <div style={{ fontSize: 14 }}>Select a file to view</div>
+                <div style={{ fontSize: 14 }}>Select a file to edit</div>
               </div>
             </div>
           ) : (
@@ -197,67 +211,108 @@ export default function KnowledgeBrowser({ onBack }: Props) {
                 <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', fontFamily: 'monospace' }}>
                   {selectedPath}
                 </span>
-                <div style={{ display: 'flex', gap: 6 }}>
-                  {!editing ? (
-                    <button
-                      onClick={startEdit}
-                      style={{
-                        padding: '5px 12px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.12)',
-                        background: 'transparent', color: 'rgba(255,255,255,0.7)',
-                        fontSize: 12, cursor: 'pointer',
-                      }}
-                    >
-                      Edit
-                    </button>
-                  ) : (
-                    <>
-                      <button
-                        onClick={cancelEdit}
-                        style={{
-                          padding: '5px 12px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.12)',
-                          background: 'transparent', color: 'rgba(255,255,255,0.5)',
-                          fontSize: 12, cursor: 'pointer',
-                        }}
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        onClick={saveFile}
-                        disabled={saving}
-                        style={{
-                          padding: '5px 12px', borderRadius: 6, border: 'none',
-                          background: '#CF7A5C', color: 'white',
-                          fontSize: 12, cursor: saving ? 'default' : 'pointer',
-                          opacity: saving ? 0.6 : 1,
-                        }}
-                      >
-                        {saving ? 'Saving...' : 'Save'}
-                      </button>
-                    </>
-                  )}
-                </div>
+                <span style={{
+                  fontSize: 11, color: saveStatus === 'saved' ? '#4ade80' : 'rgba(255,255,255,0.25)',
+                  transition: 'color 0.3s',
+                }}>
+                  {saveStatus === 'saving' ? 'Saving...' : saveStatus === 'saved' ? 'Saved' : ''}
+                </span>
               </div>
 
-              {/* Content */}
-              {editing ? (
+              {/* Checkbox view for task files */}
+              {isTaskFile ? (
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+                  {/* Interactive checkbox list */}
+                  <div style={{ flex: 1, overflowY: 'auto', padding: '12px 20px' }}>
+                    {content.split('\n').map((line, i) => {
+                      const unchecked = /^(\s*)- \[ \] (.*)/.exec(line);
+                      const checked = /^(\s*)- \[x\] (.*)/i.exec(line);
+                      const heading = /^(#{1,3})\s+(.*)/.exec(line);
+
+                      if (heading) {
+                        const level = heading[1].length;
+                        return (
+                          <div key={i} style={{
+                            fontSize: level === 1 ? 18 : level === 2 ? 15 : 13,
+                            fontWeight: 600,
+                            color: 'rgba(255,255,255,0.85)',
+                            marginTop: level === 1 ? 8 : 16,
+                            marginBottom: 8,
+                          }}>
+                            {heading[2]}
+                          </div>
+                        );
+                      }
+
+                      if (unchecked || checked) {
+                        const isChecked = !!checked;
+                        const text = isChecked ? checked![2] : unchecked![2];
+                        return (
+                          <label key={i} style={{
+                            display: 'flex', alignItems: 'flex-start', gap: 10,
+                            padding: '6px 4px', cursor: 'pointer',
+                            borderRadius: 6, transition: 'background 0.1s',
+                          }}
+                            onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; }}
+                            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={() => toggleCheckbox(i)}
+                              style={{
+                                accentColor: '#CF7A5C', width: 16, height: 16,
+                                marginTop: 2, cursor: 'pointer', flexShrink: 0,
+                              }}
+                            />
+                            <span style={{
+                              fontSize: 14, lineHeight: 1.5,
+                              color: isChecked ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.85)',
+                              textDecoration: isChecked ? 'line-through' : 'none',
+                            }}>
+                              {text}
+                            </span>
+                          </label>
+                        );
+                      }
+
+                      if (!line.trim()) return <div key={i} style={{ height: 8 }} />;
+
+                      return (
+                        <div key={i} style={{ fontSize: 14, color: 'rgba(255,255,255,0.6)', padding: '2px 4px', lineHeight: 1.5 }}>
+                          {line}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {/* Raw editor below */}
+                  <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', flexShrink: 0 }}>
+                    <textarea
+                      value={content}
+                      onChange={(e) => handleChange(e.target.value)}
+                      style={{
+                        width: '100%', height: 150, padding: '12px 20px', background: '#161616',
+                        color: 'rgba(255,255,255,0.7)', border: 'none', outline: 'none',
+                        fontSize: 12, lineHeight: 1.6, resize: 'vertical',
+                        fontFamily: "'SF Mono', 'Fira Code', 'Cascadia Code', monospace",
+                        boxSizing: 'border-box',
+                      }}
+                      placeholder="Edit markdown here..."
+                    />
+                  </div>
+                </div>
+              ) : (
+                /* Plain text editor for non-task files */
                 <textarea
-                  value={editContent}
-                  onChange={(e) => setEditContent(e.target.value)}
+                  value={content}
+                  onChange={(e) => handleChange(e.target.value)}
                   style={{
                     flex: 1, padding: '16px 20px', background: '#1a1a1a',
                     color: 'rgba(255,255,255,0.9)', border: 'none', outline: 'none',
                     fontSize: 13, lineHeight: 1.6, resize: 'none',
                     fontFamily: "'SF Mono', 'Fira Code', 'Cascadia Code', monospace",
                   }}
-                />
-              ) : (
-                <div
-                  className="markdown-body"
-                  style={{
-                    flex: 1, overflowY: 'auto', padding: '16px 24px',
-                    fontSize: 14, lineHeight: 1.6, color: 'rgba(255,255,255,0.85)',
-                  }}
-                  dangerouslySetInnerHTML={{ __html: renderedMarkdown }}
+                  placeholder="Start typing..."
                 />
               )}
             </>

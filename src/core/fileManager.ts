@@ -26,6 +26,16 @@ Role: [Your Role]
 -
 `;
 
+const TASKS_MD_TEMPLATE = `# Tasks
+
+## To Do
+- [ ]
+
+## In Progress
+
+## Done
+`;
+
 const EXAMPLE_PROJECT_CONTEXT = `# Example Project
 
 ## Overview
@@ -93,6 +103,14 @@ export class FileManager {
       await fs.access(keelPath);
     } catch {
       await fs.writeFile(keelPath, KEEL_MD_TEMPLATE, 'utf-8');
+    }
+
+    // Create tasks.md if it doesn't exist
+    const tasksPath = this.resolve('tasks.md');
+    try {
+      await fs.access(tasksPath);
+    } catch {
+      await fs.writeFile(tasksPath, TASKS_MD_TEMPLATE, 'utf-8');
     }
 
     // Create example project if it doesn't exist
