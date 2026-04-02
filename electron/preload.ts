@@ -86,6 +86,7 @@ const api: KeelAPI = {
 
   googleExportDoc: (markdownContent: string, title?: string) => ipcRenderer.invoke('keel:google-export-doc', markdownContent, title),
   googleCreateEvent: (event) => ipcRenderer.invoke('keel:google-create-event', event),
+  ollamaListModels: () => ipcRenderer.invoke('keel:ollama-list-models'),
 };
 
 contextBridge.exposeInMainWorld('keel', api);

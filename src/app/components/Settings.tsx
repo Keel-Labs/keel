@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import type { Settings as SettingsType } from '../../shared/types';
+import type { Settings as SettingsType, OllamaModelInfo } from '../../shared/types';
 import { KeelIcon } from './KeelIcon';
 
 const CLAUDE_MODELS = [
@@ -21,6 +21,11 @@ const PROVIDERS = [
   { value: 'ollama', label: 'Ollama', description: 'Local models — free, private, offline' },
 ] as const;
 
+function formatBytes(bytes: number): string {
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(0)} MB`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+}
+
 interface Props {
   onBack: () => void;
 }
@@ -34,14 +39,39 @@ export default function Settings({ onBack }: Props) {
   const [googleConfigured, setGoogleConfigured] = useState(false);
   const [googleSyncing, setGoogleSyncing] = useState(false);
   const [googleMessage, setGoogleMessage] = useState('');
+  const [ollamaModels, setOllamaModels] = useState<OllamaModelInfo[]>([]);
+  const [ollamaError, setOllamaError] = useState<string | null>(null);
+  const [ollamaLoading, setOllamaLoading] = useState(false);
+  const [ollamaManualEntry, setOllamaManualEntry] = useState(false);
+
+  const fetchOllamaModels = useCallback(async () => {
+    setOllamaLoading(true);
+    setOllamaError(null);
+    try {
+      const result = await window.keel.ollamaListModels();
+      if (result.error) {
+        setOllamaError(result.error);
+        setOllamaModels([]);
+      } else {
+        setOllamaModels(result.models);
+      }
+    } catch {
+      setOllamaError('Failed to fetch models');
+      setOllamaModels([]);
+    }
+    setOllamaLoading(false);
+  }, []);
 
   useEffect(() => {
-    window.keel.getSettings().then(setSettings).catch(() => {});
+    window.keel.getSettings().then((s) => {
+      setSettings(s);
+      if (s.provider === 'ollama') fetchOllamaModels();
+    }).catch(() => {});
     window.keel.googleStatus().then((s) => {
       setGoogleConnected(s.connected);
       setGoogleConfigured(s.configured ?? false);
     }).catch(() => {});
-  }, []);
+  }, [fetchOllamaModels]);
 
   if (!settings) return null;
 
@@ -263,19 +293,117 @@ export default function Settings({ onBack }: Props) {
             )}
 
             {settings.provider === 'ollama' && (
-              <div style={{ marginBottom: 16 }}>
-                <label style={labelStyle}>Model</label>
-                <input
-                  type="text"
-                  value={settings.ollamaModel}
-                  onChange={(e) => update({ ollamaModel: e.target.value })}
-                  placeholder="e.g. llama3.2, mistral, gemma2"
-                  style={inputStyle}
-                />
-                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', marginTop: 6 }}>
-                  Make sure Ollama is running locally with this model pulled.
+              <>
+                {/* Install instructions */}
+                <div style={{
+                  padding: '10px 14px', borderRadius: 8, marginBottom: 16,
+                  background: 'rgba(207,122,92,0.08)', border: '1px solid rgba(207,122,92,0.2)',
+                  fontSize: 12, color: 'rgba(255,255,255,0.5)', lineHeight: 1.6,
+                }}>
+                  Ollama runs AI models locally on your machine.{' '}
+                  <a href="https://ollama.com/download" target="_blank" rel="noopener noreferrer"
+                    style={{ color: '#CF7A5C', textDecoration: 'underline' }}>
+                    Download Ollama
+                  </a>{' '}
+                  if you haven't already. After installing, run{' '}
+                  <code style={{
+                    background: 'rgba(255,255,255,0.08)', padding: '1px 5px',
+                    borderRadius: 3, fontSize: 11,
+                  }}>ollama pull llama3.2</code>{' '}
+                  in your terminal to download a model.
                 </div>
-              </div>
+
+                {/* Model selector */}
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                    <label style={{ ...labelStyle, marginBottom: 0 }}>Model</label>
+                    {!ollamaManualEntry && (
+                      <button
+                        onClick={() => { fetchOllamaModels(); }}
+                        disabled={ollamaLoading}
+                        style={{
+                          background: 'none', border: 'none', color: '#CF7A5C',
+                          fontSize: 11, cursor: 'pointer', padding: 0,
+                          opacity: ollamaLoading ? 0.5 : 1,
+                        }}
+                      >
+                        {ollamaLoading ? 'Checking...' : 'Refresh'}
+                      </button>
+                    )}
+                  </div>
+
+                  {ollamaError && !ollamaManualEntry && (
+                    <div style={{
+                      padding: '8px 12px', borderRadius: 6, marginBottom: 8,
+                      background: 'rgba(220,80,80,0.1)', border: '1px solid rgba(220,80,80,0.2)',
+                      fontSize: 12, color: 'rgba(255,255,255,0.5)',
+                    }}>
+                      {ollamaError.includes('ECONNREFUSED')
+                        ? 'Ollama is not running. Start Ollama and click Refresh.'
+                        : `Could not connect to Ollama: ${ollamaError}`}
+                    </div>
+                  )}
+
+                  {!ollamaManualEntry && !ollamaError && ollamaModels.length > 0 ? (
+                    <>
+                      <select
+                        value={settings.ollamaModel}
+                        onChange={(e) => {
+                          if (e.target.value === '__manual__') {
+                            setOllamaManualEntry(true);
+                          } else {
+                            update({ ollamaModel: e.target.value });
+                          }
+                        }}
+                        style={selectStyle}
+                      >
+                        <option value="">Select a model...</option>
+                        {ollamaModels.map((m) => (
+                          <option key={m.name} value={m.name}>
+                            {m.name} ({m.parameterSize ? `${m.parameterSize}, ` : ''}{formatBytes(m.size)})
+                          </option>
+                        ))}
+                        {settings.ollamaModel && !ollamaModels.find((m) => m.name === settings.ollamaModel) && (
+                          <option value={settings.ollamaModel}>
+                            {settings.ollamaModel} (not installed)
+                          </option>
+                        )}
+                        <option value="__manual__">Type a custom model...</option>
+                      </select>
+                    </>
+                  ) : (
+                    <>
+                      <input
+                        type="text"
+                        value={settings.ollamaModel}
+                        onChange={(e) => update({ ollamaModel: e.target.value })}
+                        placeholder="e.g. llama3.2, mistral, gemma2"
+                        style={inputStyle}
+                      />
+                      {ollamaManualEntry && ollamaModels.length > 0 && (
+                        <button
+                          onClick={() => setOllamaManualEntry(false)}
+                          style={{
+                            background: 'none', border: 'none', color: '#CF7A5C',
+                            fontSize: 11, cursor: 'pointer', padding: 0, marginTop: 6,
+                          }}
+                        >
+                          Back to model list
+                        </button>
+                      )}
+                      {!ollamaManualEntry && !ollamaError && ollamaModels.length === 0 && !ollamaLoading && (
+                        <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', marginTop: 6 }}>
+                          No models found. Pull one first:{' '}
+                          <code style={{
+                            background: 'rgba(255,255,255,0.08)', padding: '1px 5px',
+                            borderRadius: 3, fontSize: 11,
+                          }}>ollama pull llama3.2</code>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              </>
             )}
           </div>
 
