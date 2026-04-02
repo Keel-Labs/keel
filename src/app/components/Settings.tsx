@@ -45,13 +45,29 @@ export default function Settings({ onBack }: Props) {
 
   if (!settings) return null;
 
+  const saveTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const update = (partial: Partial<SettingsType>) => {
-    setSettings({ ...settings, ...partial });
+    const newSettings = { ...settings, ...partial };
+    setSettings(newSettings);
     setSaved(false);
+    // Auto-save after 500ms debounce
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(async () => {
+      setSaving(true);
+      try {
+        await window.keel.saveSettings(newSettings);
+        setSaved(true);
+      } catch {
+        // handle error silently
+      }
+      setSaving(false);
+    }, 500);
   };
 
   const save = async () => {
     if (!settings) return;
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     setSaving(true);
     try {
       await window.keel.saveSettings(settings);
