@@ -49,7 +49,7 @@ import {
 } from '../src/core/connectors/googleAuth';
 import { GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_SCOPES } from '../src/core/connectors/googleConfig';
 import { syncCalendar } from '../src/core/connectors/googleCalendar';
-import { exportToGoogleDoc } from '../src/core/connectors/googleDocs';
+import { exportToGoogleDoc, readGoogleDoc, extractDocId } from '../src/core/connectors/googleDocs';
 import type { Message, Settings } from '../src/shared/types';
 
 let mainWindow: BrowserWindow | null = null;
@@ -405,15 +405,55 @@ function registerIpcHandlers() {
     contextAssembler.setTimezone(newSettings.timezone || '');
   });
 
+  // Enrich messages: auto-fetch Google Doc content when URLs are detected
+  async function enrichMessages(messages: Message[]): Promise<Message[]> {
+    if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) return messages;
+    if (!isGoogleConnected(settings.brainPath)) return messages;
+
+    const enriched = [...messages];
+    const last = enriched[enriched.length - 1];
+    if (!last || last.role !== 'user') return enriched;
+
+    // Find all Google Doc URLs in the message
+    const docUrlPattern = /https?:\/\/docs\.google\.com\/document\/d\/[a-zA-Z0-9_-]+[^\s)"]*/g;
+    const urls = last.content.match(docUrlPattern);
+    if (!urls || urls.length === 0) return enriched;
+
+    const config = { clientId: GOOGLE_CLIENT_ID, clientSecret: GOOGLE_CLIENT_SECRET, scopes: GOOGLE_SCOPES };
+    const docContents: string[] = [];
+
+    for (const url of urls) {
+      const docId = extractDocId(url);
+      if (!docId) continue;
+      try {
+        const { title, content } = await readGoogleDoc(settings.brainPath, config, docId);
+        docContents.push(`\n\n--- Google Doc: "${title}" ---\n\n${content.slice(0, 15000)}`);
+      } catch (err) {
+        docContents.push(`\n\n[Could not read Google Doc: ${err instanceof Error ? err.message : 'unknown error'}]`);
+      }
+    }
+
+    if (docContents.length > 0) {
+      enriched[enriched.length - 1] = {
+        ...last,
+        content: last.content + docContents.join(''),
+      };
+    }
+
+    return enriched;
+  }
+
   ipcMain.handle('keel:chat', async (_event, messages: Message[]) => {
-    const lastMessage = messages[messages.length - 1]?.content;
+    const enrichedMessages = await enrichMessages(messages);
+    const lastMessage = enrichedMessages[enrichedMessages.length - 1]?.content;
     const systemPrompt = await contextAssembler.assembleContext(lastMessage);
     logActivity(settings.brainPath, 'chat', lastMessage?.slice(0, 200));
-    return llmClient.chat(messages, systemPrompt);
+    return llmClient.chat(enrichedMessages, systemPrompt);
   });
 
   ipcMain.handle('keel:chat-stream', async (event, messages: Message[]) => {
-    const lastMessage = messages[messages.length - 1]?.content;
+    const enrichedMessages = await enrichMessages(messages);
+    const lastMessage = enrichedMessages[enrichedMessages.length - 1]?.content;
     const systemPrompt = await contextAssembler.assembleContext(lastMessage);
     const sender = event.sender;
 
@@ -432,7 +472,7 @@ function registerIpcHandlers() {
         flushTimer = null;
       };
 
-      await llmClient.chatStream(messages, systemPrompt, (chunk: string) => {
+      await llmClient.chatStream(enrichedMessages, systemPrompt, (chunk: string) => {
         fullResponse += chunk;
         buffer += chunk;
         // Flush immediately if buffer hits 100 chars, otherwise batch at 50ms
