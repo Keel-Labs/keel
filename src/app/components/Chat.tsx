@@ -142,6 +142,54 @@ function ThinkingIndicator() {
   );
 }
 
+function ThinkingSteps({ steps }: { steps: string[] }) {
+  const [expanded, setExpanded] = useState(false);
+  const latest = steps[steps.length - 1];
+
+  return (
+    <div style={{
+      display: 'flex', justifyContent: 'flex-start', marginBottom: 12, paddingRight: 48,
+    }}>
+      <div style={{
+        background: 'rgba(207,122,92,0.06)',
+        border: '1px solid rgba(207,122,92,0.15)',
+        borderRadius: 12, padding: '8px 14px',
+        maxWidth: '80%', fontSize: 12,
+      }}>
+        <button
+          onClick={() => setExpanded(!expanded)}
+          style={{
+            background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+            display: 'flex', alignItems: 'center', gap: 6, width: '100%',
+            color: 'rgba(255,255,255,0.5)',
+          }}
+        >
+          <span style={{
+            fontSize: 8, transition: 'transform 0.15s',
+            transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)',
+          }}>▶</span>
+          <span style={{ fontStyle: 'italic' }}>
+            {expanded ? 'Thinking steps' : latest}
+          </span>
+        </button>
+        {expanded && (
+          <div style={{ marginTop: 6, paddingLeft: 14 }}>
+            {steps.map((step, i) => (
+              <div key={i} style={{
+                color: 'rgba(255,255,255,0.4)', padding: '2px 0',
+                borderLeft: '2px solid rgba(207,122,92,0.2)',
+                paddingLeft: 10, marginBottom: 2,
+              }}>
+                {step}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 const WELCOME_SUGGESTIONS = [
   { label: 'What am I working on?', icon: '📋' },
   { label: '/daily-brief', icon: '☀️' },
@@ -300,6 +348,7 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [userTimezone, setUserTimezone] = useState<string>('');
+  const [thinkingSteps, setThinkingSteps] = useState<string[]>([]);
 
   // Load user timezone
   useEffect(() => {
@@ -619,8 +668,13 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
 
     // Regular chat — use streaming
     let accumulated = '';
+    setThinkingSteps([]);
 
     window.keel.removeStreamListeners();
+
+    window.keel.onThinkingStep((step: string) => {
+      setThinkingSteps((prev) => [...prev, step]);
+    });
 
     window.keel.onStreamChunk((chunk: string) => {
       accumulated += chunk;
@@ -720,6 +774,11 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
         {messages.map((msg, i) => (
           <Message key={i} message={msg} />
         ))}
+
+        {/* Thinking steps — collapsible chain of thought */}
+        {isStreaming && thinkingSteps.length > 0 && (
+          <ThinkingSteps steps={thinkingSteps} />
+        )}
 
         {isStreaming && streamingContent && (
           <Message

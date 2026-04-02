@@ -405,6 +405,13 @@ function registerIpcHandlers() {
     contextAssembler.setTimezone(newSettings.timezone || '');
   });
 
+  // Send a thinking step to the renderer
+  function emitThinking(step: string) {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('keel:thinking-step', step);
+    }
+  }
+
   // Enrich messages: auto-fetch Google Docs and Calendar events
   async function enrichMessages(messages: Message[]): Promise<Message[]> {
     if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) return messages;
@@ -424,10 +431,13 @@ function registerIpcHandlers() {
       for (const url of urls) {
         const docId = extractDocId(url);
         if (!docId) continue;
+        emitThinking('Reading Google Doc...');
         try {
           const { title, content } = await readGoogleDoc(settings.brainPath, config, docId);
-          appendParts.push(`\n\n--- Google Doc: "${title}" ---\n\n${content.slice(0, 15000)}`);
+          emitThinking(`Read "${title}" (${content.length.toLocaleString()} chars)`);
+          appendParts.push(`\n\n--- Google Doc: "${title}" ---\n\n${content.slice(0, 50000)}`);
         } catch (err) {
+          emitThinking(`Failed to read Google Doc: ${err instanceof Error ? err.message : 'unknown error'}`);
           appendParts.push(`\n\n[Could not read Google Doc: ${err instanceof Error ? err.message : 'unknown error'}]`);
         }
       }
@@ -439,10 +449,13 @@ function registerIpcHandlers() {
     const timeKeywords = /\b(today|tomorrow|this week|next week|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/;
     if (calendarKeywords.test(msg) && (timeKeywords.test(msg) || /\b(what|when|do i have|check|show|any)\b/.test(msg))) {
       const daysAhead = /tomorrow/.test(msg) ? 2 : /this week|next week/.test(msg) ? 7 : 1;
+      emitThinking('Fetching Google Calendar...');
       try {
         const events = await getUpcomingEventsFormatted(settings.brainPath, config, daysAhead);
+        emitThinking(`Fetched calendar events for next ${daysAhead} day(s)`);
         appendParts.push(`\n\n--- Google Calendar (next ${daysAhead} day${daysAhead > 1 ? 's' : ''}) ---\n\n${events}`);
       } catch (err) {
+        emitThinking(`Failed to fetch calendar: ${err instanceof Error ? err.message : 'unknown error'}`);
         appendParts.push(`\n\n[Could not fetch calendar: ${err instanceof Error ? err.message : 'unknown error'}]`);
       }
     }
@@ -458,17 +471,21 @@ function registerIpcHandlers() {
   }
 
   ipcMain.handle('keel:chat', async (_event, messages: Message[]) => {
+    emitThinking('Assembling context...');
     const enrichedMessages = await enrichMessages(messages);
     const lastMessage = enrichedMessages[enrichedMessages.length - 1]?.content;
     const systemPrompt = await contextAssembler.assembleContext(lastMessage);
+    emitThinking('Sending to LLM...');
     logActivity(settings.brainPath, 'chat', lastMessage?.slice(0, 200));
     return llmClient.chat(enrichedMessages, systemPrompt);
   });
 
   ipcMain.handle('keel:chat-stream', async (event, messages: Message[]) => {
+    emitThinking('Assembling context...');
     const enrichedMessages = await enrichMessages(messages);
     const lastMessage = enrichedMessages[enrichedMessages.length - 1]?.content;
     const systemPrompt = await contextAssembler.assembleContext(lastMessage);
+    emitThinking('Streaming response...');
     const sender = event.sender;
 
     logActivity(settings.brainPath, 'chat', lastMessage?.slice(0, 200));

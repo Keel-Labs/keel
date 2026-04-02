@@ -114,6 +114,7 @@ export interface KeelAPI {
   onStreamChunk: (callback: (chunk: string) => void) => void;
   onStreamDone: (callback: () => void) => void;
   onStreamError: (callback: (error: string) => void) => void;
+  onThinkingStep: (callback: (step: string) => void) => void;
   removeStreamListeners: () => void;
   getSettings: () => Promise<Settings>;
   saveSettings: (settings: Settings) => Promise<void>;
