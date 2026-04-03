@@ -256,6 +256,22 @@ export class ContextAssembler {
       }
     }
 
+    // 2b. Always include ALL project context files (small, essential for identity)
+    try {
+      const projectFiles = await this.fileManager.listFiles('projects/*/context.md');
+      if (projectFiles.length > 0) onStep?.(`Loading ${projectFiles.length} project(s)...`);
+      for (const file of projectFiles) {
+        try {
+          const content = await this.fileManager.readFile(file);
+          addSection(file, content);
+        } catch {
+          // skip unreadable files
+        }
+      }
+    } catch {
+      // no project files
+    }
+
     // 3. Retrieve: vector search (top-20) + FTS5 keyword search (top-10), then re-rank
     onStep?.('Searching for relevant context...');
 
