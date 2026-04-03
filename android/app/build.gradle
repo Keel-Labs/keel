@@ -16,10 +16,24 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        release {
+            if (project.hasProperty('KEEL_RELEASE_STORE_FILE')) {
+                storeFile file(KEEL_RELEASE_STORE_FILE)
+                storePassword KEEL_RELEASE_STORE_PASSWORD
+                keyAlias KEEL_RELEASE_KEY_ALIAS
+                keyPassword KEEL_RELEASE_KEY_PASSWORD
+            }
+        }
+    }
     buildTypes {
         release {
-            minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            if (project.hasProperty('KEEL_RELEASE_STORE_FILE')) {
+                signingConfig signingConfigs.release
+            }
         }
     }
 }

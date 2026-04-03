@@ -1,0 +1,42 @@
+{
+  "app_name": "Keel - AI Chief of Staff",
+  "subtitle": "Your personal AI assistant",
+  "bundle_id": "com.keel.app",
+  "version": "1.0.0",
+  "build_number": 1,
+
+  "description": "Keel is your personal AI chief of staff — an intelligent assistant that knows your projects, priorities, and preferences.\n\nUnlike generic chatbots, Keel maintains a persistent \"brain\" of your work context: active projects, key people, daily logs, and tasks. Every conversation is informed by what matters to you.\n\nKey Features:\n\n• Smart Context — Keel reads your projects, notes, and daily logs to give relevant, personalized answers\n• Multiple AI Models — Choose between Claude, GPT-4o, OpenRouter, or run local models with Ollama\n• Daily Briefs — Automated morning summaries of your priorities and schedule\n• Memory — Keel remembers what you tell it across conversations\n• Reminders — Set natural language reminders that notify you at the right time\n• Knowledge Browser — View and edit your brain files directly\n• Privacy First — Your data stays yours. Self-host the server or use our cloud\n• Cross-Platform — Available on Mac, Windows, iOS, and Android",
+
+  "short_description": "Personal AI assistant that knows your work",
+
+  "keywords": [
+    "AI assistant",
+    "productivity",
+    "chief of staff",
+    "project management",
+    "AI chat",
+    "daily brief",
+    "personal assistant",
+    "Claude",
+    "GPT",
+    "task management"
+  ],
+
+  "categories": {
+    "ios_primary": "Productivity",
+    "ios_secondary": "Business",
+    "android_category": "PRODUCTIVITY",
+    "android_subcategory": "PERSONALIZATION"
+  },
+
+  "content_rating": {
+    "ios": "4+",
+    "android": "Everyone"
+  },
+
+  "privacy_url": "https://getkeel.com/privacy",
+  "support_url": "https://getkeel.com/support",
+  "marketing_url": "https://getkeel.com",
+
+  "review_notes": "This app requires a Keel cloud account or self-hosted server to function. You can create a free account during onboarding. The app communicates with AI providers (Anthropic, OpenAI) using API keys the user configures in Settings."
+}

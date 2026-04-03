@@ -47,5 +47,13 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+	<key>NSCameraUsageDescription</key>
+	<string>Keel needs camera access to take photos for your conversations.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Keel needs photo library access to share images in conversations.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Keel needs permission to save images to your photo library.</string>
 </dict>
 </plist>

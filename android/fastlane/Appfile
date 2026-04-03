@@ -1,0 +1,2 @@
+json_key_file(ENV['GOOGLE_PLAY_JSON_KEY'] || "")
+package_name("com.keel.app")
