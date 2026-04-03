@@ -4,9 +4,20 @@ import Sidebar from './components/Sidebar';
 import Settings from './components/Settings';
 import KnowledgeBrowser from './components/KnowledgeBrowser';
 import Onboarding from './components/Onboarding';
+import AuthScreen from './components/AuthScreen';
 import type { Settings as SettingsType } from '../shared/types';
+import { getKeelAPI, loadTokens, isAuthenticated, setOnAuthExpired, logout } from '../lib/api-client';
 
 type ActiveView = 'chat' | 'settings' | 'knowledge';
+
+// Determine if we're running in Electron (IPC bridge) or web/Capacitor mode
+const isElectron = typeof window !== 'undefined' && !!(window as any).keel;
+
+// In web/Capacitor mode, set window.keel to the HTTP API client so all
+// existing components work without modification.
+if (!isElectron) {
+  (window as any).keel = getKeelAPI();
+}
 
 export default function App() {
   const [newChatSignal, setNewChatSignal] = useState(0);
@@ -16,9 +27,26 @@ export default function App() {
   const [activeView, setActiveView] = useState<ActiveView>('chat');
   const [showOnboarding, setShowOnboarding] = useState<boolean | null>(null);
   const [initialSettings, setInitialSettings] = useState<SettingsType | null>(null);
+  const [needsAuth, setNeedsAuth] = useState<boolean | null>(null);
+
+  // In web mode, check if user is authenticated
+  useEffect(() => {
+    if (isElectron) {
+      setNeedsAuth(false);
+      return;
+    }
+    loadTokens();
+    setNeedsAuth(!isAuthenticated());
+
+    // Listen for auth expiry (e.g. refresh token expired)
+    setOnAuthExpired(() => {
+      setNeedsAuth(true);
+    });
+  }, []);
 
   // Check if onboarding is needed (no API key configured for any provider)
   useEffect(() => {
+    if (needsAuth !== false) return; // Wait until auth is resolved
     window.keel.getSettings().then((s) => {
       setInitialSettings(s);
       const hasKey = s.anthropicApiKey || s.openaiApiKey || s.openrouterApiKey;
@@ -27,7 +55,7 @@ export default function App() {
     }).catch(() => {
       setShowOnboarding(true);
     });
-  }, []);
+  }, [needsAuth]);
 
   const handleOnboardingComplete = () => {
     setShowOnboarding(false);
@@ -50,9 +78,20 @@ export default function App() {
   };
 
   // Loading state
-  if (showOnboarding === null) {
+  if (needsAuth === null || (needsAuth === false && showOnboarding === null)) {
     return (
       <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#1a1a1a' }} />
+    );
+  }
+
+  // Auth screen (web/Capacitor mode only)
+  if (needsAuth) {
+    return (
+      <AuthScreen
+        onAuthenticated={() => {
+          setNeedsAuth(false);
+        }}
+      />
     );
   }
 
