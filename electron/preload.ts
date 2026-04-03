@@ -87,6 +87,9 @@ const api: KeelAPI = {
   googleExportDoc: (markdownContent: string, title?: string) => ipcRenderer.invoke('keel:google-export-doc', markdownContent, title),
   googleCreateEvent: (event) => ipcRenderer.invoke('keel:google-create-event', event),
   ollamaListModels: () => ipcRenderer.invoke('keel:ollama-list-models'),
+  listTeamFiles: (dirPath: string) => ipcRenderer.invoke('keel:list-team-files', dirPath),
+  readTeamFile: (filePath: string) => ipcRenderer.invoke('keel:read-team-file', filePath),
+  writeTeamFile: (filePath: string, content: string) => ipcRenderer.invoke('keel:write-team-file', filePath, content),
 };
 
 contextBridge.exposeInMainWorld('keel', api);

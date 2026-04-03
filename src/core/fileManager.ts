@@ -179,6 +179,39 @@ export class FileManager {
   }
 }
 
+const TEAM_MD_TEMPLATE = `# Team
+
+## Members
+| Name | Role | Notes |
+|---|---|---|
+
+## Goals
+
+## Norms
+`;
+
+const TEAM_DIRS = [
+  'projects',
+  'updates',
+];
+
+export class TeamFileManager extends FileManager {
+  async ensureTeamStructure(): Promise<void> {
+    // Ensure core team directories exist
+    for (const dir of TEAM_DIRS) {
+      await fs.mkdir(path.resolve(this.getBrainPath(), dir), { recursive: true });
+    }
+
+    // Create team.md if it doesn't exist
+    const teamPath = path.resolve(this.getBrainPath(), 'team.md');
+    try {
+      await fs.access(teamPath);
+    } catch {
+      await fs.writeFile(teamPath, TEAM_MD_TEMPLATE, 'utf-8');
+    }
+  }
+}
+
 function escapeRegex(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }

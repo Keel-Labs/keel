@@ -12,7 +12,7 @@ import {
 import * as path from 'path';
 import * as fs from 'fs';
 // chokidar v5 is ESM-only — loaded via dynamic import in startFileWatcher()
-import { FileManager } from '../src/core/fileManager';
+import { FileManager, TeamFileManager } from '../src/core/fileManager';
 import { LLMClient } from '../src/core/llmClient';
 import { ContextAssembler } from '../src/core/contextAssembler';
 import { loadSettings, saveSettings as saveSettingsToFile } from '../src/core/settings';
@@ -59,6 +59,9 @@ const settings = loadSettings();
 const fileManager = new FileManager(settings.brainPath);
 const llmClient = new LLMClient();
 const contextAssembler = new ContextAssembler(fileManager, false, settings.timezone || undefined);
+let teamFileManager: TeamFileManager | null = settings.teamBrainPath
+  ? new TeamFileManager(settings.teamBrainPath)
+  : null;
 
 const isDev = process.env.NODE_ENV === 'development';
 
@@ -247,6 +250,74 @@ async function startFileWatcher(): Promise<void> {
   watcher.on('unlink', handleFileDelete);
 }
 
+// --- Team Brain Indexing & Watcher ---
+
+async function teamIndexFile(filePath: string): Promise<void> {
+  if (!teamFileManager) return;
+  try {
+    const fullPath = path.join(settings.teamBrainPath, filePath);
+    const raw = fs.readFileSync(fullPath, 'utf-8');
+    const crypto = await import('crypto');
+    const hash = crypto.createHash('sha256').update(raw).digest('hex');
+    const existing = getFileIndex(settings.teamBrainPath, filePath);
+    if (existing && (existing as any).hash === hash) return;
+
+    const chunks = await embedFile(teamFileManager, filePath);
+    if (chunks.length > 0) {
+      await upsertChunks(settings.teamBrainPath, chunks);
+      updateFileIndex(settings.teamBrainPath, filePath, chunks.length, hash);
+    }
+  } catch (error) {
+    console.error(`Failed to index team file ${filePath}:`, error);
+  }
+}
+
+async function teamStartupIndex(): Promise<void> {
+  if (!teamFileManager) return;
+  try {
+    const allMdFiles = await teamFileManager.listFiles('**/*.md');
+    for (const file of allMdFiles) {
+      const existing = getFileIndex(settings.teamBrainPath, file);
+      if (!existing) {
+        await teamIndexFile(file);
+      } else {
+        try {
+          const fullPath = path.join(settings.teamBrainPath, file);
+          const stat = fs.statSync(fullPath);
+          if (stat.mtimeMs > existing.lastIndexedAt) {
+            await teamIndexFile(file);
+          }
+        } catch {
+          // File might have been deleted
+        }
+      }
+    }
+    console.log(`Team brain indexing complete: ${allMdFiles.length} files checked`);
+  } catch (error) {
+    console.error('Team brain indexing failed:', error);
+  }
+}
+
+async function startTeamFileWatcher(): Promise<void> {
+  if (!teamFileManager || !settings.teamBrainPath) return;
+  const chokidar = await import('chokidar');
+  const watcher = chokidar.watch(path.join(settings.teamBrainPath, '**/*.md'), {
+    ignoreInitial: true,
+    ignored: [/node_modules/, /\.config/],
+  });
+
+  watcher.on('add', (fullPath: string) => {
+    const relativePath = path.relative(settings.teamBrainPath, fullPath);
+    if (!relativePath.endsWith('.md') || relativePath.startsWith('.')) return;
+    teamIndexFile(relativePath);
+  });
+  watcher.on('change', (fullPath: string) => {
+    const relativePath = path.relative(settings.teamBrainPath, fullPath);
+    if (!relativePath.endsWith('.md') || relativePath.startsWith('.')) return;
+    teamIndexFile(relativePath);
+  });
+}
+
 // --- PDF Export ---
 
 async function exportToPdf(markdownContent: string, title?: string): Promise<string> {
@@ -399,10 +470,25 @@ function registerIpcHandlers() {
   });
 
   ipcMain.handle('keel:save-settings', async (_event, newSettings: Settings) => {
+    const teamPathChanged = newSettings.teamBrainPath !== settings.teamBrainPath;
     saveSettingsToFile(newSettings);
     Object.assign(settings, newSettings);
     llmClient.reload();
     contextAssembler.setTimezone(newSettings.timezone || '');
+
+    // Reinitialize team brain if path changed
+    if (teamPathChanged) {
+      if (newSettings.teamBrainPath) {
+        teamFileManager = new TeamFileManager(newSettings.teamBrainPath);
+        await teamFileManager.ensureTeamStructure();
+        contextAssembler.setTeamFileManager(teamFileManager);
+        teamStartupIndex().catch(() => {});
+        startTeamFileWatcher().catch(() => {});
+      } else {
+        teamFileManager = null;
+        contextAssembler.setTeamFileManager(null);
+      }
+    }
   });
 
   // Send a thinking step to the renderer
@@ -542,11 +628,16 @@ function registerIpcHandlers() {
   });
 
   ipcMain.handle('keel:daily-brief', async () => {
-    return dailyBrief(fileManager, llmClient);
+    return dailyBrief(fileManager, llmClient, {
+      teamFileManager: teamFileManager || undefined,
+    });
   });
 
   ipcMain.handle('keel:eod', async (_event, chatHistory: Message[]) => {
-    return eod(fileManager, llmClient, chatHistory);
+    return eod(fileManager, llmClient, chatHistory, {
+      teamFileManager: teamFileManager || undefined,
+      userName: settings.userName || undefined,
+    });
   });
 
   ipcMain.handle('keel:export-pdf', async (_event, markdownContent: string, title?: string) => {
@@ -640,6 +731,53 @@ function registerIpcHandlers() {
     }
     const fullPath = path.join(settings.brainPath, filePath);
     fs.writeFileSync(fullPath, content, 'utf-8');
+  });
+
+  // --- Team Brain file operations ---
+
+  ipcMain.handle('keel:list-team-files', async (_event, dirPath: string) => {
+    if (!teamFileManager) return [];
+    if (dirPath.includes('..') || dirPath.startsWith('.config')) {
+      throw new Error('Access denied');
+    }
+    const fullPath = path.join(settings.teamBrainPath, dirPath);
+    try {
+      const entries = fs.readdirSync(fullPath, { withFileTypes: true });
+      return entries
+        .filter((e) => !e.name.startsWith('.'))
+        .map((e) => {
+          const filePath = path.join(fullPath, e.name);
+          const stat = fs.statSync(filePath);
+          return {
+            name: e.name,
+            path: dirPath ? `${dirPath}/${e.name}` : e.name,
+            isDirectory: e.isDirectory(),
+            updatedAt: stat.mtimeMs,
+          };
+        })
+        .sort((a, b) => {
+          if (a.isDirectory !== b.isDirectory) return a.isDirectory ? -1 : 1;
+          return a.name.localeCompare(b.name);
+        });
+    } catch {
+      return [];
+    }
+  });
+
+  ipcMain.handle('keel:read-team-file', async (_event, filePath: string) => {
+    if (!teamFileManager) throw new Error('Team brain not configured');
+    if (filePath.includes('..') || filePath.startsWith('.config')) {
+      throw new Error('Access denied');
+    }
+    return teamFileManager.readFile(filePath);
+  });
+
+  ipcMain.handle('keel:write-team-file', async (_event, filePath: string, content: string) => {
+    if (!teamFileManager) throw new Error('Team brain not configured');
+    if (filePath.includes('..') || filePath.startsWith('.config')) {
+      throw new Error('Access denied');
+    }
+    await teamFileManager.writeFile(filePath, content);
   });
 
   // --- Reminders ---
@@ -756,7 +894,9 @@ function getTodayKey(): string {
 
 async function runScheduledBrief(): Promise<void> {
   try {
-    const result = await dailyBrief(fileManager, llmClient);
+    const result = await dailyBrief(fileManager, llmClient, {
+      teamFileManager: teamFileManager || undefined,
+    });
     logActivity(settings.brainPath, 'scheduled-brief', 'Auto-triggered daily brief');
 
     if (Notification.isSupported()) {
@@ -785,7 +925,10 @@ async function runScheduledBrief(): Promise<void> {
 
 async function runScheduledEod(): Promise<void> {
   try {
-    const result = await eod(fileManager, llmClient, []);
+    const result = await eod(fileManager, llmClient, [], {
+      teamFileManager: teamFileManager || undefined,
+      userName: settings.userName || undefined,
+    });
     logActivity(settings.brainPath, 'scheduled-eod', 'Auto-triggered EOD summary');
 
     if (Notification.isSupported()) {
@@ -895,6 +1038,16 @@ app.whenReady().then(async () => {
 
   // Start file watcher
   startFileWatcher();
+
+  // Initialize team brain if configured
+  if (teamFileManager) {
+    teamFileManager.ensureTeamStructure().then(() => {
+      getDb(settings.teamBrainPath);
+      contextAssembler.setTeamFileManager(teamFileManager);
+      startTeamFileWatcher();
+      teamStartupIndex();
+    }).catch((err) => console.error('Team brain init failed:', err));
+  }
 
   // Start scheduler for timed briefs/EOD
   startScheduler();

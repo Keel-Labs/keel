@@ -615,6 +615,75 @@ export default function Settings({ onBack }: Props) {
             </div>
           </div>
 
+          {/* Team Brain */}
+          <div style={sectionStyle}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: 'rgba(255,255,255,0.85)', marginBottom: 14 }}>
+              Team Brain
+            </div>
+            <div style={{
+              padding: '10px 14px', borderRadius: 8, marginBottom: 16,
+              background: 'rgba(207,122,92,0.08)', border: '1px solid rgba(207,122,92,0.2)',
+              fontSize: 12, color: 'rgba(255,255,255,0.5)', lineHeight: 1.6,
+            }}>
+              Share context with teammates by pointing to a shared folder (Dropbox, Google Drive, or a git repo).
+              Each team member sets the same path. Your personal brain stays private — only team files are shared.
+            </div>
+            <div style={{ marginBottom: 16 }}>
+              <label style={labelStyle}>Your Name</label>
+              <input
+                type="text"
+                value={settings.userName}
+                onChange={(e) => update({ userName: e.target.value })}
+                placeholder="e.g. Medha"
+                style={inputStyle}
+              />
+              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', marginTop: 6 }}>
+                Used to identify your updates in the team brain.
+              </div>
+            </div>
+            <div style={{ marginBottom: 16 }}>
+              <label style={labelStyle}>Team Brain Path</label>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input
+                  type="text"
+                  value={settings.teamBrainPath}
+                  onChange={(e) => update({ teamBrainPath: e.target.value })}
+                  placeholder="Not configured"
+                  style={{ ...inputStyle, flex: 1 }}
+                  readOnly
+                />
+                <button
+                  onClick={async () => {
+                    const picked = await window.keel.pickFolder(settings.teamBrainPath || settings.brainPath);
+                    if (picked) update({ teamBrainPath: picked });
+                  }}
+                  style={{
+                    padding: '10px 14px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.12)',
+                    background: '#303030', color: 'rgba(255,255,255,0.6)', fontSize: 13,
+                    cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
+                  }}
+                >
+                  Browse...
+                </button>
+              </div>
+              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', marginTop: 6 }}>
+                Leave empty to disable team features.
+                {settings.teamBrainPath && (
+                  <button
+                    onClick={() => update({ teamBrainPath: '' })}
+                    style={{
+                      background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)',
+                      fontSize: 12, cursor: 'pointer', padding: 0, marginLeft: 8,
+                      textDecoration: 'underline',
+                    }}
+                  >
+                    Disconnect
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
           {/* Save */}
           <button
             onClick={save}
