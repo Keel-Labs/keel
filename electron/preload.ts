@@ -22,11 +22,16 @@ const api: KeelAPI = {
     ipcRenderer.on('keel:thinking-step', (_event, step) => callback(step));
   },
 
+  onThinkingDelta: (callback: (text: string) => void) => {
+    ipcRenderer.on('keel:thinking-delta', (_event, text) => callback(text));
+  },
+
   removeStreamListeners: () => {
     ipcRenderer.removeAllListeners('keel:chat-stream-chunk');
     ipcRenderer.removeAllListeners('keel:chat-stream-done');
     ipcRenderer.removeAllListeners('keel:chat-stream-error');
     ipcRenderer.removeAllListeners('keel:thinking-step');
+    ipcRenderer.removeAllListeners('keel:thinking-delta');
   },
 
   getSettings: () => ipcRenderer.invoke('keel:get-settings'),

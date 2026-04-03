@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import type { FileEntry } from '../../shared/types';
+import { useIsMobile } from '../../lib/useIsMobile';
 
 interface Props {
   onBack: () => void;
@@ -88,6 +89,7 @@ const TEAM_KNOWLEDGE_ITEMS = new Set([
 ]);
 
 export default function KnowledgeBrowser({ onBack }: Props) {
+  const isMobile = useIsMobile();
   const [rootEntries, setRootEntries] = useState<FileEntry[]>([]);
   const [teamEntries, setTeamEntries] = useState<FileEntry[]>([]);
   const [selectedPath, setSelectedPath] = useState('');
@@ -95,6 +97,8 @@ export default function KnowledgeBrowser({ onBack }: Props) {
   const [content, setContent] = useState('');
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'idle'>('idle');
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // On mobile, show file tree or editor, not both
+  const [mobileShowEditor, setMobileShowEditor] = useState(false);
 
   useEffect(() => {
     window.keel.listFiles('').then((entries) => {
@@ -119,6 +123,7 @@ export default function KnowledgeBrowser({ onBack }: Props) {
       setIsTeamFile(team);
       setContent(text);
       setSaveStatus('idle');
+      if (isMobile) setMobileShowEditor(true);
     } catch {
       setContent('Failed to load file.');
     }
@@ -184,12 +189,16 @@ export default function KnowledgeBrowser({ onBack }: Props) {
         <span style={{ fontSize: 16, fontWeight: 600, color: 'rgba(255,255,255,0.9)' }}>Knowledge Browser</span>
       </div>
 
-      {/* Two-panel layout */}
-      <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
-        {/* File tree */}
+      {/* Two-panel layout (stacked on mobile) */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: isMobile ? 'column' : 'row', minHeight: 0 }}>
+        {/* File tree — hidden on mobile when editor is open */}
         <div style={{
-          width: 220, borderRight: '1px solid rgba(255,255,255,0.06)',
+          width: isMobile ? '100%' : 220,
+          display: isMobile && mobileShowEditor ? 'none' : 'block',
+          borderRight: isMobile ? 'none' : '1px solid rgba(255,255,255,0.06)',
+          borderBottom: isMobile ? '1px solid rgba(255,255,255,0.06)' : 'none',
           overflowY: 'auto', padding: '8px 4px', flexShrink: 0,
+          flex: isMobile && !mobileShowEditor ? 1 : undefined,
         }}>
           {rootEntries.map((entry) => (
             <FolderItem
@@ -229,12 +238,14 @@ export default function KnowledgeBrowser({ onBack }: Props) {
           )}
         </div>
 
-        {/* File editor */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+        {/* File editor — hidden on mobile when browsing file tree */}
+        <div style={{ flex: 1, display: isMobile && !mobileShowEditor ? 'none' : 'flex', flexDirection: 'column', minWidth: 0 }}>
           {!selectedPath ? (
             <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <div style={{ textAlign: 'center', color: 'rgba(255,255,255,0.3)' }}>
-                <div style={{ fontSize: 32, marginBottom: 12 }}>📂</div>
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: 12 }}>
+                  <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+                </svg>
                 <div style={{ fontSize: 14 }}>Select a file to edit</div>
               </div>
             </div>
@@ -246,7 +257,15 @@ export default function KnowledgeBrowser({ onBack }: Props) {
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                 flexShrink: 0,
               }}>
-                <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', fontFamily: 'monospace' }}>
+                <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', fontFamily: 'monospace', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  {isMobile && (
+                    <button
+                      onClick={() => setMobileShowEditor(false)}
+                      style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.6)', cursor: 'pointer', fontSize: 16, padding: '0 4px' }}
+                    >
+                      ←
+                    </button>
+                  )}
                   {isTeamFile && <span style={{ color: '#CF7A5C', marginRight: 6, fontSize: 10, fontWeight: 700, letterSpacing: '0.04em' }}>TEAM</span>}
                   {selectedPath}
                 </span>

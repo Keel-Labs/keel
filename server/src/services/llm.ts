@@ -25,8 +25,14 @@ export interface LLMClient {
   stream(
     messages: Message[],
     systemPrompt: string,
-    onChunk: (chunk: string) => void
+    onChunk: (chunk: string) => void,
+    onThinking?: (thinking: string) => void
   ): Promise<void>;
+}
+
+// Models that support extended thinking
+function supportsThinking(model: string): boolean {
+  return /claude-(sonnet|opus)-4/i.test(model) || /claude-3-7/i.test(model);
 }
 
 export function getLLMClient(settings: LLMSettings): LLMClient {
@@ -49,11 +55,12 @@ export function getLLMClient(settings: LLMSettings): LLMClient {
     async stream(
       messages: Message[],
       systemPrompt: string,
-      onChunk: (chunk: string) => void
+      onChunk: (chunk: string) => void,
+      onThinking?: (thinking: string) => void
     ): Promise<void> {
       switch (provider) {
         case 'claude':
-          return streamClaude(settings, messages, systemPrompt, onChunk);
+          return streamClaude(settings, messages, systemPrompt, onChunk, onThinking);
         case 'openai':
           return streamOpenAI(settings, messages, systemPrompt, onChunk, false);
         case 'openrouter':
@@ -104,22 +111,34 @@ async function streamClaude(
   settings: LLMSettings,
   messages: Message[],
   systemPrompt: string,
-  onChunk: (chunk: string) => void
+  onChunk: (chunk: string) => void,
+  onThinking?: (thinking: string) => void
 ): Promise<void> {
   const client = new Anthropic({ apiKey: settings.anthropicApiKey! });
-  const stream = client.messages.stream({
-    model: settings.claudeModel || 'claude-sonnet-4-20250514',
-    max_tokens: 4096,
+  const model = settings.claudeModel || 'claude-sonnet-4-20250514';
+  const useThinking = supportsThinking(model);
+
+  const params: any = {
+    model,
+    max_tokens: useThinking ? 16000 : 4096,
     system: systemPrompt,
     messages: formatClaudeMessages(messages),
-  });
+  };
+
+  if (useThinking) {
+    params.thinking = { type: 'enabled', budget_tokens: 10000 };
+  }
+
+  const stream = client.messages.stream(params);
 
   for await (const event of stream) {
-    if (
-      event.type === 'content_block_delta' &&
-      (event.delta as any).type === 'text_delta'
-    ) {
-      onChunk((event.delta as any).text);
+    if (event.type === 'content_block_delta') {
+      const delta = event.delta as any;
+      if (delta.type === 'thinking_delta' && onThinking) {
+        onThinking(delta.thinking);
+      } else if (delta.type === 'text_delta') {
+        onChunk(delta.text);
+      }
     }
   }
 }

@@ -180,6 +180,7 @@ let streamListeners: {
   onDone?: () => void;
   onError?: (error: string) => void;
   onThinking?: (step: string) => void;
+  onThinkingDelta?: (text: string) => void;
 } = {};
 let currentAbortController: AbortController | null = null;
 
@@ -240,6 +241,9 @@ export const apiClient: KeelAPI = {
                 case 'thinking':
                   streamListeners.onThinking?.(data.step);
                   break;
+                case 'thinking_delta':
+                  streamListeners.onThinkingDelta?.(data.text);
+                  break;
                 case 'done':
                   streamListeners.onDone?.();
                   break;
@@ -275,6 +279,10 @@ export const apiClient: KeelAPI = {
 
   onThinkingStep(callback) {
     streamListeners.onThinking = callback;
+  },
+
+  onThinkingDelta(callback) {
+    streamListeners.onThinkingDelta = callback;
   },
 
   removeStreamListeners() {
