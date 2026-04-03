@@ -884,6 +884,21 @@ function registerIpcHandlers() {
       };
     }
   });
+
+  // --- Cloud Migration ---
+  ipcMain.handle('keel:migrate-to-cloud', async (_event, serverUrl: string, accessToken: string) => {
+    const { migrateToCloud } = await import('./migrate-to-cloud.js');
+    return migrateToCloud(settings.brainPath, serverUrl, accessToken, (progress) => {
+      mainWindow?.webContents.send('keel:migration-progress', progress);
+    });
+  });
+
+  ipcMain.handle('keel:export-local-data', async () => {
+    const { exportLocalData } = await import('./migrate-to-cloud.js');
+    return exportLocalData(settings.brainPath, (progress) => {
+      mainWindow?.webContents.send('keel:migration-progress', progress);
+    });
+  });
 }
 
 // --- Scheduler for Timed Briefs/EOD ---
