@@ -9,11 +9,16 @@ import { reminderRoutes } from './routes/reminders.js';
 import { workflowRoutes } from './routes/workflows.js';
 import { fileRoutes } from './routes/files.js';
 import { closeDb } from './db/index.js';
+import { migrate } from './db/migrate.js';
 
 const PORT = parseInt(process.env.PORT || '3001');
 const HOST = process.env.HOST || '0.0.0.0';
 
 async function main() {
+  // Auto-migrate on startup (idempotent CREATE IF NOT EXISTS)
+  if (process.env.NODE_ENV === 'production' || process.env.AUTO_MIGRATE === 'true') {
+    await migrate();
+  }
   const app = Fastify({
     logger: {
       level: process.env.LOG_LEVEL || 'info',
@@ -21,8 +26,11 @@ async function main() {
   });
 
   // Plugins
+  const corsOrigin = process.env.CORS_ORIGIN;
   await app.register(cors, {
-    origin: process.env.CORS_ORIGIN || true, // Allow all in dev
+    origin: corsOrigin
+      ? corsOrigin.split(',').map((o) => o.trim())
+      : true, // Allow all in dev
     credentials: true,
   });
 
