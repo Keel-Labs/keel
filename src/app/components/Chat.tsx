@@ -179,6 +179,71 @@ function NauticalLoader() {
   );
 }
 
+function OrigamiBoatLoader() {
+  // Simple flat origami boat bobbing on a wave line
+  // Viewbox 48x32 — wide enough for boat + water
+  return (
+    <svg viewBox="0 0 48 32" xmlns="http://www.w3.org/2000/svg" width="48" height="32" style={{ flexShrink: 0 }}>
+      <defs>
+        <style>{`
+          @keyframes bob {
+            0%,100% { transform: translateY(0px) rotate(-1deg); }
+            50%      { transform: translateY(-4px) rotate(1deg); }
+          }
+          @keyframes wave-shift {
+            0%,100% { d: path("M0 22 Q8 18 16 22 Q24 26 32 22 Q40 18 48 22 L48 32 L0 32 Z"); }
+            50%      { d: path("M0 22 Q8 26 16 22 Q24 18 32 22 Q40 26 48 22 L48 32 L0 32 Z"); }
+          }
+        `}</style>
+      </defs>
+
+      {/* Water */}
+      <path
+        fill="#CF7A5C"
+        opacity="0.25"
+        style={{ animation: 'wave-shift 2.4s ease-in-out infinite' }}
+      >
+        <animate
+          attributeName="d"
+          dur="2.4s"
+          repeatCount="indefinite"
+          calcMode="spline"
+          keySplines="0.45 0 0.55 1; 0.45 0 0.55 1"
+          values="
+            M0 22 Q8 18 16 22 Q24 26 32 22 Q40 18 48 22 L48 32 L0 32 Z;
+            M0 22 Q8 26 16 22 Q24 18 32 22 Q40 26 48 22 L48 32 L0 32 Z;
+            M0 22 Q8 18 16 22 Q24 26 32 22 Q40 18 48 22 L48 32 L0 32 Z
+          "
+        />
+      </path>
+
+      {/* Boat group — bobs up and down */}
+      <g style={{ transformOrigin: '24px 21px', animation: 'bob 2.4s ease-in-out infinite' }}>
+        {/* Hull: flat-bottomed trapezoid */}
+        <path
+          d="M13 21 L35 21 L32 26 L16 26 Z"
+          fill="#CF7A5C"
+          opacity="0.85"
+        />
+        {/* Left sail: triangle leaning right */}
+        <path
+          d="M22 21 L22 8 L30 21 Z"
+          fill="#CF7A5C"
+          opacity="0.55"
+        />
+        {/* Right sail panel (darker fold line effect) */}
+        <path
+          d="M22 21 L26 10 L30 21 Z"
+          fill="#CF7A5C"
+          opacity="0.35"
+        />
+        {/* Mast line */}
+        <line x1="22" y1="21" x2="22" y2="8" stroke="#CF7A5C" strokeWidth="0.8" opacity="0.6" />
+      </g>
+    </svg>
+  );
+}
+
 function ThinkingIndicator() {
   const [messageIndex, setMessageIndex] = useState(() =>
     Math.floor(Math.random() * THINKING_MESSAGES.length)
@@ -198,7 +263,7 @@ function ThinkingIndicator() {
   return (
     <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 16, paddingRight: 48 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 0' }}>
-        <NauticalLoader />
+        <OrigamiBoatLoader />
         <span className="thinking-text" style={{
           fontSize: 13, color: 'rgba(255,255,255,0.4)',
           fontStyle: 'italic',
