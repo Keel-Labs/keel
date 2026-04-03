@@ -5,10 +5,13 @@ import Settings from './components/Settings';
 import KnowledgeBrowser from './components/KnowledgeBrowser';
 import Onboarding from './components/Onboarding';
 import AuthScreen from './components/AuthScreen';
+import MobileNav from './components/MobileNav';
+import MobileHistory from './components/MobileHistory';
 import type { Settings as SettingsType } from '../shared/types';
 import { getKeelAPI, loadTokens, isAuthenticated, setOnAuthExpired, logout } from '../lib/api-client';
+import { useIsMobile } from '../lib/useIsMobile';
 
-type ActiveView = 'chat' | 'settings' | 'knowledge';
+type ActiveView = 'chat' | 'settings' | 'knowledge' | 'history';
 
 // Determine if we're running in Electron (IPC bridge) or web/Capacitor mode
 const isElectron = typeof window !== 'undefined' && !!(window as any).keel;
@@ -28,6 +31,7 @@ export default function App() {
   const [showOnboarding, setShowOnboarding] = useState<boolean | null>(null);
   const [initialSettings, setInitialSettings] = useState<SettingsType | null>(null);
   const [needsAuth, setNeedsAuth] = useState<boolean | null>(null);
+  const isMobile = useIsMobile();
 
   // In web mode, check if user is authenticated
   useEffect(() => {
@@ -100,6 +104,49 @@ export default function App() {
     return <Onboarding initialSettings={initialSettings} onComplete={handleOnboardingComplete} />;
   }
 
+  // Mobile layout: vertical with bottom nav
+  if (isMobile) {
+    return (
+      <div style={{
+        height: '100vh',
+        display: 'flex',
+        flexDirection: 'column',
+        background: '#1a1a1a',
+      }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+          {activeView === 'chat' && (
+            <Chat
+              newChatSignal={newChatSignal}
+              loadSessionId={loadSessionId}
+              onSessionChange={handleSessionChange}
+            />
+          )}
+          {activeView === 'history' && (
+            <MobileHistory
+              onSelectSession={(id) => {
+                handleSelectSession(id);
+                setActiveView('chat');
+              }}
+              refreshSignal={refreshSidebar}
+            />
+          )}
+          {activeView === 'settings' && (
+            <Settings onBack={() => setActiveView('chat')} />
+          )}
+          {activeView === 'knowledge' && (
+            <KnowledgeBrowser onBack={() => setActiveView('chat')} />
+          )}
+        </div>
+        <MobileNav
+          activeView={activeView}
+          onNavigate={setActiveView}
+          onNewChat={handleNewChat}
+        />
+      </div>
+    );
+  }
+
+  // Desktop layout: sidebar + main content
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'row', background: '#1a1a1a' }}>
       <Sidebar
