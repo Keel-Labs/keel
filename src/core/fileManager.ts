@@ -7,7 +7,7 @@ const BRAIN_DIRS = [
   'daily-log',
 ];
 
-const KEEL_MD_TEMPLATE = `# Profile
+export const KEEL_MD_TEMPLATE = `# Profile
 Name: [Your Name]
 Role: [Your Role]
 

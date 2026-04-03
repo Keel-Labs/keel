@@ -609,7 +609,11 @@ function registerIpcHandlers() {
 
       // Extract and save memory in background (don't block the response)
       const allMessages = [...messages, { role: 'assistant' as const, content: fullResponse, timestamp: Date.now() }];
-      extractAndSaveMemory(allMessages, fileManager, llmClient).catch(() => {});
+      extractAndSaveMemory(allMessages, fileManager, llmClient).then(() => {
+        setSelfWriting();
+      }).catch((err) => {
+        console.error('[main] Memory extraction failed:', err);
+      });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       if (!sender.isDestroyed()) {
