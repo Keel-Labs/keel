@@ -1,0 +1,22 @@
+Keel is your personal AI chief of staff — an intelligent assistant that knows your projects, priorities, and preferences.
+
+Unlike generic chatbots, Keel maintains a persistent "brain" of your work context: active projects, key people, daily logs, and tasks. Every conversation is informed by what matters to you.
+
+<b>Key Features</b>
+
+• <b>Smart Context</b> — Keel reads your projects, notes, and daily logs to give relevant, personalized answers
+• <b>Multiple AI Models</b> — Choose between Claude, GPT-4o, OpenRouter, or run local models with Ollama
+• <b>Daily Briefs</b> — Automated morning summaries of your priorities and schedule
+• <b>Memory</b> — Keel remembers what you tell it across conversations
+• <b>Reminders</b> — Set natural language reminders that notify you at the right time
+• <b>Knowledge Browser</b> — View and edit your brain files directly
+• <b>Privacy First</b> — Your data stays yours. Self-host the server or use our cloud
+• <b>Cross-Platform</b> — Syncs with the Keel desktop app on Mac and Windows
+
+<b>Getting Started</b>
+
+1. Create a free Keel cloud account (or connect to your self-hosted server)
+2. Add an API key for your preferred AI provider
+3. Start chatting — Keel learns your context over time
+
+If you already use Keel on desktop, use "Sync to Cloud" in desktop Settings to migrate your data.

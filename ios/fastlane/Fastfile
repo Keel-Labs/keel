@@ -1,0 +1,70 @@
+default_platform(:ios)
+
+platform :ios do
+  desc "Build and upload to TestFlight"
+  lane :beta do
+    setup_ci if ENV['CI']
+
+    # Match signing (requires match repo configured)
+    match(
+      type: "appstore",
+      app_identifier: "com.keel.app",
+      readonly: is_ci
+    )
+
+    # Increment build number
+    increment_build_number(
+      build_number: ENV['BUILD_NUMBER'] || latest_testflight_build_number + 1,
+      xcodeproj: "App/App.xcodeproj"
+    )
+
+    # Build
+    build_app(
+      workspace: "App/App.xcworkspace",
+      scheme: "App",
+      export_method: "app-store",
+      output_directory: "./build",
+      output_name: "Keel.ipa",
+      clean: true
+    )
+
+    # Upload to TestFlight
+    upload_to_testflight(
+      skip_waiting_for_build_processing: true,
+      apple_id: ENV['APPLE_APP_ID']
+    )
+  end
+
+  desc "Build and upload to App Store"
+  lane :release do
+    setup_ci if ENV['CI']
+
+    match(
+      type: "appstore",
+      app_identifier: "com.keel.app",
+      readonly: is_ci
+    )
+
+    increment_build_number(
+      build_number: ENV['BUILD_NUMBER'] || latest_testflight_build_number + 1,
+      xcodeproj: "App/App.xcodeproj"
+    )
+
+    build_app(
+      workspace: "App/App.xcworkspace",
+      scheme: "App",
+      export_method: "app-store",
+      output_directory: "./build",
+      output_name: "Keel.ipa",
+      clean: true
+    )
+
+    upload_to_app_store(
+      skip_screenshots: true,
+      skip_metadata: false,
+      force: true,
+      submit_for_review: false,
+      automatic_release: false
+    )
+  end
+end
