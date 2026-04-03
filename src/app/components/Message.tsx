@@ -31,6 +31,21 @@ export default function Message({ message }: Props) {
           padding: '10px 16px', fontSize: 14, lineHeight: 1.6,
           whiteSpace: 'pre-wrap',
         }}>
+          {message.images && message.images.length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+              {message.images.map((img, i) => (
+                <img
+                  key={i}
+                  src={`data:${img.mediaType};base64,${img.data}`}
+                  alt=""
+                  style={{
+                    maxWidth: 200, maxHeight: 200, borderRadius: 8,
+                    objectFit: 'cover', border: '2px solid rgba(255,255,255,0.2)',
+                  }}
+                />
+              ))}
+            </div>
+          )}
           {message.content}
         </div>
       </div>

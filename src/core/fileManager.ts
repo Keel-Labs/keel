@@ -179,6 +179,19 @@ export class FileManager {
   }
 }
 
+export const PULSE_MD_TEMPLATE = `# Pulse
+Last updated: —
+
+## Active Focus
+- (auto-updated from recent chats)
+
+## Recent Activity
+- (auto-updated from daily briefs and EOD summaries)
+
+## Open Threads
+- (unresolved questions or topics from recent sessions)
+`;
+
 const TEAM_MD_TEMPLATE = `# Team
 
 ## Members

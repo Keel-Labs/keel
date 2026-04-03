@@ -1,7 +1,19 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import type { Message as MessageType } from '../../shared/types';
+import type { Message as MessageType, MessageImage, Settings as SettingsType, OllamaModelInfo } from '../../shared/types';
 import Message from './Message';
 import { KeelIcon } from './KeelIcon';
+
+const CLAUDE_MODELS = [
+  { value: 'claude-sonnet-4-20250514', label: 'Sonnet 4' },
+  { value: 'claude-haiku-4-5-20251001', label: 'Haiku 4.5' },
+];
+
+const OPENAI_MODELS = [
+  { value: 'gpt-4o', label: 'GPT-4o' },
+  { value: 'gpt-4o-mini', label: 'GPT-4o Mini' },
+  { value: 'gpt-4.1', label: 'GPT-4.1' },
+  { value: 'gpt-4.1-mini', label: 'GPT-4.1 Mini' },
+];
 
 const THINKING_MESSAGES = [
   'Moving fast and thinking things...',
@@ -280,7 +292,7 @@ function isGoogleDocCommand(text: string): boolean {
  * /schedule 2026-04-03 2:00 PM Team standup
  * /schedule today at 3pm for 2 hours Design review
  */
-function parseScheduleCommand(text: string): { summary: string; startTime: string; endTime: string } | null {
+function parseScheduleCommand(text: string, timezone?: string): { summary: string; startTime: string; endTime: string } | null {
   const t = text.trim();
   const match = t.match(/^\/schedule\s+(.+)/i);
   if (!match) return null;
@@ -291,7 +303,7 @@ function parseScheduleCommand(text: string): { summary: string; startTime: strin
   // "tomorrow at HH:MM [am/pm] [for N hours] message"
   const tomorrowMatch = rest.match(/^tomorrow\s+(?:at\s+)?(\d{1,2}):?(\d{2})?\s*(am|pm)?\s+(?:for\s+(\d+)\s*(?:hours?|hrs?)\s+)?(.+)/i);
   if (tomorrowMatch) {
-    const due = parseTimeToDate(now, tomorrowMatch[1], tomorrowMatch[2] || '00', tomorrowMatch[3]);
+    const due = parseTimeToDate(now, tomorrowMatch[1], tomorrowMatch[2] || '00', tomorrowMatch[3], timezone);
     due.setDate(due.getDate() + 1);
     const durationHrs = tomorrowMatch[4] ? parseInt(tomorrowMatch[4]) : 1;
     const end = new Date(due.getTime() + durationHrs * 3_600_000);
@@ -301,7 +313,7 @@ function parseScheduleCommand(text: string): { summary: string; startTime: strin
   // "today at HH:MM [am/pm] [for N hours] message"
   const todayMatch = rest.match(/^today\s+(?:at\s+)?(\d{1,2}):?(\d{2})?\s*(am|pm)?\s+(?:for\s+(\d+)\s*(?:hours?|hrs?)\s+)?(.+)/i);
   if (todayMatch) {
-    const due = parseTimeToDate(now, todayMatch[1], todayMatch[2] || '00', todayMatch[3]);
+    const due = parseTimeToDate(now, todayMatch[1], todayMatch[2] || '00', todayMatch[3], timezone);
     const durationHrs = todayMatch[4] ? parseInt(todayMatch[4]) : 1;
     const end = new Date(due.getTime() + durationHrs * 3_600_000);
     return { summary: todayMatch[5], startTime: due.toISOString(), endTime: end.toISOString() };
@@ -310,7 +322,7 @@ function parseScheduleCommand(text: string): { summary: string; startTime: strin
   // "HH:MM [am/pm] [for N hours] message" or "at HH:MM message"
   const timeMatch = rest.match(/^(?:at\s+)?(\d{1,2}):?(\d{2})?\s*(am|pm)?\s+(?:for\s+(\d+)\s*(?:hours?|hrs?)\s+)?(.+)/i);
   if (timeMatch && timeMatch[5]) {
-    const due = parseTimeToDate(now, timeMatch[1], timeMatch[2] || '00', timeMatch[3]);
+    const due = parseTimeToDate(now, timeMatch[1], timeMatch[2] || '00', timeMatch[3], timezone);
     if (due <= now) due.setDate(due.getDate() + 1);
     const durationHrs = timeMatch[4] ? parseInt(timeMatch[4]) : 1;
     const end = new Date(due.getTime() + durationHrs * 3_600_000);
@@ -329,7 +341,7 @@ function parseScheduleCommand(text: string): { summary: string; startTime: strin
  *   /remind every day at 9am standup  (recurring)
  *   /reminders  (list)
  */
-function parseReminderCommand(text: string): { dueAt: number; message: string; recurring?: string } | 'list' | null {
+function parseReminderCommand(text: string, timezone?: string): { dueAt: number; message: string; recurring?: string } | 'list' | null {
   const t = text.trim();
   if (/^\/reminders?$/i.test(t)) return 'list';
 
@@ -344,7 +356,7 @@ function parseReminderCommand(text: string): { dueAt: number; message: string; r
   if (recurMatch) {
     const recur = recurMatch[1].toLowerCase();
     const recurring = recur === 'day' || recur === 'daily' ? 'daily' : recur === 'week' || recur === 'weekly' ? 'weekly' : 'monthly';
-    const due = parseTimeToDate(now, recurMatch[2], recurMatch[3] || '00', recurMatch[4]);
+    const due = parseTimeToDate(now, recurMatch[2], recurMatch[3] || '00', recurMatch[4], timezone);
     if (due <= now) due.setDate(due.getDate() + 1);
     return { dueAt: due.getTime(), message: recurMatch[5], recurring };
   }
@@ -361,7 +373,7 @@ function parseReminderCommand(text: string): { dueAt: number; message: string; r
   // "tomorrow at HH:MM message"
   const tomorrowMatch = rest.match(/^tomorrow\s+(?:at\s+)?(\d{1,2}):?(\d{2})?\s*(am|pm)?\s+(.+)/i);
   if (tomorrowMatch) {
-    const due = parseTimeToDate(now, tomorrowMatch[1], tomorrowMatch[2] || '00', tomorrowMatch[3]);
+    const due = parseTimeToDate(now, tomorrowMatch[1], tomorrowMatch[2] || '00', tomorrowMatch[3], timezone);
     due.setDate(due.getDate() + 1);
     return { dueAt: due.getTime(), message: tomorrowMatch[4] };
   }
@@ -369,7 +381,7 @@ function parseReminderCommand(text: string): { dueAt: number; message: string; r
   // "HH:MM [am/pm] message" or "at HH:MM message"
   const timeMatch = rest.match(/^(?:at\s+)?(\d{1,2}):?(\d{2})?\s*(am|pm)?\s+(.+)/i);
   if (timeMatch && timeMatch[4]) {
-    const due = parseTimeToDate(now, timeMatch[1], timeMatch[2] || '00', timeMatch[3]);
+    const due = parseTimeToDate(now, timeMatch[1], timeMatch[2] || '00', timeMatch[3], timezone);
     if (due <= now) due.setDate(due.getDate() + 1); // next day if time already passed
     return { dueAt: due.getTime(), message: timeMatch[4] };
   }
@@ -378,16 +390,23 @@ function parseReminderCommand(text: string): { dueAt: number; message: string; r
   return { dueAt: Date.now() + 3_600_000, message: rest };
 }
 
-function parseTimeToDate(base: Date, hours: string, minutes: string, ampm?: string | null): Date {
+function parseTimeToDate(base: Date, hours: string, minutes: string, ampm?: string | null, timezone?: string): Date {
   let h = parseInt(hours);
   const m = parseInt(minutes);
   if (ampm) {
     if (ampm.toLowerCase() === 'pm' && h < 12) h += 12;
     if (ampm.toLowerCase() === 'am' && h === 12) h = 0;
   }
-  const d = new Date(base);
-  d.setHours(h, m, 0, 0);
-  return d;
+  // Build the target time in the user's timezone, then convert to UTC
+  const tz = timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const dateStr = base.toLocaleDateString('en-CA', { timeZone: tz }); // YYYY-MM-DD
+  const isoStr = `${dateStr}T${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00`;
+  // Start with UTC guess, then adjust by the offset the timezone introduces
+  const guess = new Date(isoStr + 'Z');
+  const displayedHour = parseInt(guess.toLocaleString('en-US', { hour: '2-digit', hour12: false, timeZone: tz }));
+  const displayedMin = parseInt(guess.toLocaleString('en-US', { minute: '2-digit', timeZone: tz }));
+  const offsetMs = ((displayedHour - h) * 60 + (displayedMin - m)) * 60000;
+  return new Date(guess.getTime() - offsetMs);
 }
 
 function generateSessionId(): string {
@@ -410,10 +429,30 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [userTimezone, setUserTimezone] = useState<string>('');
   const [thinkingSteps, setThinkingSteps] = useState<string[]>([]);
+  const [attachedImages, setAttachedImages] = useState<MessageImage[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [currentProvider, setCurrentProvider] = useState<string>('claude');
+  const [currentModel, setCurrentModel] = useState<string>('');
+  const [ollamaModels, setOllamaModels] = useState<OllamaModelInfo[]>([]);
+  const [showModelDropdown, setShowModelDropdown] = useState(false);
 
-  // Load user timezone
+  // Load settings (timezone, model, provider)
   useEffect(() => {
-    window.keel.getSettings().then((s) => setUserTimezone(s.timezone || '')).catch(() => {});
+    window.keel.getSettings().then((s) => {
+      setUserTimezone(s.timezone || '');
+      setCurrentProvider(s.provider);
+      switch (s.provider) {
+        case 'claude': setCurrentModel(s.claudeModel || 'claude-sonnet-4-20250514'); break;
+        case 'openai': setCurrentModel(s.openaiModel || 'gpt-4o'); break;
+        case 'openrouter': setCurrentModel(s.openrouterModel || ''); break;
+        case 'ollama': setCurrentModel(s.ollamaModel || 'llama3.2'); break;
+      }
+      if (s.provider === 'ollama') {
+        window.keel.ollamaListModels().then((r) => {
+          if (!r.error && r.models.length > 0) setOllamaModels(r.models);
+        }).catch(() => {});
+      }
+    }).catch(() => {});
   }, []);
 
   const formatTime = (ms: number) => {
@@ -523,19 +562,76 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
     setSessionId(generateSessionId());
   };
 
+  const handleModelChange = async (model: string) => {
+    setCurrentModel(model);
+    setShowModelDropdown(false);
+    try {
+      const settings = await window.keel.getSettings();
+      switch (currentProvider) {
+        case 'claude': settings.claudeModel = model; break;
+        case 'openai': settings.openaiModel = model; break;
+        case 'openrouter': settings.openrouterModel = model; break;
+        case 'ollama': settings.ollamaModel = model; break;
+      }
+      await window.keel.saveSettings(settings);
+    } catch { /* ignore */ }
+  };
+
+  const getModelLabel = (): string => {
+    if (currentProvider === 'claude') {
+      return CLAUDE_MODELS.find((m) => m.value === currentModel)?.label || currentModel;
+    }
+    if (currentProvider === 'openai') {
+      return OPENAI_MODELS.find((m) => m.value === currentModel)?.label || currentModel;
+    }
+    if (currentProvider === 'ollama') {
+      const found = ollamaModels.find((m) => m.name === currentModel);
+      return found ? found.name.split(':')[0] : currentModel || 'llama3.2';
+    }
+    return currentModel || 'OpenRouter';
+  };
+
+  const handleImageAttach = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+    Array.from(files).forEach((file) => {
+      if (!file.type.startsWith('image/')) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result as string;
+        const base64 = result.split(',')[1];
+        const mediaType = file.type as MessageImage['mediaType'];
+        setAttachedImages((prev) => [...prev, { data: base64, mediaType }]);
+      };
+      reader.readAsDataURL(file);
+    });
+    // Reset input so same file can be re-selected
+    e.target.value = '';
+  };
+
+  const removeImage = (index: number) => {
+    setAttachedImages((prev) => prev.filter((_, i) => i !== index));
+  };
+
   const sendMessage = async (overrideText?: string) => {
     const trimmed = (overrideText || input).trim();
-    if (!trimmed || isStreaming) return;
+    if ((!trimmed && attachedImages.length === 0) || isStreaming) return;
 
     const userMessage: MessageType = {
       role: 'user',
       content: trimmed,
+      images: attachedImages.length > 0 ? [...attachedImages] : undefined,
       timestamp: Date.now(),
     };
 
     const updatedMessages = [...messages, userMessage];
     setMessages(updatedMessages);
     setInput('');
+    setAttachedImages([]);
     setIsStreaming(true);
     setStreamingContent('');
 
@@ -676,7 +772,7 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
     }
 
     // Reminder commands
-    const reminderParsed = parseReminderCommand(trimmed);
+    const reminderParsed = parseReminderCommand(trimmed, userTimezone || undefined);
     if (reminderParsed === 'list') {
       try {
         const reminders = await window.keel.listReminders();
@@ -712,7 +808,7 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
     }
 
     // Schedule command
-    const scheduleParsed = parseScheduleCommand(trimmed);
+    const scheduleParsed = parseScheduleCommand(trimmed, userTimezone || undefined);
     if (scheduleParsed) {
       try {
         const result = await window.keel.googleCreateEvent(scheduleParsed);
@@ -861,7 +957,48 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
         padding: '12px 24px',
         background: '#1a1a1a',
       }}>
+        {/* Image thumbnails */}
+        {attachedImages.length > 0 && (
+          <div style={{ display: 'flex', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
+            {attachedImages.map((img, i) => (
+              <div key={i} style={{ position: 'relative' }}>
+                <img
+                  src={`data:${img.mediaType};base64,${img.data}`}
+                  alt=""
+                  style={{
+                    width: 56, height: 56, borderRadius: 8, objectFit: 'cover',
+                    border: '1px solid rgba(255,255,255,0.12)',
+                  }}
+                />
+                <button
+                  onClick={() => removeImage(i)}
+                  style={{
+                    position: 'absolute', top: -6, right: -6,
+                    width: 18, height: 18, borderRadius: '50%',
+                    background: '#CF7A5C', border: 'none', color: 'white',
+                    fontSize: 11, cursor: 'pointer', display: 'flex',
+                    alignItems: 'center', justifyContent: 'center',
+                    lineHeight: 1, padding: 0,
+                  }}
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
         <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10, position: 'relative' }}>
+          {/* Hidden file input */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/gif,image/webp"
+            multiple
+            onChange={handleFileChange}
+            style={{ display: 'none' }}
+          />
+
           <div style={{ flex: 1, position: 'relative' }}>
             {input.startsWith('/') && (
               <div style={{
@@ -904,20 +1041,163 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
               }}
             />
           </div>
+
+          {/* Image attach button */}
+          <button
+            onClick={handleImageAttach}
+            disabled={isStreaming}
+            title="Attach image"
+            style={{
+              background: 'transparent', border: '1px solid rgba(255,255,255,0.08)',
+              color: 'rgba(255,255,255,0.4)', fontSize: 18, borderRadius: 12,
+              padding: '8px 10px', cursor: isStreaming ? 'default' : 'pointer',
+              transition: 'all 0.15s', flexShrink: 0, lineHeight: 1,
+              opacity: isStreaming ? 0.4 : 1,
+            }}
+            onMouseEnter={(e) => {
+              if (!isStreaming) {
+                e.currentTarget.style.borderColor = 'rgba(207,122,92,0.4)';
+                e.currentTarget.style.color = 'rgba(255,255,255,0.7)';
+              }
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)';
+              e.currentTarget.style.color = 'rgba(255,255,255,0.4)';
+            }}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+              <circle cx="8.5" cy="8.5" r="1.5"/>
+              <polyline points="21 15 16 10 5 21"/>
+            </svg>
+          </button>
+
           <button
             onClick={() => sendMessage()}
-            disabled={isStreaming || !input.trim()}
+            disabled={isStreaming || (!input.trim() && attachedImages.length === 0)}
             style={{
-              background: isStreaming || !input.trim() ? '#252525' : '#CF7A5C',
-              border: isStreaming || !input.trim() ? '1px solid rgba(255,255,255,0.08)' : '1px solid transparent',
-              color: isStreaming || !input.trim() ? 'rgba(255,255,255,0.2)' : 'white',
+              background: isStreaming || (!input.trim() && attachedImages.length === 0) ? '#252525' : '#CF7A5C',
+              border: isStreaming || (!input.trim() && attachedImages.length === 0) ? '1px solid rgba(255,255,255,0.08)' : '1px solid transparent',
+              color: isStreaming || (!input.trim() && attachedImages.length === 0) ? 'rgba(255,255,255,0.2)' : 'white',
               fontSize: 14, fontWeight: 500, borderRadius: 12,
-              padding: '10px 16px', cursor: isStreaming || !input.trim() ? 'default' : 'pointer',
+              padding: '10px 16px', cursor: isStreaming || (!input.trim() && attachedImages.length === 0) ? 'default' : 'pointer',
               transition: 'all 0.15s', flexShrink: 0,
             }}
           >
             Send
           </button>
+        </div>
+
+        {/* Model selector bar */}
+        <div style={{
+          display: 'flex', justifyContent: 'flex-end', alignItems: 'center',
+          marginTop: 6, paddingRight: 2, position: 'relative',
+        }}>
+          <button
+            onClick={() => setShowModelDropdown(!showModelDropdown)}
+            style={{
+              background: 'none', border: 'none', padding: '2px 6px',
+              color: 'rgba(255,255,255,0.3)', fontSize: 11,
+              cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4,
+              borderRadius: 6, transition: 'all 0.15s',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.color = 'rgba(255,255,255,0.6)';
+              e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = 'rgba(255,255,255,0.3)';
+              e.currentTarget.style.background = 'none';
+            }}
+          >
+            {getModelLabel()}
+            <span style={{ fontSize: 8 }}>▼</span>
+          </button>
+
+          {showModelDropdown && (
+            <>
+              {/* Backdrop to close */}
+              <div
+                onClick={() => setShowModelDropdown(false)}
+                style={{ position: 'fixed', inset: 0, zIndex: 99 }}
+              />
+              <div style={{
+                position: 'absolute', bottom: '100%', right: 0, marginBottom: 4,
+                background: '#2a2a2a', border: '1px solid rgba(255,255,255,0.12)',
+                borderRadius: 10, padding: '4px 0', minWidth: 160,
+                boxShadow: '0 8px 24px rgba(0,0,0,0.4)', zIndex: 100,
+              }}>
+                {currentProvider === 'claude' && CLAUDE_MODELS.map((m) => (
+                  <button
+                    key={m.value}
+                    onClick={() => handleModelChange(m.value)}
+                    style={{
+                      display: 'block', width: '100%', textAlign: 'left',
+                      padding: '7px 14px', border: 'none', cursor: 'pointer',
+                      background: currentModel === m.value ? 'rgba(207,122,92,0.15)' : 'transparent',
+                      color: currentModel === m.value ? '#CF7A5C' : 'rgba(255,255,255,0.7)',
+                      fontSize: 12, transition: 'background 0.1s',
+                    }}
+                    onMouseEnter={(e) => {
+                      if (currentModel !== m.value) e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
+                    }}
+                    onMouseLeave={(e) => {
+                      if (currentModel !== m.value) e.currentTarget.style.background = 'transparent';
+                    }}
+                  >
+                    {m.label}
+                  </button>
+                ))}
+                {currentProvider === 'openai' && OPENAI_MODELS.map((m) => (
+                  <button
+                    key={m.value}
+                    onClick={() => handleModelChange(m.value)}
+                    style={{
+                      display: 'block', width: '100%', textAlign: 'left',
+                      padding: '7px 14px', border: 'none', cursor: 'pointer',
+                      background: currentModel === m.value ? 'rgba(207,122,92,0.15)' : 'transparent',
+                      color: currentModel === m.value ? '#CF7A5C' : 'rgba(255,255,255,0.7)',
+                      fontSize: 12, transition: 'background 0.1s',
+                    }}
+                    onMouseEnter={(e) => {
+                      if (currentModel !== m.value) e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
+                    }}
+                    onMouseLeave={(e) => {
+                      if (currentModel !== m.value) e.currentTarget.style.background = 'transparent';
+                    }}
+                  >
+                    {m.label}
+                  </button>
+                ))}
+                {currentProvider === 'ollama' && ollamaModels.map((m) => (
+                  <button
+                    key={m.name}
+                    onClick={() => handleModelChange(m.name)}
+                    style={{
+                      display: 'block', width: '100%', textAlign: 'left',
+                      padding: '7px 14px', border: 'none', cursor: 'pointer',
+                      background: currentModel === m.name ? 'rgba(207,122,92,0.15)' : 'transparent',
+                      color: currentModel === m.name ? '#CF7A5C' : 'rgba(255,255,255,0.7)',
+                      fontSize: 12, transition: 'background 0.1s',
+                    }}
+                    onMouseEnter={(e) => {
+                      if (currentModel !== m.name) e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
+                    }}
+                    onMouseLeave={(e) => {
+                      if (currentModel !== m.name) e.currentTarget.style.background = 'transparent';
+                    }}
+                  >
+                    {m.name.split(':')[0]} <span style={{ color: 'rgba(255,255,255,0.3)' }}>{m.parameterSize}</span>
+                  </button>
+                ))}
+                {currentProvider === 'openrouter' && (
+                  <div style={{ padding: '7px 14px', color: 'rgba(255,255,255,0.4)', fontSize: 12 }}>
+                    {currentModel || 'No model set'} — change in Settings
+                  </div>
+                )}
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>

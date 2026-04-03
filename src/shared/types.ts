@@ -1,6 +1,12 @@
+export interface MessageImage {
+  data: string;      // base64-encoded image data (no prefix)
+  mediaType: 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp';
+}
+
 export interface Message {
   role: 'user' | 'assistant';
   content: string;
+  images?: MessageImage[];
   timestamp: number;
 }
 

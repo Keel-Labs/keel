@@ -44,6 +44,11 @@ IMPORTANT: You have access to the user's Google Calendar. When the user asks abo
 
 IMPORTANT: When the user asks you to schedule or create a meeting/event, tell them to use the /schedule command. Provide the exact command they should type. Example: /schedule tomorrow at 9am Meeting with Alex. Do NOT say you cannot create calendar events — you CAN via the /schedule command.
 
+CONTEXT SOURCES:
+- Your personal brain files contain the user's profile, projects, and daily logs.
+- Files prefixed with [TEAM] come from the shared team brain. Reference them when relevant, attribute information to team members by name, and respect privacy boundaries.
+- The pulse file (pulse.md) contains the user's current priorities and recent activity. Use it for immediate context about what they're working on right now.
+
 Here is everything you know about the user:
 
 `;
@@ -83,19 +88,19 @@ export class ContextAssembler {
     this.useSemanticSearch = true;
   }
 
-  async assembleContext(userMessage?: string): Promise<string> {
+  async assembleContext(userMessage?: string, onStep?: (step: string) => void): Promise<string> {
     if (this.useSemanticSearch && userMessage) {
       try {
-        return await this.assembleV2(userMessage);
+        return await this.assembleV2(userMessage, onStep);
       } catch {
         // Fall back to v1 if semantic search fails
-        return this.assembleV1();
+        return this.assembleV1(onStep);
       }
     }
-    return this.assembleV1();
+    return this.assembleV1(onStep);
   }
 
-  private async assembleV1(): Promise<string> {
+  private async assembleV1(onStep?: (step: string) => void): Promise<string> {
     const systemPrompt = buildSystemPrompt(this.timezone);
     const sections: string[] = [];
     let totalChars = systemPrompt.length;
@@ -112,15 +117,25 @@ export class ContextAssembler {
 
     // 1. Always include keel.md
     try {
+      onStep?.('Reading your profile...');
       const keelContent = await this.fileManager.readFile('keel.md');
       addSection('keel.md', keelContent);
     } catch {
       // keel.md doesn't exist yet
     }
 
+    // 1b. Include pulse.md (current state)
+    try {
+      const pulseContent = await this.fileManager.readFile('pulse.md');
+      addSection('pulse.md', pulseContent);
+    } catch {
+      // pulse.md doesn't exist yet
+    }
+
     // 2. All project context files
     try {
       const projectFiles = await this.fileManager.listFiles('projects/*/context.md');
+      if (projectFiles.length > 0) onStep?.(`Scanning ${projectFiles.length} project(s)...`);
       for (const file of projectFiles) {
         try {
           const content = await this.fileManager.readFile(file);
@@ -137,6 +152,7 @@ export class ContextAssembler {
     try {
       const dailyLogs = await this.fileManager.listFiles('daily-log/*.md');
       const recent = dailyLogs.sort().reverse().slice(0, 2);
+      if (recent.length > 0) onStep?.('Loading recent daily logs...');
       for (const file of recent) {
         try {
           const content = await this.fileManager.readFile(file);
@@ -151,6 +167,7 @@ export class ContextAssembler {
 
     // 4. Team brain context (if configured)
     if (this.teamFileManager) {
+      onStep?.('Checking team brain...');
       try {
         const teamContent = await this.teamFileManager.readFile('team.md');
         addSection('[TEAM] team.md', teamContent);
@@ -193,7 +210,7 @@ export class ContextAssembler {
     return systemPrompt + sections.join('');
   }
 
-  private async assembleV2(userMessage: string): Promise<string> {
+  private async assembleV2(userMessage: string, onStep?: (step: string) => void): Promise<string> {
     const systemPrompt = buildSystemPrompt(this.timezone);
     const brainPath = this.fileManager.getBrainPath();
     const sections: string[] = [];
@@ -211,10 +228,19 @@ export class ContextAssembler {
 
     // 1. Always include keel.md
     try {
+      onStep?.('Reading your profile...');
       const keelContent = await this.fileManager.readFile('keel.md');
       addSection('keel.md', keelContent);
     } catch {
       // keel.md doesn't exist
+    }
+
+    // 1b. Include pulse.md (current state)
+    try {
+      const pulseContent = await this.fileManager.readFile('pulse.md');
+      addSection('pulse.md', pulseContent);
+    } catch {
+      // pulse.md doesn't exist yet
     }
 
     // 2. Today's and yesterday's daily logs
@@ -231,6 +257,7 @@ export class ContextAssembler {
     }
 
     // 3. Retrieve: vector search (top-20) + FTS5 keyword search (top-10), then re-rank
+    onStep?.('Searching for relevant context...');
 
     // Collect candidates from both sources
     const candidateMap = new Map<string, RankableChunk>();
@@ -280,6 +307,7 @@ export class ContextAssembler {
 
     // 4. Team brain search (if configured)
     if (this.teamFileManager) {
+      onStep?.('Searching team brain...');
       const teamBrainPath = this.teamFileManager.getBrainPath();
 
       // Team vector search
@@ -325,6 +353,9 @@ export class ContextAssembler {
 
     const candidates = Array.from(candidateMap.values());
     const reranked = rerank(candidates, TOP_K);
+    if (reranked.length > 0) {
+      onStep?.(`Found ${reranked.length} relevant section(s)`);
+    }
 
     // Group by file and add to context
     const byFile = new Map<string, string[]>();
