@@ -2,7 +2,7 @@
 # Deploy: fly launch / fly deploy
 # Docs: https://fly.io/docs/reference/configuration/
 
-app = "keel-api"
+app = "keel-ai"
 primary_region = "sjc"
 
 [build]
