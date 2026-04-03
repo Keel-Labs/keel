@@ -557,21 +557,19 @@ function registerIpcHandlers() {
   }
 
   ipcMain.handle('keel:chat', async (_event, messages: Message[]) => {
-    emitThinking('Assembling context...');
     const enrichedMessages = await enrichMessages(messages);
     const lastMessage = enrichedMessages[enrichedMessages.length - 1]?.content;
-    const systemPrompt = await contextAssembler.assembleContext(lastMessage);
-    emitThinking('Sending to LLM...');
+    const systemPrompt = await contextAssembler.assembleContext(lastMessage, emitThinking);
+    emitThinking('Thinking...');
     logActivity(settings.brainPath, 'chat', lastMessage?.slice(0, 200));
     return llmClient.chat(enrichedMessages, systemPrompt);
   });
 
   ipcMain.handle('keel:chat-stream', async (event, messages: Message[]) => {
-    emitThinking('Assembling context...');
     const enrichedMessages = await enrichMessages(messages);
     const lastMessage = enrichedMessages[enrichedMessages.length - 1]?.content;
-    const systemPrompt = await contextAssembler.assembleContext(lastMessage);
-    emitThinking('Streaming response...');
+    const systemPrompt = await contextAssembler.assembleContext(lastMessage, emitThinking);
+    emitThinking('Generating response...');
     const sender = event.sender;
 
     logActivity(settings.brainPath, 'chat', lastMessage?.slice(0, 200));
@@ -628,16 +626,26 @@ function registerIpcHandlers() {
   });
 
   ipcMain.handle('keel:daily-brief', async () => {
-    return dailyBrief(fileManager, llmClient, {
+    const result = await dailyBrief(fileManager, llmClient, {
       teamFileManager: teamFileManager || undefined,
     });
+    // Update pulse.md async
+    const today = new Date().toISOString().split('T')[0];
+    setSelfWriting();
+    fileManager.writeFile('pulse.md', `# Pulse\nLast updated: ${today} (morning brief)\n\n## Active Focus\n- See today's priorities in morning brief\n\n## Recent Activity\n- Daily brief generated ${today}\n`).catch(() => {});
+    return result;
   });
 
   ipcMain.handle('keel:eod', async (_event, chatHistory: Message[]) => {
-    return eod(fileManager, llmClient, chatHistory, {
+    const result = await eod(fileManager, llmClient, chatHistory, {
       teamFileManager: teamFileManager || undefined,
       userName: settings.userName || undefined,
     });
+    // Update pulse.md async
+    const today = new Date().toISOString().split('T')[0];
+    setSelfWriting();
+    fileManager.writeFile('pulse.md', `# Pulse\nLast updated: ${today} (EOD)\n\n## Active Focus\n- See tomorrow's priorities in EOD summary\n\n## Recent Activity\n- EOD completed ${today}\n`).catch(() => {});
+    return result;
   });
 
   ipcMain.handle('keel:export-pdf', async (_event, markdownContent: string, title?: string) => {

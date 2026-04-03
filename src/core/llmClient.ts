@@ -121,6 +121,37 @@ export class LLMClient {
 
   // --- Claude ---
 
+  private formatClaudeMessages(messages: Message[]): any[] {
+    return messages.map((m) => {
+      if (m.images && m.images.length > 0) {
+        const content: any[] = m.images.map((img) => ({
+          type: 'image',
+          source: { type: 'base64', media_type: img.mediaType, data: img.data },
+        }));
+        content.push({ type: 'text', text: m.content });
+        return { role: m.role, content };
+      }
+      return { role: m.role, content: m.content };
+    });
+  }
+
+  private formatOpenAIMessages(messages: Message[], systemPrompt: string): any[] {
+    const formatted: any[] = [{ role: 'system', content: systemPrompt }];
+    for (const m of messages) {
+      if (m.images && m.images.length > 0) {
+        const content: any[] = m.images.map((img) => ({
+          type: 'image_url',
+          image_url: { url: `data:${img.mediaType};base64,${img.data}` },
+        }));
+        content.push({ type: 'text', text: m.content });
+        formatted.push({ role: m.role, content });
+      } else {
+        formatted.push({ role: m.role as 'user' | 'assistant', content: m.content });
+      }
+    }
+    return formatted;
+  }
+
   private async chatClaude(messages: Message[], systemPrompt: string): Promise<string> {
     if (!this.anthropic) throw new Error('Anthropic API key not configured');
 
@@ -128,7 +159,7 @@ export class LLMClient {
       model: this.claudeModel,
       max_tokens: 4096,
       system: systemPrompt,
-      messages: messages.map((m) => ({ role: m.role, content: m.content })),
+      messages: this.formatClaudeMessages(messages),
     });
 
     const textBlock = response.content.find((b) => b.type === 'text');
@@ -146,7 +177,7 @@ export class LLMClient {
       model: this.claudeModel,
       max_tokens: 4096,
       system: systemPrompt,
-      messages: messages.map((m) => ({ role: m.role, content: m.content })),
+      messages: this.formatClaudeMessages(messages),
     });
 
     for await (const event of stream) {
@@ -168,10 +199,7 @@ export class LLMClient {
 
     const response = await client.chat.completions.create({
       model,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        ...messages.map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content })),
-      ],
+      messages: this.formatOpenAIMessages(messages, systemPrompt),
     });
 
     return response.choices[0]?.message?.content || '';
@@ -189,10 +217,7 @@ export class LLMClient {
     const stream = await client.chat.completions.create({
       model,
       stream: true,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        ...messages.map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content })),
-      ],
+      messages: this.formatOpenAIMessages(messages, systemPrompt),
     });
 
     for await (const chunk of stream) {
@@ -203,13 +228,22 @@ export class LLMClient {
 
   // --- Ollama ---
 
+  private formatOllamaMessages(messages: Message[], systemPrompt: string): any[] {
+    const formatted: any[] = [{ role: 'system', content: systemPrompt }];
+    for (const m of messages) {
+      const msg: any = { role: m.role as 'user' | 'assistant', content: m.content };
+      if (m.images && m.images.length > 0) {
+        msg.images = m.images.map((img) => img.data);
+      }
+      formatted.push(msg);
+    }
+    return formatted;
+  }
+
   private async chatOllama(messages: Message[], systemPrompt: string): Promise<string> {
     const response = await this.ollama.chat({
       model: this.ollamaModel,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        ...messages.map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content })),
-      ],
+      messages: this.formatOllamaMessages(messages, systemPrompt),
     });
 
     return response.message.content;
@@ -223,10 +257,7 @@ export class LLMClient {
     const response = await this.ollama.chat({
       model: this.ollamaModel,
       stream: true,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        ...messages.map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content })),
-      ],
+      messages: this.formatOllamaMessages(messages, systemPrompt),
     });
 
     for await (const chunk of response) {
