@@ -7,7 +7,7 @@ interface Session {
   updatedAt: number;
 }
 
-type ActiveView = 'chat' | 'settings' | 'knowledge';
+type ActiveView = 'chat' | 'settings' | 'knowledge' | 'history';
 
 interface Props {
   currentSessionId: string;

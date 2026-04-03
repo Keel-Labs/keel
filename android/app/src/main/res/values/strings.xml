@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Keel</string>
+    <string name="title_activity_main">Keel</string>
+    <string name="package_name">com.keel.app</string>
+    <string name="custom_url_scheme">com.keel.app</string>
+</resources>
