@@ -62,6 +62,8 @@ export default function Settings({ onBack }: Props) {
     setOllamaLoading(false);
   }, []);
 
+  const saveTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
   useEffect(() => {
     window.keel.getSettings().then((s) => {
       setSettings(s);
@@ -74,8 +76,6 @@ export default function Settings({ onBack }: Props) {
   }, [fetchOllamaModels]);
 
   if (!settings) return null;
-
-  const saveTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const update = (partial: Partial<SettingsType>) => {
     const newSettings = { ...settings, ...partial };
