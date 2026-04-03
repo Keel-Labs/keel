@@ -435,8 +435,11 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
   const [currentModel, setCurrentModel] = useState<string>('');
   const [ollamaModels, setOllamaModels] = useState<OllamaModelInfo[]>([]);
   const [showModelDropdown, setShowModelDropdown] = useState(false);
+  const justLoadedRef = useRef(false);
+  const [availableProviders, setAvailableProviders] = useState<Set<string>>(new Set());
+  const [openrouterModelName, setOpenrouterModelName] = useState<string>('');
 
-  // Load settings (timezone, model, provider)
+  // Load settings (timezone, model, provider) and detect all available providers
   useEffect(() => {
     window.keel.getSettings().then((s) => {
       setUserTimezone(s.timezone || '');
@@ -447,11 +450,23 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
         case 'openrouter': setCurrentModel(s.openrouterModel || ''); break;
         case 'ollama': setCurrentModel(s.ollamaModel || 'llama3.2'); break;
       }
-      if (s.provider === 'ollama') {
-        window.keel.ollamaListModels().then((r) => {
-          if (!r.error && r.models.length > 0) setOllamaModels(r.models);
-        }).catch(() => {});
+      // Detect all available providers
+      const available = new Set<string>();
+      if (s.anthropicApiKey) available.add('claude');
+      if (s.openaiApiKey) available.add('openai');
+      if (s.openrouterApiKey) {
+        available.add('openrouter');
+        setOpenrouterModelName(s.openrouterModel || '');
       }
+      // Always try Ollama
+      window.keel.ollamaListModels().then((r) => {
+        if (!r.error && r.models.length > 0) {
+          setOllamaModels(r.models);
+          available.add('ollama');
+          setAvailableProviders(new Set(available));
+        }
+      }).catch(() => {});
+      setAvailableProviders(new Set(available));
     }).catch(() => {});
   }, []);
 
@@ -477,6 +492,7 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
       (async () => {
         const saved = await window.keel.loadChat(loadSessionId);
         if (saved) {
+          justLoadedRef.current = true;
           setSessionId(loadSessionId);
           setMessages(saved);
           onSessionChange(loadSessionId);
@@ -493,6 +509,7 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
         if (latestId) {
           const saved = await window.keel.loadChat(latestId);
           if (saved && saved.length > 0) {
+            justLoadedRef.current = true;
             setSessionId(latestId);
             setMessages(saved);
             onSessionChange(latestId);
@@ -525,9 +542,13 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
     };
   }, []);
 
-  // Auto-save messages whenever they change
+  // Auto-save messages whenever they change (skip if just loaded from DB)
   useEffect(() => {
     if (messages.length > 0) {
+      if (justLoadedRef.current) {
+        justLoadedRef.current = false;
+        return;
+      }
       window.keel.saveChat(sessionId, messages).catch(() => {});
     }
   }, [messages, sessionId]);
@@ -562,12 +583,14 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
     setSessionId(generateSessionId());
   };
 
-  const handleModelChange = async (model: string) => {
+  const handleModelChange = async (provider: string, model: string) => {
+    setCurrentProvider(provider);
     setCurrentModel(model);
     setShowModelDropdown(false);
     try {
       const settings = await window.keel.getSettings();
-      switch (currentProvider) {
+      settings.provider = provider as SettingsType['provider'];
+      switch (provider) {
         case 'claude': settings.claudeModel = model; break;
         case 'openai': settings.openaiModel = model; break;
         case 'openrouter': settings.openrouterModel = model; break;
@@ -1124,75 +1147,67 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
               <div style={{
                 position: 'absolute', bottom: '100%', right: 0, marginBottom: 4,
                 background: '#2a2a2a', border: '1px solid rgba(255,255,255,0.12)',
-                borderRadius: 10, padding: '4px 0', minWidth: 160,
+                borderRadius: 10, padding: '4px 0', minWidth: 180,
                 boxShadow: '0 8px 24px rgba(0,0,0,0.4)', zIndex: 100,
+                maxHeight: 320, overflowY: 'auto',
               }}>
-                {currentProvider === 'claude' && CLAUDE_MODELS.map((m) => (
-                  <button
-                    key={m.value}
-                    onClick={() => handleModelChange(m.value)}
-                    style={{
-                      display: 'block', width: '100%', textAlign: 'left',
-                      padding: '7px 14px', border: 'none', cursor: 'pointer',
-                      background: currentModel === m.value ? 'rgba(207,122,92,0.15)' : 'transparent',
-                      color: currentModel === m.value ? '#CF7A5C' : 'rgba(255,255,255,0.7)',
-                      fontSize: 12, transition: 'background 0.1s',
-                    }}
-                    onMouseEnter={(e) => {
-                      if (currentModel !== m.value) e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
-                    }}
-                    onMouseLeave={(e) => {
-                      if (currentModel !== m.value) e.currentTarget.style.background = 'transparent';
-                    }}
-                  >
-                    {m.label}
-                  </button>
-                ))}
-                {currentProvider === 'openai' && OPENAI_MODELS.map((m) => (
-                  <button
-                    key={m.value}
-                    onClick={() => handleModelChange(m.value)}
-                    style={{
-                      display: 'block', width: '100%', textAlign: 'left',
-                      padding: '7px 14px', border: 'none', cursor: 'pointer',
-                      background: currentModel === m.value ? 'rgba(207,122,92,0.15)' : 'transparent',
-                      color: currentModel === m.value ? '#CF7A5C' : 'rgba(255,255,255,0.7)',
-                      fontSize: 12, transition: 'background 0.1s',
-                    }}
-                    onMouseEnter={(e) => {
-                      if (currentModel !== m.value) e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
-                    }}
-                    onMouseLeave={(e) => {
-                      if (currentModel !== m.value) e.currentTarget.style.background = 'transparent';
-                    }}
-                  >
-                    {m.label}
-                  </button>
-                ))}
-                {currentProvider === 'ollama' && ollamaModels.map((m) => (
-                  <button
-                    key={m.name}
-                    onClick={() => handleModelChange(m.name)}
-                    style={{
-                      display: 'block', width: '100%', textAlign: 'left',
-                      padding: '7px 14px', border: 'none', cursor: 'pointer',
-                      background: currentModel === m.name ? 'rgba(207,122,92,0.15)' : 'transparent',
-                      color: currentModel === m.name ? '#CF7A5C' : 'rgba(255,255,255,0.7)',
-                      fontSize: 12, transition: 'background 0.1s',
-                    }}
-                    onMouseEnter={(e) => {
-                      if (currentModel !== m.name) e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
-                    }}
-                    onMouseLeave={(e) => {
-                      if (currentModel !== m.name) e.currentTarget.style.background = 'transparent';
-                    }}
-                  >
-                    {m.name.split(':')[0]} <span style={{ color: 'rgba(255,255,255,0.3)' }}>{m.parameterSize}</span>
-                  </button>
-                ))}
-                {currentProvider === 'openrouter' && (
-                  <div style={{ padding: '7px 14px', color: 'rgba(255,255,255,0.4)', fontSize: 12 }}>
-                    {currentModel || 'No model set'} — change in Settings
+                {availableProviders.has('claude') && (
+                  <>
+                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', padding: '6px 14px 2px', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600 }}>Claude</div>
+                    {CLAUDE_MODELS.map((m) => {
+                      const active = currentProvider === 'claude' && currentModel === m.value;
+                      return (
+                        <button key={`claude-${m.value}`} onClick={() => handleModelChange('claude', m.value)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '7px 14px', border: 'none', cursor: 'pointer', background: active ? 'rgba(207,122,92,0.15)' : 'transparent', color: active ? '#CF7A5C' : 'rgba(255,255,255,0.7)', fontSize: 12, transition: 'background 0.1s' }}
+                          onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; }}
+                          onMouseLeave={(e) => { if (!active) e.currentTarget.style.background = 'transparent'; }}
+                        >{m.label}</button>
+                      );
+                    })}
+                  </>
+                )}
+                {availableProviders.has('openai') && (
+                  <>
+                    {availableProviders.has('claude') && <div style={{ height: 1, background: 'rgba(255,255,255,0.08)', margin: '4px 0' }} />}
+                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', padding: '6px 14px 2px', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600 }}>OpenAI</div>
+                    {OPENAI_MODELS.map((m) => {
+                      const active = currentProvider === 'openai' && currentModel === m.value;
+                      return (
+                        <button key={`openai-${m.value}`} onClick={() => handleModelChange('openai', m.value)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '7px 14px', border: 'none', cursor: 'pointer', background: active ? 'rgba(207,122,92,0.15)' : 'transparent', color: active ? '#CF7A5C' : 'rgba(255,255,255,0.7)', fontSize: 12, transition: 'background 0.1s' }}
+                          onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; }}
+                          onMouseLeave={(e) => { if (!active) e.currentTarget.style.background = 'transparent'; }}
+                        >{m.label}</button>
+                      );
+                    })}
+                  </>
+                )}
+                {availableProviders.has('ollama') && ollamaModels.length > 0 && (
+                  <>
+                    {(availableProviders.has('claude') || availableProviders.has('openai')) && <div style={{ height: 1, background: 'rgba(255,255,255,0.08)', margin: '4px 0' }} />}
+                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', padding: '6px 14px 2px', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600 }}>Ollama</div>
+                    {ollamaModels.map((m) => {
+                      const active = currentProvider === 'ollama' && currentModel === m.name;
+                      return (
+                        <button key={`ollama-${m.name}`} onClick={() => handleModelChange('ollama', m.name)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '7px 14px', border: 'none', cursor: 'pointer', background: active ? 'rgba(207,122,92,0.15)' : 'transparent', color: active ? '#CF7A5C' : 'rgba(255,255,255,0.7)', fontSize: 12, transition: 'background 0.1s' }}
+                          onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; }}
+                          onMouseLeave={(e) => { if (!active) e.currentTarget.style.background = 'transparent'; }}
+                        >{m.name.split(':')[0]} <span style={{ color: 'rgba(255,255,255,0.3)' }}>{m.parameterSize}</span></button>
+                      );
+                    })}
+                  </>
+                )}
+                {availableProviders.has('openrouter') && (
+                  <>
+                    {(availableProviders.has('claude') || availableProviders.has('openai') || availableProviders.has('ollama')) && <div style={{ height: 1, background: 'rgba(255,255,255,0.08)', margin: '4px 0' }} />}
+                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', padding: '6px 14px 2px', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600 }}>OpenRouter</div>
+                    <button onClick={() => handleModelChange('openrouter', openrouterModelName)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '7px 14px', border: 'none', cursor: 'pointer', background: currentProvider === 'openrouter' ? 'rgba(207,122,92,0.15)' : 'transparent', color: currentProvider === 'openrouter' ? '#CF7A5C' : 'rgba(255,255,255,0.7)', fontSize: 12, transition: 'background 0.1s' }}
+                      onMouseEnter={(e) => { if (currentProvider !== 'openrouter') e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; }}
+                      onMouseLeave={(e) => { if (currentProvider !== 'openrouter') e.currentTarget.style.background = 'transparent'; }}
+                    >{openrouterModelName || 'Configure in Settings'}</button>
+                  </>
+                )}
+                {availableProviders.size === 0 && (
+                  <div style={{ padding: '10px 14px', color: 'rgba(255,255,255,0.4)', fontSize: 12 }}>
+                    No providers configured. Add an API key in Settings.
                   </div>
                 )}
               </div>

@@ -1,4 +1,4 @@
-import { FileManager } from '../fileManager';
+import { FileManager, KEEL_MD_TEMPLATE } from '../fileManager';
 import { LLMClient } from '../llmClient';
 import { logActivity } from '../db';
 import type { Message } from '../../shared/types';
@@ -72,12 +72,20 @@ export async function extractAndSaveMemory(
     const update: MemoryUpdate = JSON.parse(response.trim());
     if (!update.hasUpdates) return;
 
-    // Read current keel.md
+    // Read current keel.md (create from template if missing)
     let keelContent: string;
     try {
       keelContent = await fileManager.readFile('keel.md');
     } catch {
-      return; // Can't update if keel.md doesn't exist
+      // keel.md doesn't exist yet — create it from template so we can save into it
+      try {
+        await fileManager.writeFile('keel.md', KEEL_MD_TEMPLATE);
+        keelContent = KEEL_MD_TEMPLATE;
+        console.log('[memory-extract] Created keel.md from template');
+      } catch (writeErr) {
+        console.error('[memory-extract] Failed to create keel.md:', writeErr);
+        return;
+      }
     }
 
     let modified = false;
@@ -109,12 +117,16 @@ export async function extractAndSaveMemory(
           // Replace existing row
           const rowRegex = new RegExp(`\\| ${project.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} \\|.*\\|`, 'g');
           keelContent = keelContent.replace(rowRegex, tableRow);
+          console.log(`[memory-extract] Updated project: ${project.name}`);
         } else {
-          // Add new row after the table header
-          keelContent = keelContent.replace(
-            /(# Active Projects\n\|.*\|\n\|[-| ]+\|)/,
-            `$1\n${tableRow}`
-          );
+          // Add new row after the table header (lenient: allow variable spacing in header)
+          const tableHeaderRegex = /(#+ Active Projects\n\|[^\n]+\|\n\|[-| ]+\|)/;
+          if (tableHeaderRegex.test(keelContent)) {
+            keelContent = keelContent.replace(tableHeaderRegex, `$1\n${tableRow}`);
+            console.log(`[memory-extract] Added project: ${project.name}`);
+          } else {
+            console.warn(`[memory-extract] Could not find Active Projects table to insert: ${project.name}`);
+          }
         }
         modified = true;
       }
@@ -151,8 +163,10 @@ export async function extractAndSaveMemory(
       await fileManager.writeFile('keel.md', keelContent);
       const brainPath = fileManager.getBrainPath();
       logActivity(brainPath, 'memory-update', `Updated keel.md from chat conversation`);
+      console.log('[memory-extract] Successfully updated keel.md');
     }
-  } catch {
+  } catch (err) {
     // Memory extraction is best-effort — never fail the chat
+    console.error('[memory-extract] Failed:', err);
   }
 }
