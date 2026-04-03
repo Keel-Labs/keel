@@ -197,19 +197,14 @@ function ThinkingIndicator() {
 
   return (
     <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 16, paddingRight: 48 }}>
-      <div style={{
-        background: '#252525', border: '1px solid rgba(255,255,255,0.08)',
-        borderRadius: '16px 16px 16px 4px', padding: '12px 16px',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <NauticalLoader />
-          <span className="thinking-text" style={{
-            fontSize: 13, color: 'rgba(255,255,255,0.4)',
-            fontStyle: 'italic',
-          }}>
-            {THINKING_MESSAGES[messageIndex]}
-          </span>
-        </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 0' }}>
+        <NauticalLoader />
+        <span className="thinking-text" style={{
+          fontSize: 13, color: 'rgba(255,255,255,0.4)',
+          fontStyle: 'italic',
+        }}>
+          {THINKING_MESSAGES[messageIndex]}
+        </span>
       </div>
     </div>
   );
