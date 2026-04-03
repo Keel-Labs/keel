@@ -48,10 +48,10 @@ export async function brainRoutes(app: FastifyInstance): Promise<void> {
     return entries;
   });
 
-  // Read file
-  app.get('/api/brain/files/*', async (request, reply) => {
+  // Read file — use query param instead of wildcard path (Fastify 5 compat)
+  app.get('/api/brain/file', async (request, reply) => {
     const { userId } = getUser(request);
-    const { '*': filePath } = request.params as { '*': string };
+    const { path: filePath } = request.query as { path: string };
 
     if (filePath.includes('..')) {
       return reply.code(400).send({ error: 'Invalid path' });
@@ -76,9 +76,9 @@ export async function brainRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // Write file
-  app.put('/api/brain/files/*', async (request, reply) => {
+  app.put('/api/brain/file', async (request, reply) => {
     const { userId } = getUser(request);
-    const { '*': filePath } = request.params as { '*': string };
+    const { path: filePath } = (request.body as any);
     const { content } = request.body as { content: string };
 
     if (filePath.includes('..')) {
@@ -99,9 +99,9 @@ export async function brainRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // Delete file
-  app.delete('/api/brain/files/*', async (request, reply) => {
+  app.delete('/api/brain/file', async (request, reply) => {
     const { userId } = getUser(request);
-    const { '*': filePath } = request.params as { '*': string };
+    const { path: filePath } = request.query as { path: string };
 
     if (filePath.includes('..')) {
       return reply.code(400).send({ error: 'Invalid path' });
