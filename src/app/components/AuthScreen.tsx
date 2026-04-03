@@ -1,0 +1,201 @@
+import React, { useState } from 'react';
+import { KeelIcon, KeelWordmark } from './KeelIcon';
+import { login, register } from '../../lib/api-client';
+
+interface Props {
+  onAuthenticated: () => void;
+}
+
+export default function AuthScreen({ onAuthenticated }: Props) {
+  const [mode, setMode] = useState<'login' | 'register'>('login');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+
+    try {
+      if (mode === 'register') {
+        await register(email, password, name || undefined);
+      } else {
+        await login(email, password);
+      }
+      onAuthenticated();
+    } catch (err: any) {
+      setError(err.message || 'Something went wrong');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const inputStyle: React.CSSProperties = {
+    width: '100%',
+    background: '#252525',
+    border: '1px solid rgba(255,255,255,0.1)',
+    color: 'rgba(255,255,255,0.9)',
+    fontSize: 14,
+    borderRadius: 10,
+    padding: '10px 14px',
+    outline: 'none',
+    boxSizing: 'border-box',
+    fontFamily: 'inherit',
+  };
+
+  return (
+    <div style={{
+      height: '100vh',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      background: '#1a1a1a',
+    }}>
+      <div style={{
+        width: 360,
+        padding: 32,
+        background: '#1e1e1e',
+        border: '1px solid rgba(255,255,255,0.08)',
+        borderRadius: 16,
+      }}>
+        {/* Logo */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: 24 }}>
+          <KeelIcon size={36} />
+          <KeelWordmark height={20} />
+        </div>
+
+        <h2 style={{
+          textAlign: 'center',
+          fontSize: 18,
+          fontWeight: 600,
+          color: 'rgba(255,255,255,0.9)',
+          marginBottom: 4,
+        }}>
+          {mode === 'login' ? 'Welcome back' : 'Create your account'}
+        </h2>
+        <p style={{
+          textAlign: 'center',
+          fontSize: 13,
+          color: 'rgba(255,255,255,0.4)',
+          marginBottom: 24,
+        }}>
+          {mode === 'login'
+            ? 'Sign in to your Keel account'
+            : 'Get started with your AI chief of staff'}
+        </p>
+
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {mode === 'register' && (
+            <input
+              type="text"
+              placeholder="Name (optional)"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              style={inputStyle}
+            />
+          )}
+          <input
+            type="email"
+            placeholder="Email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            style={inputStyle}
+          />
+          <input
+            type="password"
+            placeholder="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            minLength={8}
+            style={inputStyle}
+          />
+
+          {error && (
+            <div style={{
+              fontSize: 13,
+              color: '#e55',
+              background: 'rgba(238,85,85,0.1)',
+              padding: '8px 12px',
+              borderRadius: 8,
+            }}>
+              {error}
+            </div>
+          )}
+
+          <button
+            type="submit"
+            disabled={loading}
+            style={{
+              width: '100%',
+              background: '#CF7A5C',
+              border: 'none',
+              color: 'white',
+              fontSize: 14,
+              fontWeight: 600,
+              borderRadius: 10,
+              padding: '11px 16px',
+              cursor: loading ? 'default' : 'pointer',
+              opacity: loading ? 0.6 : 1,
+              transition: 'opacity 0.15s',
+              marginTop: 4,
+            }}
+          >
+            {loading
+              ? 'Please wait...'
+              : mode === 'login'
+                ? 'Sign in'
+                : 'Create account'}
+          </button>
+        </form>
+
+        <div style={{
+          textAlign: 'center',
+          marginTop: 16,
+          fontSize: 13,
+          color: 'rgba(255,255,255,0.4)',
+        }}>
+          {mode === 'login' ? (
+            <>
+              Don't have an account?{' '}
+              <button
+                onClick={() => { setMode('register'); setError(''); }}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#CF7A5C',
+                  cursor: 'pointer',
+                  fontSize: 13,
+                  padding: 0,
+                }}
+              >
+                Sign up
+              </button>
+            </>
+          ) : (
+            <>
+              Already have an account?{' '}
+              <button
+                onClick={() => { setMode('login'); setError(''); }}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#CF7A5C',
+                  cursor: 'pointer',
+                  fontSize: 13,
+                  padding: 0,
+                }}
+              >
+                Sign in
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
