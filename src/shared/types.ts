@@ -20,6 +20,9 @@ export interface Settings {
   ollamaModel: string;
   // General
   brainPath: string;
+  // Team Brain
+  teamBrainPath: string;   // Path to shared team brain folder. Empty = disabled.
+  userName: string;         // User's display name for team updates.
   // Scheduler
   dailyBriefTime: string;  // HH:MM format, e.g. "09:00". Empty = disabled.
   eodTime: string;         // HH:MM format, e.g. "17:30". Empty = disabled.
@@ -119,7 +122,10 @@ export type IpcChannels =
   | 'keel:google-status'
   | 'keel:google-sync-calendar'
   | 'keel:google-export-doc'
-  | 'keel:ollama-list-models';
+  | 'keel:ollama-list-models'
+  | 'keel:list-team-files'
+  | 'keel:read-team-file'
+  | 'keel:write-team-file';
 
 // Preload API exposed to renderer
 export interface KeelAPI {
@@ -161,6 +167,10 @@ export interface KeelAPI {
   googleCreateEvent: (event: { summary: string; startTime: string; endTime: string; description?: string; attendees?: string[] }) => Promise<{ id: string; htmlLink: string }>;
   // Ollama
   ollamaListModels: () => Promise<OllamaListResult>;
+  // Team Brain
+  listTeamFiles: (dirPath: string) => Promise<FileEntry[]>;
+  readTeamFile: (filePath: string) => Promise<string>;
+  writeTeamFile: (filePath: string, content: string) => Promise<void>;
 }
 
 declare global {

@@ -13,6 +13,8 @@ const DEFAULT_SETTINGS: Settings = {
   openrouterBaseUrl: 'https://openrouter.ai/api/v1',
   ollamaModel: 'llama3.2',
   brainPath: path.join(process.env.HOME || '~', 'Keel'),
+  teamBrainPath: '',
+  userName: '',
   dailyBriefTime: '',
   eodTime: '',
   timezone: '',

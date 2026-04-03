@@ -61,6 +61,7 @@ function buildSystemPrompt(timezone?: string): string {
 
 export class ContextAssembler {
   private fileManager: FileManager;
+  private teamFileManager: FileManager | null = null;
   private useSemanticSearch: boolean;
   private timezone?: string;
 
@@ -72,6 +73,10 @@ export class ContextAssembler {
 
   setTimezone(tz: string): void {
     this.timezone = tz || undefined;
+  }
+
+  setTeamFileManager(tfm: FileManager | null): void {
+    this.teamFileManager = tfm;
   }
 
   enableSemanticSearch(): void {
@@ -142,6 +147,47 @@ export class ContextAssembler {
       }
     } catch {
       // no daily logs
+    }
+
+    // 4. Team brain context (if configured)
+    if (this.teamFileManager) {
+      try {
+        const teamContent = await this.teamFileManager.readFile('team.md');
+        addSection('[TEAM] team.md', teamContent);
+      } catch {
+        // no team.md
+      }
+
+      // Team project context files
+      try {
+        const teamProjects = await this.teamFileManager.listFiles('projects/*/context.md');
+        for (const file of teamProjects) {
+          try {
+            const content = await this.teamFileManager.readFile(file);
+            if (!addSection(`[TEAM] ${file}`, content)) break;
+          } catch {
+            // skip
+          }
+        }
+      } catch {
+        // no team projects
+      }
+
+      // Recent team updates (last 2 days)
+      try {
+        const teamUpdates = await this.teamFileManager.listFiles('updates/*.md');
+        const recentUpdates = teamUpdates.sort().reverse().slice(0, 10);
+        for (const file of recentUpdates) {
+          try {
+            const content = await this.teamFileManager.readFile(file);
+            if (!addSection(`[TEAM] ${file}`, content)) break;
+          } catch {
+            // skip
+          }
+        }
+      } catch {
+        // no team updates
+      }
     }
 
     return systemPrompt + sections.join('');
@@ -230,6 +276,51 @@ export class ContextAssembler {
       }
     } catch {
       // FTS not available
+    }
+
+    // 4. Team brain search (if configured)
+    if (this.teamFileManager) {
+      const teamBrainPath = this.teamFileManager.getBrainPath();
+
+      // Team vector search
+      try {
+        const queryVector = await embedText(userMessage);
+        const teamVectorResults = await vectorStore.search(teamBrainPath, queryVector, 10);
+        for (const r of teamVectorResults) {
+          const similarity = 1 - (r.score ?? 0);
+          const key = `team-${r.chunk.id}`;
+          if (!candidateMap.has(key)) {
+            candidateMap.set(key, {
+              id: key,
+              filePath: `[TEAM] ${r.chunk.filePath}`,
+              text: r.chunk.text,
+              score: Math.max(0, similarity) * 0.8, // lower priority than personal
+              updatedAt: undefined,
+            });
+          }
+        }
+      } catch {
+        // Team embeddings not available
+      }
+
+      // Team FTS search
+      try {
+        const teamFtsResults = searchChunksFts(teamBrainPath, userMessage, 5);
+        for (const row of teamFtsResults) {
+          const key = `team-fts-${row.id}`;
+          if (!candidateMap.has(key)) {
+            candidateMap.set(key, {
+              id: key,
+              filePath: `[TEAM] ${row.filePath}`,
+              text: row.content,
+              score: 0.4, // lower than personal FTS
+              updatedAt: row.updatedAt,
+            });
+          }
+        }
+      } catch {
+        // Team FTS not available
+      }
     }
 
     const candidates = Array.from(candidateMap.values());

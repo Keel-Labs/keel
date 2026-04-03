@@ -4,7 +4,8 @@ import { logActivity } from '../db';
 
 export async function dailyBrief(
   fileManager: FileManager,
-  llmClient: LLMClient
+  llmClient: LLMClient,
+  options?: { teamFileManager?: FileManager }
 ): Promise<string> {
   const brainPath = fileManager.getBrainPath();
   const today = formatDate(new Date());
@@ -44,6 +45,24 @@ export async function dailyBrief(
     }
   } catch {
     // no keel.md
+  }
+
+  // Team updates from yesterday (if team brain configured)
+  if (options?.teamFileManager) {
+    try {
+      const teamUpdates = await options.teamFileManager.listFiles('updates/*.md');
+      const yesterdayUpdates = teamUpdates.filter((f) => f.includes(yesterday));
+      for (const file of yesterdayUpdates) {
+        try {
+          const content = await options.teamFileManager.readFile(file);
+          parts.push(`## [TEAM] ${file}\n${content}`);
+        } catch {
+          // skip
+        }
+      }
+    } catch {
+      // no team updates
+    }
   }
 
   const context = parts.join('\n\n---\n\n');

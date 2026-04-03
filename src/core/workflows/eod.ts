@@ -6,7 +6,8 @@ import type { Message } from '../../shared/types';
 export async function eod(
   fileManager: FileManager,
   llmClient: LLMClient,
-  chatHistory: Message[]
+  chatHistory: Message[],
+  options?: { teamFileManager?: FileManager; userName?: string }
 ): Promise<string> {
   const brainPath = fileManager.getBrainPath();
   const today = formatDate(new Date());
@@ -68,6 +69,18 @@ Be concise and actionable. Use markdown formatting.`
   }
 
   logActivity(brainPath, 'eod', `Generated for ${today}`);
+
+  // Write concise team update if team brain is configured
+  if (options?.teamFileManager && options?.userName) {
+    try {
+      const slug = options.userName.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+      const teamUpdatePath = `updates/${slug}-${today}.md`;
+      const teamContent = `# ${options.userName} — ${today}\n\n${summary}\n`;
+      await options.teamFileManager.writeFile(teamUpdatePath, teamContent);
+    } catch {
+      // Team write failed — don't block personal EOD
+    }
+  }
 
   return summary;
 }

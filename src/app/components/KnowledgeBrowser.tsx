@@ -5,15 +5,16 @@ interface Props {
   onBack: () => void;
 }
 
-function FolderItem({ entry, depth, onSelect, selectedPath }: {
-  entry: FileEntry; depth: number; onSelect: (path: string) => void; selectedPath: string;
+function FolderItem({ entry, depth, onSelect, selectedPath, isTeam }: {
+  entry: FileEntry; depth: number; onSelect: (path: string, team?: boolean) => void; selectedPath: string; isTeam?: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [children, setChildren] = useState<FileEntry[]>([]);
 
   const toggle = () => {
     if (!expanded && children.length === 0) {
-      window.keel.listFiles(entry.path).then(setChildren).catch(() => {});
+      const listFn = isTeam ? window.keel.listTeamFiles : window.keel.listFiles;
+      listFn(entry.path).then(setChildren).catch(() => {});
     }
     setExpanded(!expanded);
   };
@@ -22,7 +23,7 @@ function FolderItem({ entry, depth, onSelect, selectedPath }: {
     const isActive = entry.path === selectedPath;
     return (
       <button
-        onClick={() => onSelect(entry.path)}
+        onClick={() => onSelect(entry.path, isTeam)}
         style={{
           width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center',
           gap: 6, padding: '5px 8px', paddingLeft: 8 + depth * 16,
@@ -70,6 +71,7 @@ function FolderItem({ entry, depth, onSelect, selectedPath }: {
           depth={depth + 1}
           onSelect={onSelect}
           selectedPath={selectedPath}
+          isTeam={isTeam}
         />
       ))}
     </div>
@@ -81,9 +83,15 @@ const KNOWLEDGE_ITEMS = new Set([
   'keel.md', 'tasks.md', 'projects', 'daily-log',
 ]);
 
+const TEAM_KNOWLEDGE_ITEMS = new Set([
+  'team.md', 'projects', 'updates',
+]);
+
 export default function KnowledgeBrowser({ onBack }: Props) {
   const [rootEntries, setRootEntries] = useState<FileEntry[]>([]);
+  const [teamEntries, setTeamEntries] = useState<FileEntry[]>([]);
   const [selectedPath, setSelectedPath] = useState('');
+  const [isTeamFile, setIsTeamFile] = useState(false);
   const [content, setContent] = useState('');
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'idle'>('idle');
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -92,16 +100,23 @@ export default function KnowledgeBrowser({ onBack }: Props) {
     window.keel.listFiles('').then((entries) => {
       setRootEntries(entries.filter((e) => KNOWLEDGE_ITEMS.has(e.name)));
     }).catch(() => {});
+    // Load team files if team brain is configured
+    window.keel.listTeamFiles('').then((entries) => {
+      setTeamEntries(entries.filter((e) => TEAM_KNOWLEDGE_ITEMS.has(e.name)));
+    }).catch(() => {});
   }, []);
 
-  const loadFile = async (filePath: string) => {
+  const loadFile = async (filePath: string, team = false) => {
     // Save current file before switching
     if (selectedPath && content) {
-      await window.keel.writeFile(selectedPath, content).catch(() => {});
+      const saveFn = isTeamFile ? window.keel.writeTeamFile : window.keel.writeFile;
+      await saveFn(selectedPath, content).catch(() => {});
     }
     try {
-      const text = await window.keel.readFile(filePath);
+      const readFn = team ? window.keel.readTeamFile : window.keel.readFile;
+      const text = await readFn(filePath);
       setSelectedPath(filePath);
+      setIsTeamFile(team);
       setContent(text);
       setSaveStatus('idle');
     } catch {
@@ -116,14 +131,15 @@ export default function KnowledgeBrowser({ onBack }: Props) {
       if (!selectedPath) return;
       setSaveStatus('saving');
       try {
-        await window.keel.writeFile(selectedPath, newContent);
+        const saveFn = isTeamFile ? window.keel.writeTeamFile : window.keel.writeFile;
+        await saveFn(selectedPath, newContent);
         setSaveStatus('saved');
         setTimeout(() => setSaveStatus('idle'), 1500);
       } catch {
         setSaveStatus('idle');
       }
     }, 800);
-  }, [selectedPath]);
+  }, [selectedPath, isTeamFile]);
 
   const handleChange = (newContent: string) => {
     setContent(newContent);
@@ -181,13 +197,35 @@ export default function KnowledgeBrowser({ onBack }: Props) {
               entry={entry}
               depth={0}
               onSelect={loadFile}
-              selectedPath={selectedPath}
+              selectedPath={!isTeamFile ? selectedPath : ''}
             />
           ))}
           {rootEntries.length === 0 && (
             <div style={{ padding: 16, color: 'rgba(255,255,255,0.3)', fontSize: 12, textAlign: 'center' }}>
               No files found
             </div>
+          )}
+          {teamEntries.length > 0 && (
+            <>
+              <div style={{
+                padding: '12px 8px 4px', fontSize: 10, fontWeight: 700,
+                color: 'rgba(207,122,92,0.7)', textTransform: 'uppercase',
+                letterSpacing: '0.08em', borderTop: '1px solid rgba(255,255,255,0.06)',
+                marginTop: 8,
+              }}>
+                Team Brain
+              </div>
+              {teamEntries.map((entry) => (
+                <FolderItem
+                  key={`team-${entry.path}`}
+                  entry={entry}
+                  depth={0}
+                  onSelect={loadFile}
+                  selectedPath={isTeamFile ? selectedPath : ''}
+                  isTeam
+                />
+              ))}
+            </>
           )}
         </div>
 
@@ -209,6 +247,7 @@ export default function KnowledgeBrowser({ onBack }: Props) {
                 flexShrink: 0,
               }}>
                 <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', fontFamily: 'monospace' }}>
+                  {isTeamFile && <span style={{ color: '#CF7A5C', marginRight: 6, fontSize: 10, fontWeight: 700, letterSpacing: '0.04em' }}>TEAM</span>}
                   {selectedPath}
                 </span>
                 <span style={{
