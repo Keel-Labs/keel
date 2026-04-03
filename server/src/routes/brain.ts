@@ -49,9 +49,9 @@ export async function brainRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // Read file
-  app.get('/api/brain/files/:path(*)', async (request, reply) => {
+  app.get('/api/brain/files/*', async (request, reply) => {
     const { userId } = getUser(request);
-    const { path: filePath } = request.params as { path: string };
+    const { '*': filePath } = request.params as { '*': string };
 
     if (filePath.includes('..')) {
       return reply.code(400).send({ error: 'Invalid path' });
@@ -76,9 +76,9 @@ export async function brainRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // Write file
-  app.put('/api/brain/files/:path(*)', async (request, reply) => {
+  app.put('/api/brain/files/*', async (request, reply) => {
     const { userId } = getUser(request);
-    const { path: filePath } = request.params as { path: string };
+    const { '*': filePath } = request.params as { '*': string };
     const { content } = request.body as { content: string };
 
     if (filePath.includes('..')) {
@@ -99,9 +99,9 @@ export async function brainRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // Delete file
-  app.delete('/api/brain/files/:path(*)', async (request, reply) => {
+  app.delete('/api/brain/files/*', async (request, reply) => {
     const { userId } = getUser(request);
-    const { path: filePath } = request.params as { path: string };
+    const { '*': filePath } = request.params as { '*': string };
 
     if (filePath.includes('..')) {
       return reply.code(400).send({ error: 'Invalid path' });
