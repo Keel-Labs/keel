@@ -16,9 +16,13 @@ export async function migrate(): Promise<void> {
 
   console.log('[migrate] Running database setup...');
 
-  // Create pgvector extension
-  await db.execute(sql`CREATE EXTENSION IF NOT EXISTS vector`);
-  console.log('[migrate] pgvector extension ready');
+  // Try to create pgvector extension (optional — not available on all Postgres hosts)
+  try {
+    await db.execute(sql`CREATE EXTENSION IF NOT EXISTS vector`);
+    console.log('[migrate] pgvector extension ready');
+  } catch {
+    console.log('[migrate] pgvector not available — skipping vector search features');
+  }
 
   // Create tables using raw SQL (idempotent CREATE IF NOT EXISTS)
   await db.execute(sql`
@@ -85,10 +89,14 @@ export async function migrate(): Promise<void> {
   await db.execute(sql`
     CREATE INDEX IF NOT EXISTS chunks_file_id ON chunks(file_id)
   `);
-  // Add vector column if not exists
-  await db.execute(sql`
-    ALTER TABLE chunks ADD COLUMN IF NOT EXISTS embedding vector(768)
-  `);
+  // Add vector column if pgvector is available
+  try {
+    await db.execute(sql`
+      ALTER TABLE chunks ADD COLUMN IF NOT EXISTS embedding vector(768)
+    `);
+  } catch {
+    console.log('[migrate] Skipping vector column (pgvector not available)');
+  }
 
   await db.execute(sql`
     CREATE TABLE IF NOT EXISTS chat_sessions (
