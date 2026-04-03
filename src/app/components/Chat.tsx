@@ -215,9 +215,14 @@ function ThinkingIndicator() {
   );
 }
 
-function ThinkingSteps({ steps }: { steps: string[] }) {
+function ThinkingSteps({ steps, thinkingContent }: { steps: string[]; thinkingContent?: string }) {
   const [expanded, setExpanded] = useState(false);
   const latest = steps[steps.length - 1];
+  const hasRealThinking = !!thinkingContent;
+  const label = hasRealThinking ? 'Chain of thought' : 'Thinking steps';
+  const summary = hasRealThinking
+    ? (thinkingContent.length > 60 ? thinkingContent.slice(0, 60) + '...' : thinkingContent)
+    : latest;
 
   return (
     <div style={{
@@ -242,7 +247,7 @@ function ThinkingSteps({ steps }: { steps: string[] }) {
             transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)',
           }}>▶</span>
           <span style={{ fontStyle: 'italic' }}>
-            {expanded ? 'Thinking steps' : latest}
+            {expanded ? label : summary}
           </span>
         </button>
         {expanded && (
@@ -256,6 +261,17 @@ function ThinkingSteps({ steps }: { steps: string[] }) {
                 {step}
               </div>
             ))}
+            {hasRealThinking && (
+              <div style={{
+                color: 'rgba(255,255,255,0.45)', padding: '6px 0 2px',
+                borderLeft: '2px solid rgba(207,122,92,0.3)',
+                paddingLeft: 10, marginTop: 4,
+                whiteSpace: 'pre-wrap', lineHeight: 1.5,
+                maxHeight: 300, overflowY: 'auto',
+              }}>
+                {thinkingContent}
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -263,11 +279,46 @@ function ThinkingSteps({ steps }: { steps: string[] }) {
   );
 }
 
-const WELCOME_SUGGESTIONS = [
-  { label: 'What am I working on?', icon: '📋' },
-  { label: '/daily-brief', icon: '☀️' },
-  { label: '/capture', icon: '📎' },
-  { label: '/reminders', icon: '🔔' },
+function ClipboardIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+      <rect x="8" y="2" width="8" height="4" rx="1" ry="1" />
+    </svg>
+  );
+}
+function SunIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="5" />
+      <line x1="12" y1="1" x2="12" y2="3" /><line x1="12" y1="21" x2="12" y2="23" />
+      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" /><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+      <line x1="1" y1="12" x2="3" y2="12" /><line x1="21" y1="12" x2="23" y2="12" />
+      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" /><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+    </svg>
+  );
+}
+function PaperclipIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+    </svg>
+  );
+}
+function BellIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+      <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+    </svg>
+  );
+}
+
+const WELCOME_SUGGESTIONS: Array<{ label: string; icon: React.ReactNode }> = [
+  { label: 'What am I working on?', icon: <ClipboardIcon /> },
+  { label: '/daily-brief', icon: <SunIcon /> },
+  { label: '/capture', icon: <PaperclipIcon /> },
+  { label: '/reminders', icon: <BellIcon /> },
 ];
 
 function isPdfCommand(text: string): boolean {
@@ -429,6 +480,7 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [userTimezone, setUserTimezone] = useState<string>('');
   const [thinkingSteps, setThinkingSteps] = useState<string[]>([]);
+  const [thinkingContent, setThinkingContent] = useState<string>('');
   const [attachedImages, setAttachedImages] = useState<MessageImage[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [currentProvider, setCurrentProvider] = useState<string>('claude');
@@ -501,8 +553,9 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
     }
   }, [loadSessionId]);
 
-  // Load the last session on mount
+  // Load the last session on mount (only if no specific session was requested)
   useEffect(() => {
+    if (loadSessionId) return; // A specific session was requested — skip auto-load
     (async () => {
       try {
         const latestId = await window.keel.getLatestSession();
@@ -849,11 +902,17 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
     // Regular chat — use streaming
     let accumulated = '';
     setThinkingSteps([]);
+    setThinkingContent('');
 
     window.keel.removeStreamListeners();
 
     window.keel.onThinkingStep((step: string) => {
       setThinkingSteps((prev) => [...prev, step]);
+    });
+
+    // Real chain-of-thought from Claude extended thinking
+    window.keel.onThinkingDelta((text: string) => {
+      setThinkingContent((prev) => prev + text);
     });
 
     window.keel.onStreamChunk((chunk: string) => {
@@ -958,8 +1017,8 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
         {isStreaming && !streamingContent && <ThinkingIndicator />}
 
         {/* Thinking steps — collapsible chain of thought */}
-        {isStreaming && thinkingSteps.length > 0 && (
-          <ThinkingSteps steps={thinkingSteps} />
+        {isStreaming && (thinkingSteps.length > 0 || thinkingContent) && (
+          <ThinkingSteps steps={thinkingSteps} thinkingContent={thinkingContent} />
         )}
 
         {isStreaming && streamingContent && (

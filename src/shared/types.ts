@@ -141,6 +141,7 @@ export interface KeelAPI {
   onStreamDone: (callback: () => void) => void;
   onStreamError: (callback: (error: string) => void) => void;
   onThinkingStep: (callback: (step: string) => void) => void;
+  onThinkingDelta: (callback: (text: string) => void) => void;
   removeStreamListeners: () => void;
   getSettings: () => Promise<Settings>;
   saveSettings: (settings: Settings) => Promise<void>;

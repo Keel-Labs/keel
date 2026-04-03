@@ -10,14 +10,18 @@ export async function chatRoutes(app: FastifyInstance): Promise<void> {
   app.addHook('preHandler', requireAuth);
 
   // Stream chat via SSE
-  app.post('/api/chat/stream', async (request, reply) => {
+  app.post('/api/chat/stream', { config: { rawBody: true }, bodyLimit: 25 * 1024 * 1024 }, async (request, reply) => {
     const { userId } = getUser(request);
     const { messages } = request.body as { messages: any[] };
+
+    // Hijack the reply so Fastify doesn't try to send its own response
+    reply.hijack();
 
     reply.raw.writeHead(200, {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache',
       Connection: 'keep-alive',
+      'X-Accel-Buffering': 'no',
     });
 
     const sendEvent = (event: string, data: any) => {
@@ -33,7 +37,25 @@ export async function chatRoutes(app: FastifyInstance): Promise<void> {
         .limit(1);
 
       if (!settings) {
-        sendEvent('error', { message: 'Settings not configured' });
+        sendEvent('error', { message: 'Settings not configured. Go to Settings and add your API key.' });
+        reply.raw.end();
+        return;
+      }
+
+      // Validate API key for selected provider
+      const provider = settings.provider || 'claude';
+      if (provider === 'claude' && !settings.anthropicApiKey) {
+        sendEvent('error', { message: 'No Anthropic API key configured. Go to Settings to add it.' });
+        reply.raw.end();
+        return;
+      }
+      if (provider === 'openai' && !settings.openaiApiKey) {
+        sendEvent('error', { message: 'No OpenAI API key configured. Go to Settings to add it.' });
+        reply.raw.end();
+        return;
+      }
+      if (provider === 'openrouter' && !settings.openrouterApiKey) {
+        sendEvent('error', { message: 'No OpenRouter API key configured. Go to Settings to add it.' });
         reply.raw.end();
         return;
       }
@@ -52,6 +74,8 @@ export async function chatRoutes(app: FastifyInstance): Promise<void> {
       await llmClient.stream(messages, systemPrompt, (chunk: string) => {
         fullResponse += chunk;
         sendEvent('chunk', { text: chunk });
+      }, (thinking: string) => {
+        sendEvent('thinking_delta', { text: thinking });
       });
 
       sendEvent('done', { content: fullResponse });
@@ -67,17 +91,15 @@ export async function chatRoutes(app: FastifyInstance): Promise<void> {
     } catch (error) {
       const message =
         error instanceof Error ? error.message : 'Unknown error';
+      console.error('[chat/stream] Error:', message);
       sendEvent('error', { message });
     } finally {
       reply.raw.end();
     }
-
-    // Prevent Fastify from trying to send a response
-    return reply;
   });
 
   // Non-streaming chat
-  app.post('/api/chat', async (request) => {
+  app.post('/api/chat', { bodyLimit: 25 * 1024 * 1024 }, async (request) => {
     const { userId } = getUser(request);
     const { messages } = request.body as { messages: any[] };
 
@@ -154,7 +176,7 @@ export async function chatRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // Save chat session
-  app.put('/api/chat/sessions/:id', async (request) => {
+  app.put('/api/chat/sessions/:id', { bodyLimit: 25 * 1024 * 1024 }, async (request) => {
     const { userId } = getUser(request);
     const { id } = request.params as { id: string };
     const { messages } = request.body as { messages: any[] };
