@@ -9,13 +9,13 @@ primary_region = "sjc"
   dockerfile = "Dockerfile"
 
 [env]
-  PORT = "3001"
+  PORT = "3000"
   HOST = "0.0.0.0"
   LOG_LEVEL = "info"
   NODE_ENV = "production"
 
 [http_service]
-  internal_port = 3001
+  internal_port = 3000
   force_https = true
   auto_stop_machines = "stop"
   auto_start_machines = true
