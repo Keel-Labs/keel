@@ -26,6 +26,6 @@ COPY --from=builder /app/dist ./dist
 # Drizzle config for db:migrate
 COPY drizzle.config.ts ./
 
-EXPOSE 3001
+EXPOSE 3000
 
 CMD ["node", "dist/index.js"]
