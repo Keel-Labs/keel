@@ -1,6 +1,8 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import type { Settings as SettingsType, OllamaModelInfo } from '../../shared/types';
 import { KeelIcon } from './KeelIcon';
+
+const isElectron = typeof window !== 'undefined' && !!(window as any).keelMigrate;
 
 const CLAUDE_MODELS = [
   { value: 'claude-sonnet-4-20250514', label: 'Claude Sonnet 4' },
@@ -684,6 +686,11 @@ export default function Settings({ onBack }: Props) {
             </div>
           </div>
 
+          {/* Sync to Cloud (desktop only) */}
+          {isElectron && (
+            <CloudMigrationSection inputStyle={inputStyle} labelStyle={labelStyle} sectionStyle={sectionStyle} />
+          )}
+
           {/* Save */}
           <button
             onClick={save}
@@ -701,6 +708,223 @@ export default function Settings({ onBack }: Props) {
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+// --- Cloud Migration Section (Desktop only) ---
+
+function CloudMigrationSection({ inputStyle, labelStyle, sectionStyle }: {
+  inputStyle: React.CSSProperties;
+  labelStyle: React.CSSProperties;
+  sectionStyle: React.CSSProperties;
+}) {
+  const [serverUrl, setServerUrl] = useState(() =>
+    localStorage.getItem('keel_cloud_server') || ''
+  );
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [migrating, setMigrating] = useState(false);
+  const [progress, setProgress] = useState<{ step: string; current: number; total: number } | null>(null);
+  const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null);
+  const [authStep, setAuthStep] = useState<'credentials' | 'ready' | 'migrating'>('credentials');
+  const [accessToken, setAccessToken] = useState<string | null>(null);
+
+  useEffect(() => {
+    const migrate = (window as any).keelMigrate;
+    if (migrate) {
+      migrate.onMigrationProgress((p: any) => setProgress(p));
+      return () => migrate.removeMigrationListeners();
+    }
+  }, []);
+
+  const handleAuth = async () => {
+    if (!serverUrl || !email || !password) {
+      setResult({ ok: false, message: 'Please fill in all fields' });
+      return;
+    }
+
+    setResult(null);
+    try {
+      // Register or login
+      let res = await fetch(`${serverUrl}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+
+      if (!res.ok) {
+        // Try registering
+        res = await fetch(`${serverUrl}/api/auth/register`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password }),
+        });
+      }
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'Auth failed' }));
+        setResult({ ok: false, message: (err as any).error || 'Authentication failed' });
+        return;
+      }
+
+      const data = await res.json() as { accessToken: string; refreshToken: string };
+      setAccessToken(data.accessToken);
+      localStorage.setItem('keel_cloud_server', serverUrl);
+      setAuthStep('ready');
+      setResult({ ok: true, message: 'Authenticated! Ready to migrate.' });
+    } catch (err) {
+      setResult({ ok: false, message: err instanceof Error ? err.message : 'Connection failed' });
+    }
+  };
+
+  const handleMigrate = async () => {
+    if (!accessToken || !serverUrl) return;
+
+    setMigrating(true);
+    setResult(null);
+    setAuthStep('migrating');
+
+    try {
+      const migrate = (window as any).keelMigrate;
+      const res = await migrate.migrateToCloud(serverUrl, accessToken);
+
+      if (res.ok) {
+        const imp = res.imported;
+        setResult({
+          ok: true,
+          message: `Migration complete! Synced: ${imp.brainFiles} brain files, ${imp.chatSessions} chats, ${imp.reminders} reminders.`,
+        });
+      } else {
+        setResult({ ok: false, message: res.error || 'Migration failed' });
+      }
+    } catch (err) {
+      setResult({ ok: false, message: err instanceof Error ? err.message : 'Migration failed' });
+    }
+
+    setMigrating(false);
+    setAuthStep('ready');
+  };
+
+  return (
+    <div style={sectionStyle}>
+      <div style={{ fontSize: 14, fontWeight: 600, color: 'rgba(255,255,255,0.85)', marginBottom: 6 }}>
+        Sync to Cloud
+      </div>
+      <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', marginBottom: 14 }}>
+        Migrate your desktop data (brain files, chat history, reminders, settings) to the Keel cloud
+        server so you can access them from your phone.
+      </div>
+
+      <div style={{ marginBottom: 12 }}>
+        <label style={labelStyle}>Server URL</label>
+        <input
+          type="text"
+          value={serverUrl}
+          onChange={(e) => setServerUrl(e.target.value)}
+          placeholder="https://keel-api.fly.dev"
+          style={inputStyle}
+          disabled={authStep === 'migrating'}
+        />
+      </div>
+
+      {authStep === 'credentials' && (
+        <>
+          <div style={{ marginBottom: 12 }}>
+            <label style={labelStyle}>Email</label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@example.com"
+              style={inputStyle}
+            />
+          </div>
+          <div style={{ marginBottom: 12 }}>
+            <label style={labelStyle}>Password</label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Cloud account password"
+              style={inputStyle}
+            />
+            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)', marginTop: 4 }}>
+              A new account will be created if one doesn't exist.
+            </div>
+          </div>
+          <button
+            onClick={handleAuth}
+            style={{
+              padding: '10px 20px', borderRadius: 8, border: 'none',
+              background: '#CF7A5C', color: 'white', fontSize: 13, fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            Connect to Cloud
+          </button>
+        </>
+      )}
+
+      {authStep === 'ready' && (
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button
+            onClick={handleMigrate}
+            disabled={migrating}
+            style={{
+              padding: '10px 20px', borderRadius: 8, border: 'none',
+              background: '#CF7A5C', color: 'white', fontSize: 13, fontWeight: 600,
+              cursor: migrating ? 'default' : 'pointer',
+              opacity: migrating ? 0.6 : 1,
+            }}
+          >
+            Start Migration
+          </button>
+          <button
+            onClick={() => { setAuthStep('credentials'); setAccessToken(null); setResult(null); }}
+            style={{
+              padding: '10px 20px', borderRadius: 8,
+              border: '1px solid rgba(255,255,255,0.15)',
+              background: 'transparent', color: 'rgba(255,255,255,0.5)',
+              fontSize: 13, cursor: 'pointer',
+            }}
+          >
+            Change Account
+          </button>
+        </div>
+      )}
+
+      {authStep === 'migrating' && progress && (
+        <div style={{
+          padding: '10px 14px', borderRadius: 8, marginTop: 10,
+          background: 'rgba(207,122,92,0.08)', border: '1px solid rgba(207,122,92,0.2)',
+        }}>
+          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)', marginBottom: 4 }}>
+            {progress.step}
+          </div>
+          {progress.total > 0 && (
+            <div style={{
+              height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.1)',
+              overflow: 'hidden',
+            }}>
+              <div style={{
+                height: '100%', borderRadius: 2, background: '#CF7A5C',
+                width: `${Math.min(100, (progress.current / progress.total) * 100)}%`,
+                transition: 'width 0.3s',
+              }} />
+            </div>
+          )}
+        </div>
+      )}
+
+      {result && (
+        <div style={{
+          fontSize: 12, marginTop: 10,
+          color: result.ok ? '#4ade80' : '#f87171',
+        }}>
+          {result.message}
+        </div>
+      )}
     </div>
   );
 }

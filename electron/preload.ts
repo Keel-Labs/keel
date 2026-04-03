@@ -93,3 +93,17 @@ const api: KeelAPI = {
 };
 
 contextBridge.exposeInMainWorld('keel', api);
+
+// Desktop-only migration API
+contextBridge.exposeInMainWorld('keelMigrate', {
+  migrateToCloud: (serverUrl: string, accessToken: string) =>
+    ipcRenderer.invoke('keel:migrate-to-cloud', serverUrl, accessToken),
+  exportLocalData: () =>
+    ipcRenderer.invoke('keel:export-local-data'),
+  onMigrationProgress: (callback: (progress: { step: string; current: number; total: number }) => void) => {
+    ipcRenderer.on('keel:migration-progress', (_event, progress) => callback(progress));
+  },
+  removeMigrationListeners: () => {
+    ipcRenderer.removeAllListeners('keel:migration-progress');
+  },
+});
