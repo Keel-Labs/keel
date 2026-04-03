@@ -1,0 +1,42 @@
+{
+  "name": "@keel/server",
+  "version": "0.1.0",
+  "description": "Keel cloud API server",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "db:migrate": "drizzle-kit push",
+    "db:generate": "drizzle-kit generate",
+    "db:studio": "drizzle-kit studio"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.80.0",
+    "@aws-sdk/client-s3": "^3.700.0",
+    "@aws-sdk/s3-request-presigner": "^3.700.0",
+    "@fastify/cors": "^10.0.0",
+    "@fastify/multipart": "^9.0.0",
+    "@fastify/websocket": "^11.0.0",
+    "bcrypt": "^6.0.0",
+    "drizzle-orm": "^0.44.0",
+    "fastify": "^5.0.0",
+    "jsonwebtoken": "^9.0.0",
+    "ollama": "^0.6.3",
+    "openai": "^6.33.0",
+    "pg": "^8.14.0",
+    "marked": "^17.0.5",
+    "unified": "^11.0.5",
+    "remark-parse": "^11.0.0"
+  },
+  "devDependencies": {
+    "@types/bcrypt": "^5.0.0",
+    "@types/jsonwebtoken": "^9.0.0",
+    "@types/node": "^25.5.0",
+    "@types/pg": "^8.11.0",
+    "drizzle-kit": "^0.30.0",
+    "tsx": "^4.19.0",
+    "typescript": "^6.0.2"
+  }
+}
