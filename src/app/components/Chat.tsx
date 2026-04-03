@@ -836,6 +836,8 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
           <Message key={i} message={msg} />
         ))}
 
+        {isStreaming && !streamingContent && <ThinkingIndicator />}
+
         {/* Thinking steps — collapsible chain of thought */}
         {isStreaming && thinkingSteps.length > 0 && (
           <ThinkingSteps steps={thinkingSteps} />
@@ -851,7 +853,6 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
           />
         )}
 
-        {isStreaming && !streamingContent && <ThinkingIndicator />}
       </div>
 
       {/* Input area */}
