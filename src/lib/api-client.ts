@@ -326,7 +326,7 @@ export const apiClient: KeelAPI = {
 
   async resetProfile(): Promise<void> {
     const KEEL_TEMPLATE = `# Profile\nName: [Your Name]\nRole: [Your Role]\n\n# Active Projects\n| Project | Status | Deadline | Summary |\n|---|---|---|---|\n\n# Current Priorities\n1.\n\n# Key People\n| Name | Role | Notes |\n|---|---|---|\n\n# Conventions\n-\n`;
-    await apiPut('/api/brain/files/keel.md', { content: KEEL_TEMPLATE });
+    await apiPut('/api/brain/file', { path: 'keel.md', content: KEEL_TEMPLATE });
   },
 
   // Chat sessions
@@ -371,12 +371,12 @@ export const apiClient: KeelAPI = {
   },
 
   async readFile(filePath: string): Promise<string> {
-    const data = await apiGet<{ content: string }>(`/api/brain/files/${encodeURIComponent(filePath)}`);
+    const data = await apiGet<{ content: string }>(`/api/brain/file?path=${encodeURIComponent(filePath)}`);
     return data.content;
   },
 
   async writeFile(filePath: string, content: string): Promise<void> {
-    await apiPut(`/api/brain/files/${encodeURIComponent(filePath)}`, { content });
+    await apiPut('/api/brain/file', { path: filePath, content });
   },
 
   // Scheduled notifications (poll-based in cloud mode)
