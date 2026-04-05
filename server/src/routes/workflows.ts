@@ -163,7 +163,54 @@ export async function workflowRoutes(app: FastifyInstance): Promise<void> {
     const capturePath = `captures/${today}-${slug}.md`;
     await writeBrainFile(userId, capturePath, `# Capture — ${today}\n\n${summary}\n\n---\nOriginal: ${input}\n`);
 
-    return { content: `Captured: ${summary}` };
+    // Extract and file any tasks/to-dos from the capture
+    try {
+      const taskExtraction = await llm.chat(
+        [{ role: 'user', content: `Extract tasks from this capture:\n\n${input}`, timestamp: Date.now() }],
+        `You extract action items from captured notes. Return JSON only.
+If there are tasks/to-dos, return: {"tasks": [{"task": "description", "project": "project name or empty string"}]}
+If no tasks found, return: {"tasks": []}
+Respond ONLY with valid JSON.`
+      );
+
+      const parsed = JSON.parse(taskExtraction.trim());
+      if (parsed.tasks && parsed.tasks.length > 0) {
+        // Find existing projects to match against
+        const existingProjects = await listBrainFilesByPattern(userId, 'projects/%/context.md');
+        const projectSlugs = existingProjects.map(p => {
+          const match = p.match(/^projects\/(.+?)\/context\.md$/);
+          return match ? match[1] : '';
+        }).filter(Boolean);
+
+        for (const t of parsed.tasks) {
+          const projectName = t.project?.trim() || '';
+          if (projectName) {
+            const slug = projectName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+            const tasksPath = `projects/${slug}/tasks.md`;
+            const contextPath = `projects/${slug}/context.md`;
+
+            // Ensure project exists
+            if (!projectSlugs.includes(slug)) {
+              await writeBrainFile(userId, contextPath, `# ${projectName}\n\nProject context and notes.\n`);
+            }
+
+            // Append task
+            try {
+              const existing = await readBrainFile(userId, tasksPath);
+              if (!existing.includes(t.task)) {
+                await writeBrainFile(userId, tasksPath, existing.trimEnd() + `\n- [ ] ${t.task}\n`);
+              }
+            } catch {
+              await writeBrainFile(userId, tasksPath, `# ${projectName} — Tasks\n\n- [ ] ${t.task}\n`);
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.error('[capture] Task extraction failed:', err);
+    }
+
+    return { content: `Captured and filed to ${capturePath}` };
   });
 }
 
