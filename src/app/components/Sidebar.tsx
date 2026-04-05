@@ -27,15 +27,15 @@ function NavItem({ icon, label, active, onClick }: {
       style={{
         width: '100%', display: 'flex', alignItems: 'center', gap: 10,
         padding: '7px 12px', borderRadius: 'var(--radius-base)', border: 'none',
-        background: active ? 'var(--accent-bg)' : 'transparent',
-        color: active ? 'var(--accent)' : 'var(--text-muted)',
+        background: active ? '#2a2a2a' : 'transparent',
+        color: active ? '#ececec' : 'var(--text-muted)',
         fontSize: 'var(--text-sm)', cursor: 'pointer', transition: 'var(--transition-fast)',
         textAlign: 'left', fontFamily: 'inherit', fontWeight: active ? 500 : 400,
       }}
       onMouseEnter={(e) => {
         if (!active) {
-          e.currentTarget.style.background = 'var(--bg-surface)';
-          e.currentTarget.style.color = 'var(--text-secondary)';
+          e.currentTarget.style.background = '#232323';
+          e.currentTarget.style.color = '#d1d1d1';
         }
       }}
       onMouseLeave={(e) => {
@@ -85,8 +85,8 @@ export default function Sidebar({ currentSessionId, onSelectSession, onNewChat, 
             transition: 'var(--transition-fast)', textAlign: 'left', fontFamily: 'inherit',
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.background = 'var(--bg-surface)';
-            e.currentTarget.style.color = 'var(--text-secondary)';
+            e.currentTarget.style.background = '#232323';
+            e.currentTarget.style.color = '#d1d1d1';
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.background = 'transparent';
@@ -130,16 +130,16 @@ export default function Sidebar({ currentSessionId, onSelectSession, onNewChat, 
               style={{
                 width: '100%', textAlign: 'left', display: 'block',
                 padding: '8px 12px', borderRadius: 'var(--radius-base)', border: 'none',
-                background: isActive ? 'var(--bg-surface)' : 'transparent',
-                color: isActive ? 'var(--text-primary)' : 'var(--text-subtle)',
+                background: isActive ? '#2a2a2a' : 'transparent',
+                color: isActive ? '#ececec' : 'var(--text-subtle)',
                 fontSize: 'var(--text-sm)', cursor: 'pointer', transition: 'var(--transition-fast)',
                 overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                 marginBottom: 1, lineHeight: 1.4, fontFamily: 'inherit',
               }}
               onMouseEnter={(e) => {
                 if (!isActive) {
-                  e.currentTarget.style.background = 'var(--bg-surface)';
-                  e.currentTarget.style.color = 'var(--text-secondary)';
+                  e.currentTarget.style.background = '#232323';
+                  e.currentTarget.style.color = '#d1d1d1';
                 }
               }}
               onMouseLeave={(e) => {
