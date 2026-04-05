@@ -1,6 +1,6 @@
 import React from 'react';
 
-type ActiveView = 'chat' | 'settings' | 'knowledge' | 'history';
+type ActiveView = 'chat' | 'settings' | 'wiki' | 'history';
 
 interface Props {
   activeView: ActiveView;
@@ -45,7 +45,7 @@ function SettingsIcon({ color }: { color: string }) {
 const NAV_ITEMS: Array<{ view: ActiveView; icon: (color: string) => React.ReactNode; label: string }> = [
   { view: 'chat', icon: (c) => <ChatIcon color={c} />, label: 'Chat' },
   { view: 'history', icon: (c) => <HistoryIcon color={c} />, label: 'History' },
-  { view: 'knowledge', icon: (c) => <BrainIcon color={c} />, label: 'Brain' },
+  { view: 'wiki', icon: (c) => <BrainIcon color={c} />, label: 'Wiki' },
   { view: 'settings', icon: (c) => <SettingsIcon color={c} />, label: 'Settings' },
 ];
 
