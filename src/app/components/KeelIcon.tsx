@@ -12,17 +12,17 @@ export function KeelIcon({ size = 30 }: { size?: number }) {
 }
 
 export function KeelWordmark({ height = 20 }: { height?: number }) {
-  const width = height * 3.2;
+  const width = height * 3.0;
   return (
-    <svg width={width} height={height} viewBox="0 0 160 50" xmlns="http://www.w3.org/2000/svg">
+    <svg width={width} height={height} viewBox="0 0 150 50" xmlns="http://www.w3.org/2000/svg">
       <text
         x="0"
         y="40"
-        fontFamily="-apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif"
-        fontSize="50"
-        fontWeight="700"
-        fill="rgba(255,255,255,0.85)"
-        letterSpacing="-1"
+        fontFamily="'Playfair Display', Georgia, 'Times New Roman', serif"
+        fontSize="46"
+        fontWeight="400"
+        fill="var(--text-primary)"
+        letterSpacing="0"
       >Keel</text>
     </svg>
   );
