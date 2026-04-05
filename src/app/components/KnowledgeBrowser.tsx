@@ -3,7 +3,11 @@ import type { FileEntry } from '../../shared/types';
 import { useIsMobile } from '../../lib/useIsMobile';
 
 interface Props {
-  onBack: () => void;
+  onBack?: () => void;
+  showBack?: boolean;
+  title?: string;
+  subtitle?: string;
+  focus?: 'all' | 'team';
 }
 
 function FolderItem({ entry, depth, onSelect, selectedPath, isTeam }: {
@@ -29,13 +33,13 @@ function FolderItem({ entry, depth, onSelect, selectedPath, isTeam }: {
           width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center',
           gap: 6, padding: '5px 8px', paddingLeft: 8 + depth * 16,
           borderRadius: 6, border: 'none',
-          background: isActive ? 'rgba(207,122,92,0.15)' : 'transparent',
-          color: isActive ? '#CF7A5C' : 'rgba(255,255,255,0.6)',
+	          background: isActive ? 'var(--accent-bg)' : 'transparent',
+	          color: isActive ? 'var(--accent-link)' : 'var(--text-tertiary)',
           fontSize: 13, cursor: 'pointer', transition: 'all 0.12s',
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
         }}
         onMouseEnter={(e) => {
-          if (!isActive) e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
+	          if (!isActive) e.currentTarget.style.background = 'var(--surface-muted)';
         }}
         onMouseLeave={(e) => {
           if (!isActive) e.currentTarget.style.background = 'transparent';
@@ -55,10 +59,10 @@ function FolderItem({ entry, depth, onSelect, selectedPath, isTeam }: {
           width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center',
           gap: 6, padding: '5px 8px', paddingLeft: 8 + depth * 16,
           borderRadius: 6, border: 'none', background: 'transparent',
-          color: 'rgba(255,255,255,0.7)', fontSize: 13, cursor: 'pointer',
+	          color: 'var(--text-secondary)', fontSize: 13, cursor: 'pointer',
           fontWeight: 500, transition: 'all 0.12s',
         }}
-        onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; }}
+	        onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--surface-muted)'; }}
         onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
       >
         <span style={{ fontSize: 10, opacity: 0.4, transition: 'transform 0.15s', transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)' }}>▶</span>
@@ -88,7 +92,13 @@ const TEAM_KNOWLEDGE_ITEMS = new Set([
   'team.md', 'projects', 'updates',
 ]);
 
-export default function KnowledgeBrowser({ onBack }: Props) {
+export default function KnowledgeBrowser({
+  onBack,
+  showBack = true,
+  title = 'Knowledge Browser',
+  subtitle,
+  focus = 'all',
+}: Props) {
   const isMobile = useIsMobile();
   const [rootEntries, setRootEntries] = useState<FileEntry[]>([]);
   const [teamEntries, setTeamEntries] = useState<FileEntry[]>([]);
@@ -172,22 +182,34 @@ export default function KnowledgeBrowser({ onBack }: Props) {
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
       {/* Header */}
       <div style={{
-        padding: '16px 24px', borderBottom: '1px solid var(--border-default)',
+        padding: '18px 24px 16px', borderBottom: '1px solid var(--border-default)',
         display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0,
       }}>
-        <button
-          onClick={onBack}
-          style={{
-            background: 'none', border: 'none', color: 'var(--text-tertiary)',
-            cursor: 'pointer', fontSize: 'var(--text-xl)', padding: '2px 6px', borderRadius: 'var(--radius-md)',
-            transition: 'var(--transition-fast)',
-          }}
-          onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--text-primary)'; }}
-          onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-tertiary)'; }}
-        >
-          ←
-        </button>
-        <span style={{ fontSize: 'var(--text-lg)', fontWeight: 600, color: 'var(--text-primary)' }}>Knowledge Browser</span>
+        {showBack && onBack && (
+          <button
+            onClick={onBack}
+            style={{
+              background: 'none', border: 'none', color: 'var(--text-tertiary)',
+              cursor: 'pointer', fontSize: 'var(--text-xl)', padding: '2px 6px', borderRadius: 'var(--radius-md)',
+              transition: 'var(--transition-fast)',
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--text-primary)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-tertiary)'; }}
+          >
+            ←
+          </button>
+        )}
+        <div>
+          <div style={{ fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-disabled)', marginBottom: 4 }}>
+            {focus === 'team' ? 'Shared Context' : 'Knowledge Workspace'}
+          </div>
+          <div style={{ fontSize: 'var(--text-lg)', fontWeight: 600, color: 'var(--text-primary)' }}>{title}</div>
+          {subtitle && (
+            <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-subtle)', marginTop: 4 }}>
+              {subtitle}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Two-panel layout (stacked on mobile) */}
@@ -201,7 +223,7 @@ export default function KnowledgeBrowser({ onBack }: Props) {
           overflowY: 'auto', padding: '8px 4px', flexShrink: 0,
           flex: isMobile && !mobileShowEditor ? 1 : undefined,
         }}>
-          {rootEntries.map((entry) => (
+          {focus !== 'team' && rootEntries.map((entry) => (
             <FolderItem
               key={entry.path}
               entry={entry}
@@ -210,8 +232,8 @@ export default function KnowledgeBrowser({ onBack }: Props) {
               selectedPath={!isTeamFile ? selectedPath : ''}
             />
           ))}
-          {rootEntries.length === 0 && (
-            <div style={{ padding: 16, color: 'rgba(255,255,255,0.3)', fontSize: 12, textAlign: 'center' }}>
+          {focus !== 'team' && rootEntries.length === 0 && (
+	            <div style={{ padding: 16, color: 'var(--text-disabled)', fontSize: 12, textAlign: 'center' }}>
               No files found
             </div>
           )}
@@ -219,7 +241,7 @@ export default function KnowledgeBrowser({ onBack }: Props) {
             <>
               <div style={{
                 padding: '12px 8px 4px', fontSize: 10, fontWeight: 700,
-                color: 'rgba(207,122,92,0.7)', textTransform: 'uppercase',
+	                color: 'var(--accent-link)', textTransform: 'uppercase',
                 letterSpacing: '0.08em', borderTop: '1px solid var(--border-subtle)',
                 marginTop: 8,
               }}>
@@ -237,14 +259,19 @@ export default function KnowledgeBrowser({ onBack }: Props) {
               ))}
             </>
           )}
+          {focus === 'team' && teamEntries.length === 0 && (
+	            <div style={{ padding: 16, color: 'var(--text-disabled)', fontSize: 12, textAlign: 'center', lineHeight: 1.6 }}>
+              Add a Team Brain folder in Settings to unlock shared notes, projects, and updates.
+            </div>
+          )}
         </div>
 
         {/* File editor — hidden on mobile when browsing file tree */}
         <div style={{ flex: 1, display: isMobile && !mobileShowEditor ? 'none' : 'flex', flexDirection: 'column', minWidth: 0 }}>
           {!selectedPath ? (
             <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <div style={{ textAlign: 'center', color: 'rgba(255,255,255,0.3)' }}>
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: 12 }}>
+	              <div style={{ textAlign: 'center', color: 'var(--text-disabled)' }}>
+	                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--text-disabled)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: 12 }}>
                   <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
                 </svg>
                 <div style={{ fontSize: 14 }}>Select a file to edit</div>
@@ -262,16 +289,16 @@ export default function KnowledgeBrowser({ onBack }: Props) {
                   {isMobile && (
                     <button
                       onClick={() => setMobileShowEditor(false)}
-                      style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.6)', cursor: 'pointer', fontSize: 16, padding: '0 4px' }}
+	                      style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: 16, padding: '0 4px' }}
                     >
                       ←
                     </button>
                   )}
-                  {isTeamFile && <span style={{ color: '#CF7A5C', marginRight: 6, fontSize: 10, fontWeight: 700, letterSpacing: '0.04em' }}>TEAM</span>}
+	                  {isTeamFile && <span style={{ color: 'var(--accent-link)', marginRight: 6, fontSize: 10, fontWeight: 700, letterSpacing: '0.04em' }}>TEAM</span>}
                   {selectedPath}
                 </span>
                 <span style={{
-                  fontSize: 11, color: saveStatus === 'saved' ? '#4ade80' : 'rgba(255,255,255,0.25)',
+	                  fontSize: 11, color: saveStatus === 'saved' ? '#4ade80' : 'var(--text-disabled)',
                   transition: 'color 0.3s',
                 }}>
                   {saveStatus === 'saving' ? 'Saving...' : saveStatus === 'saved' ? 'Saved' : ''}
@@ -294,7 +321,7 @@ export default function KnowledgeBrowser({ onBack }: Props) {
                           <div key={i} style={{
                             fontSize: level === 1 ? 18 : level === 2 ? 15 : 13,
                             fontWeight: 600,
-                            color: 'rgba(255,255,255,0.85)',
+	                            color: 'var(--text-primary)',
                             marginTop: level === 1 ? 8 : 16,
                             marginBottom: 8,
                           }}>
@@ -312,7 +339,7 @@ export default function KnowledgeBrowser({ onBack }: Props) {
                             padding: '6px 4px', cursor: 'pointer',
                             borderRadius: 6, transition: 'background 0.1s',
                           }}
-                            onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; }}
+	                            onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--surface-muted)'; }}
                             onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
                           >
                             <input
@@ -320,13 +347,13 @@ export default function KnowledgeBrowser({ onBack }: Props) {
                               checked={isChecked}
                               onChange={() => toggleCheckbox(i)}
                               style={{
-                                accentColor: '#CF7A5C', width: 16, height: 16,
+	                                accentColor: 'var(--accent)', width: 16, height: 16,
                                 marginTop: 2, cursor: 'pointer', flexShrink: 0,
                               }}
                             />
                             <span style={{
                               fontSize: 14, lineHeight: 1.5,
-                              color: isChecked ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.85)',
+	                              color: isChecked ? 'var(--text-disabled)' : 'var(--text-primary)',
                               textDecoration: isChecked ? 'line-through' : 'none',
                             }}>
                               {text}
@@ -338,7 +365,7 @@ export default function KnowledgeBrowser({ onBack }: Props) {
                       if (!line.trim()) return <div key={i} style={{ height: 8 }} />;
 
                       return (
-                        <div key={i} style={{ fontSize: 14, color: 'rgba(255,255,255,0.6)', padding: '2px 4px', lineHeight: 1.5 }}>
+	                        <div key={i} style={{ fontSize: 14, color: 'var(--text-tertiary)', padding: '2px 4px', lineHeight: 1.5 }}>
                           {line}
                         </div>
                       );

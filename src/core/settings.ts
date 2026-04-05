@@ -3,6 +3,7 @@ import * as path from 'path';
 import type { Settings } from '../shared/types';
 
 const DEFAULT_SETTINGS: Settings = {
+  theme: 'dark',
   provider: 'claude',
   anthropicApiKey: '',
   claudeModel: 'claude-sonnet-4-20250514',

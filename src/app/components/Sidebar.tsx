@@ -1,57 +1,123 @@
 import React, { useEffect, useState } from 'react';
-import { KeelIcon, KeelWordmark } from './KeelIcon';
-
 interface Session {
   id: string;
   title: string;
   updatedAt: number;
 }
 
-type ActiveView = 'chat' | 'settings' | 'knowledge' | 'history';
+export type DesktopView = 'chat' | 'search' | 'chats' | 'teams' | 'inbox' | 'settings';
 
 interface Props {
+  collapsed: boolean;
   currentSessionId: string;
-  onSelectSession: (id: string) => void;
+  activeView: DesktopView;
+  onNavigate: (view: DesktopView) => void;
   onNewChat: () => void;
+  onSelectSession: (id: string) => void;
   refreshSignal: number;
-  activeView: ActiveView;
-  onNavigate: (view: ActiveView) => void;
 }
 
-function NavItem({ icon, label, active, onClick }: {
-  icon: string; label: string; active: boolean; onClick: () => void;
+function SearchIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="11" cy="11" r="7" />
+      <path d="m20 20-3.5-3.5" />
+    </svg>
+  );
+}
+
+function ChatIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 15a2 2 0 0 1-2 2H8l-5 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+    </svg>
+  );
+}
+
+function TeamIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+      <circle cx="8.5" cy="7" r="4" />
+      <path d="M20 8v6" />
+      <path d="M23 11h-6" />
+    </svg>
+  );
+}
+
+function InboxIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M22 12h-6l-2 3H10l-2-3H2" />
+      <path d="M5 5h14l3 7v6a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-6z" />
+    </svg>
+  );
+}
+
+function PlusIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 5v14" />
+      <path d="M5 12h14" />
+    </svg>
+  );
+}
+
+function SettingsIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="3" />
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06A2 2 0 1 1 7.04 4.3l.06.06A1.65 1.65 0 0 0 8.92 4a1.65 1.65 0 0 0 1-1.51V2a2 2 0 0 1 4 0v.09A1.65 1.65 0 0 0 14.92 3.6a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.56.23.96.77.96 1.39V12c0 .62-.4 1.16-.96 1.39Z" />
+    </svg>
+  );
+}
+
+const PRIMARY_ITEMS: Array<{
+  id: DesktopView;
+  label: string;
+  icon: React.ReactNode;
+}> = [
+  { id: 'search', label: 'Search', icon: <SearchIcon /> },
+  { id: 'chats', label: 'Chats', icon: <ChatIcon /> },
+  { id: 'teams', label: 'Teams', icon: <TeamIcon /> },
+  { id: 'inbox', label: 'Inbox', icon: <InboxIcon /> },
+];
+
+function NavRow({
+  active,
+  collapsed,
+  icon,
+  label,
+  onClick,
+}: {
+  active?: boolean;
+  collapsed: boolean;
+  icon: React.ReactNode;
+  label: string;
+  onClick: () => void;
 }) {
   return (
     <button
       onClick={onClick}
-      style={{
-        width: '100%', display: 'flex', alignItems: 'center', gap: 10,
-        padding: '8px 10px', borderRadius: 'var(--radius-base)', border: 'none',
-        background: active ? 'var(--accent-bg)' : 'transparent',
-        color: active ? 'var(--accent)' : 'rgba(255,255,255,0.55)',
-        fontSize: 'var(--text-sm)', cursor: 'pointer', transition: 'var(--transition-fast)',
-        textAlign: 'left', fontFamily: 'inherit',
-      }}
-      onMouseEnter={(e) => {
-        if (!active) {
-          e.currentTarget.style.background = 'rgba(255,255,255,0.06)';
-          e.currentTarget.style.color = 'rgba(255,255,255,0.8)';
-        }
-      }}
-      onMouseLeave={(e) => {
-        if (!active) {
-          e.currentTarget.style.background = 'transparent';
-          e.currentTarget.style.color = 'rgba(255,255,255,0.55)';
-        }
-      }}
+      title={collapsed ? label : undefined}
+      className={active ? 'desktop-sidebar__nav is-active' : 'desktop-sidebar__nav'}
+      style={{ justifyContent: collapsed ? 'center' : 'flex-start' }}
     >
-      <span style={{ fontSize: 15, width: 20, textAlign: 'center', flexShrink: 0 }}>{icon}</span>
-      <span>{label}</span>
+      <span className="desktop-sidebar__nav-icon">{icon}</span>
+      {!collapsed && <span>{label}</span>}
     </button>
   );
 }
 
-export default function Sidebar({ currentSessionId, onSelectSession, onNewChat, refreshSignal, activeView, onNavigate }: Props) {
+export default function Sidebar({
+  collapsed,
+  currentSessionId,
+  activeView,
+  onNavigate,
+  onNewChat,
+  onSelectSession,
+  refreshSignal,
+}: Props) {
   const [sessions, setSessions] = useState<Session[]>([]);
 
   useEffect(() => {
@@ -59,108 +125,71 @@ export default function Sidebar({ currentSessionId, onSelectSession, onNewChat, 
   }, [refreshSignal, currentSessionId]);
 
   return (
-    <div style={{
-      width: 'var(--sidebar-width)', height: '100%', borderRight: '1px solid var(--border-default)',
-      background: 'var(--bg-sidebar)', display: 'flex', flexDirection: 'column',
-      flexShrink: 0, overflow: 'hidden',
-    }}>
-      {/* Logo */}
-      <div style={{
-        display: 'flex', alignItems: 'center', padding: '16px 16px 12px',
-        borderBottom: '1px solid var(--border-subtle)',
-      }}>
-        <div style={{ marginRight: 10, flexShrink: 0 }}><KeelIcon size={30} /></div>
-        <KeelWordmark height={18} />
-      </div>
-
-      {/* Top nav */}
-      <div style={{ padding: '12px 8px 0', display: 'flex', flexDirection: 'column', gap: 1 }}>
+    <div className={collapsed ? 'desktop-sidebar is-collapsed' : 'desktop-sidebar'}>
+      <div className="desktop-sidebar__section">
         <button
           onClick={onNewChat}
-          style={{
-            width: '100%', display: 'flex', alignItems: 'center', gap: 10,
-            padding: '8px 10px', borderRadius: 'var(--radius-base)',
-            background: 'transparent', border: 'none',
-            color: 'rgba(255,255,255,0.55)', fontSize: 'var(--text-sm)', cursor: 'pointer',
-            transition: 'var(--transition-fast)', textAlign: 'left', fontFamily: 'inherit',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = 'rgba(255,255,255,0.06)';
-            e.currentTarget.style.color = 'rgba(255,255,255,0.8)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = 'transparent';
-            e.currentTarget.style.color = 'rgba(255,255,255,0.55)';
-          }}
+          title={collapsed ? 'New chat' : undefined}
+          className="desktop-sidebar__new-chat desktop-sidebar__nav"
+          style={{ justifyContent: collapsed ? 'center' : 'flex-start' }}
         >
-          <span style={{ fontSize: 15, width: 20, textAlign: 'center', flexShrink: 0 }}>+</span>
-          <span>New session</span>
+          <span className="desktop-sidebar__nav-icon">
+            <PlusIcon />
+          </span>
+          {!collapsed && <span>New chat</span>}
         </button>
-        <NavItem
-          icon="📁"
-          label="Knowledge Browser"
-          active={activeView === 'knowledge'}
-          onClick={() => onNavigate('knowledge')}
-        />
-        <NavItem
-          icon="⚙"
-          label="Settings"
+      </div>
+
+      <div className="desktop-sidebar__section" style={{ gap: 4 }}>
+        {PRIMARY_ITEMS.map((item) => {
+          const active = activeView === item.id;
+          return (
+            <NavRow
+              key={item.id}
+              active={active}
+              collapsed={collapsed}
+              icon={item.icon}
+              label={item.label}
+              onClick={() => onNavigate(item.id)}
+            />
+          );
+        })}
+      </div>
+
+      {!collapsed && (
+        <div className="desktop-sidebar__history">
+	          <div className="desktop-sidebar__label">Recents</div>
+
+          {sessions.slice(0, 14).map((session) => {
+            const active = activeView === 'chat' && session.id === currentSessionId;
+            return (
+              <button
+                key={session.id}
+                onClick={() => onSelectSession(session.id)}
+                className={active ? 'desktop-sidebar__session is-active' : 'desktop-sidebar__session'}
+              >
+                <span className="desktop-sidebar__session-title">{session.title}</span>
+              </button>
+            );
+          })}
+
+          {sessions.length === 0 && (
+            <div className="desktop-sidebar__empty">
+              No conversations yet.
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="desktop-sidebar__footer">
+        <NavRow
           active={activeView === 'settings'}
+          collapsed={collapsed}
+          icon={<SettingsIcon />}
+          label="Settings"
           onClick={() => onNavigate('settings')}
         />
       </div>
-
-      {/* Session list */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '4px 8px 16px' }}>
-        {sessions.length > 0 && (
-          <div style={{
-            fontSize: 'var(--text-xs)', fontWeight: 600, color: 'var(--text-disabled)',
-            padding: '14px 8px 6px', textTransform: 'uppercase', letterSpacing: '0.05em',
-          }}>
-            History
-          </div>
-        )}
-
-        {sessions.map((s) => {
-          const isActive = s.id === currentSessionId && activeView === 'chat';
-          return (
-            <button
-              key={s.id}
-              onClick={() => onSelectSession(s.id)}
-              style={{
-                width: '100%', textAlign: 'left', display: 'block',
-                padding: '9px 10px', borderRadius: 'var(--radius-base)', border: 'none',
-                background: isActive ? 'rgba(255,255,255,0.1)' : 'transparent',
-                color: isActive ? 'var(--text-primary)' : 'rgba(255,255,255,0.45)',
-                fontSize: 'var(--text-sm)', cursor: 'pointer', transition: 'var(--transition-fast)',
-                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                marginBottom: 1, lineHeight: 1.4, fontFamily: 'inherit',
-              }}
-              onMouseEnter={(e) => {
-                if (!isActive) {
-                  e.currentTarget.style.background = 'rgba(255,255,255,0.06)';
-                  e.currentTarget.style.color = 'var(--text-secondary)';
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!isActive) {
-                  e.currentTarget.style.background = 'transparent';
-                  e.currentTarget.style.color = 'rgba(255,255,255,0.45)';
-                }
-              }}
-            >
-              {s.title}
-            </button>
-          );
-        })}
-
-        {sessions.length === 0 && (
-          <div style={{ padding: '24px 8px', color: 'var(--text-ghost)', fontSize: 12, textAlign: 'center' }}>
-            No conversations yet
-          </div>
-        )}
-      </div>
-
     </div>
   );
 }
