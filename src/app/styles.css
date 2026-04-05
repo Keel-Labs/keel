@@ -5,8 +5,8 @@
 :root {
   /* Backgrounds — neutral dark grays matching Claude */
   --bg-base: #1e1e1e;
-  --bg-sidebar: #171717;
-  --bg-chat: #333333;
+  --bg-sidebar: #212121;
+  --bg-chat: #2c2c2c;
   --bg-surface: #3d3d3d;
   --bg-surface-hover: #474747;
   --bg-input-focus: #333333;
@@ -77,7 +77,7 @@
   --transition-slow: all 0.25s ease;
 
   /* Sidebar */
-  --sidebar-width: 260px;
+  --sidebar-width: 300px;
 }
 
 * {

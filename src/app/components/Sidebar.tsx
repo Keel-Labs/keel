@@ -27,21 +27,21 @@ function NavItem({ icon, label, active, onClick }: {
       style={{
         width: '100%', display: 'flex', alignItems: 'center', gap: 10,
         padding: '7px 12px', borderRadius: 'var(--radius-base)', border: 'none',
-        background: active ? '#2a2a2a' : 'transparent',
-        color: active ? '#f5f5f5' : 'var(--text-muted)',
+        background: active ? '#2d2d2d' : 'transparent',
+        color: active ? '#f0f0f0' : '#999',
         fontSize: 'var(--text-sm)', cursor: 'pointer', transition: 'var(--transition-fast)',
         textAlign: 'left', fontFamily: 'inherit', fontWeight: active ? 500 : 400,
       }}
       onMouseEnter={(e) => {
         if (!active) {
-          e.currentTarget.style.background = '#232323';
-          e.currentTarget.style.color = '#e0e0e0';
+          e.currentTarget.style.background = '#2a2a2a';
+          e.currentTarget.style.color = '#ddd';
         }
       }}
       onMouseLeave={(e) => {
         if (!active) {
           e.currentTarget.style.background = 'transparent';
-          e.currentTarget.style.color = 'var(--text-muted)';
+          e.currentTarget.style.color = '#999';
         }
       }}
     >
@@ -85,12 +85,12 @@ export default function Sidebar({ currentSessionId, onSelectSession, onNewChat, 
             transition: 'var(--transition-fast)', textAlign: 'left', fontFamily: 'inherit',
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.background = '#232323';
-            e.currentTarget.style.color = '#e0e0e0';
+            e.currentTarget.style.background = '#2a2a2a';
+            e.currentTarget.style.color = '#ddd';
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.background = 'transparent';
-            e.currentTarget.style.color = 'var(--text-muted)';
+            e.currentTarget.style.color = '#999';
           }}
         >
           <span style={{ fontSize: 14, width: 20, textAlign: 'center', flexShrink: 0 }}>+</span>
@@ -129,23 +129,23 @@ export default function Sidebar({ currentSessionId, onSelectSession, onNewChat, 
               onClick={() => onSelectSession(s.id)}
               style={{
                 width: '100%', textAlign: 'left', display: 'block',
-                padding: '8px 10px', borderRadius: 8, border: 'none',
-                background: isActive ? '#222222' : 'transparent',
-                color: isActive ? '#e8e8e8' : '#888',
+                padding: '8px 12px', borderRadius: 8, border: 'none',
+                background: isActive ? '#2d2d2d' : 'transparent',
+                color: isActive ? '#f0f0f0' : '#888',
                 fontSize: 'var(--text-sm)', cursor: 'pointer', transition: 'var(--transition-fast)',
                 overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                 marginBottom: 1, lineHeight: 1.4, fontFamily: 'inherit',
               }}
               onMouseEnter={(e) => {
                 if (!isActive) {
-                  e.currentTarget.style.background = '#232323';
-                  e.currentTarget.style.color = '#e0e0e0';
+                  e.currentTarget.style.background = '#2a2a2a';
+                  e.currentTarget.style.color = '#ddd';
                 }
               }}
               onMouseLeave={(e) => {
                 if (!isActive) {
                   e.currentTarget.style.background = 'transparent';
-                  e.currentTarget.style.color = 'var(--text-subtle)';
+                  e.currentTarget.style.color = '#888';
                 }
               }}
             >

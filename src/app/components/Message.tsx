@@ -25,8 +25,8 @@ export default function Message({ message }: Props) {
     return (
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16, paddingLeft: 80 }}>
         <div style={{
-          background: '#4e4e4e', color: '#f0f0f0',
-          borderRadius: '18px',
+          background: '#424242', color: '#f0f0f0',
+          borderRadius: '20px 20px 4px 20px',
           padding: '10px 16px', fontSize: 'var(--text-base)', lineHeight: 1.55,
           whiteSpace: 'pre-wrap', maxWidth: 600,
         }}>
