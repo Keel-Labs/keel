@@ -165,6 +165,24 @@ export const syncState = pgTable(
   ]
 );
 
+// --- Team Brain Files (shared across all users) ---
+
+export const teamBrainFiles = pgTable(
+  'team_brain_files',
+  {
+    id: serial('id').primaryKey(),
+    path: text('path').notNull().unique(), // e.g. 'team.md', 'projects/keel/context.md'
+    content: text('content').notNull(),
+    hash: varchar('hash', { length: 64 }).notNull(),
+    lastEditedBy: integer('last_edited_by').references(() => users.id),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('team_brain_files_path').on(table.path),
+  ]
+);
+
 // --- S3 File References ---
 
 export const fileUploads = pgTable(

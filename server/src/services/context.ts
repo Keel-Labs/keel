@@ -1,4 +1,5 @@
 import { readBrainFile, listBrainFilesByPattern } from './brain.js';
+import { readTeamFile, listTeamFilesByPattern } from './team-brain.js';
 
 const SYSTEM_PROMPT_PREFIX = `You are Keel, a personal AI chief of staff. You know the user's projects, priorities, people, and preferences because they are loaded into your context below.
 
@@ -15,6 +16,7 @@ IMPORTANT: When the user asks you to schedule or create a meeting/event, tell th
 CONTEXT SOURCES:
 - Your personal brain files contain the user's profile, projects, and daily logs.
 - The pulse file (pulse.md) contains the user's current priorities and recent activity.
+- Team brain files contain shared context across your team (goals, members, shared projects).
 
 Here is everything you know about the user:
 
@@ -72,12 +74,11 @@ export async function assembleContext(
     } catch { /* log doesn't exist */ }
   }
 
-  // 5. Recent captures (last 7 days)
+  // 5. Recent captures
   try {
     const captureFiles = await listBrainFilesByPattern(userId, 'captures/%');
     if (captureFiles.length > 0) {
       onStep?.(`Loading ${captureFiles.length} capture(s)...`);
-      // Sort by path (date-prefixed) descending and take recent ones
       const recentCaptures = captureFiles.sort().reverse().slice(0, 20);
       for (const file of recentCaptures) {
         try {
@@ -107,6 +108,34 @@ export async function assembleContext(
     const tasksContent = await readBrainFile(userId, 'tasks.md');
     addSection('tasks.md', tasksContent);
   } catch { /* no general tasks */ }
+
+  // 8. Team brain files (shared across all users)
+  try {
+    onStep?.('Loading team context...');
+    const teamMd = await readTeamFile('team.md');
+    addSection('[TEAM] team.md', teamMd);
+  } catch { /* no team.md */ }
+
+  try {
+    const teamProjects = await listTeamFilesByPattern('projects/%/context.md');
+    for (const file of teamProjects) {
+      try {
+        const content = await readTeamFile(file);
+        addSection(`[TEAM] ${file}`, content);
+      } catch { /* skip */ }
+    }
+  } catch { /* no team projects */ }
+
+  try {
+    const teamUpdates = await listTeamFilesByPattern('updates/%.md');
+    const recent = teamUpdates.sort().reverse().slice(0, 10);
+    for (const file of recent) {
+      try {
+        const content = await readTeamFile(file);
+        addSection(`[TEAM] ${file}`, content);
+      } catch { /* skip */ }
+    }
+  } catch { /* no team updates */ }
 
   if (parts.length > 0) {
     onStep?.(`Found ${parts.length} relevant section(s)`);

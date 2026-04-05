@@ -176,6 +176,40 @@ export async function migrate(): Promise<void> {
     CREATE INDEX IF NOT EXISTS file_uploads_user ON file_uploads(user_id)
   `);
 
+  // Team brain files (shared across all users)
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS team_brain_files (
+      id SERIAL PRIMARY KEY,
+      path TEXT NOT NULL UNIQUE,
+      content TEXT NOT NULL,
+      hash VARCHAR(64) NOT NULL,
+      last_edited_by INTEGER REFERENCES users(id),
+      updated_at TIMESTAMP DEFAULT NOW() NOT NULL,
+      created_at TIMESTAMP DEFAULT NOW() NOT NULL
+    )
+  `);
+  await db.execute(sql`
+    CREATE UNIQUE INDEX IF NOT EXISTS team_brain_files_path ON team_brain_files(path)
+  `);
+
+  // Seed default team.md if table is empty
+  await db.execute(sql`
+    INSERT INTO team_brain_files (path, content, hash)
+    SELECT 'team.md', '# Team
+
+## Members
+| Name | Role | Notes |
+|---|---|---|
+
+## Goals
+-
+
+## Norms
+-
+', 'seed'
+    WHERE NOT EXISTS (SELECT 1 FROM team_brain_files WHERE path = 'team.md')
+  `);
+
   // Vector index (only create if enough rows, otherwise Postgres handles seq scan)
   // Using ivfflat — for small datasets this is fine; switch to hnsw if scaling
   try {

@@ -129,5 +129,59 @@ ${content.slice(0, 3000)}
 
   logActivity(brainPath, 'capture', `Filed to ${fileName}`);
 
+  // Extract and save tasks from the captured content
+  try {
+    const taskExtraction = await llmClient.chat(
+      [{ role: 'user', content: `Extract tasks from this capture:\n\n${content.slice(0, 3000)}`, timestamp: Date.now() }],
+      `You extract action items from captured notes. Return JSON only.
+If there are tasks/to-dos, return: {"tasks": [{"task": "description", "project": "${projectFolder || ''}"}]}
+If no tasks found, return: {"tasks": []}
+Respond ONLY with valid JSON.`
+    );
+
+    const parsed = JSON.parse(taskExtraction.trim());
+    if (parsed.tasks && parsed.tasks.length > 0) {
+      for (const t of parsed.tasks) {
+        const projName = t.project?.trim() || projectFolder || '';
+        if (projName) {
+          const projSlug = projName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+          // Don't file tasks under "captures" pseudo-project
+          if (projSlug === 'captures') continue;
+          const tasksPath = `projects/${projSlug}/tasks.md`;
+          const contextPath = `projects/${projSlug}/context.md`;
+
+          // Ensure project context exists
+          if (!(await fileManager.fileExists(contextPath))) {
+            await fileManager.writeFile(contextPath, `# ${projName}\n\nProject context and notes.\n`);
+          }
+
+          // Append task
+          try {
+            const existing = await fileManager.readFile(tasksPath);
+            if (!existing.includes(t.task)) {
+              await fileManager.writeFile(tasksPath, existing.trimEnd() + `\n- [ ] ${t.task}\n`);
+            }
+          } catch {
+            await fileManager.writeFile(tasksPath, `# ${projName} — Tasks\n\n- [ ] ${t.task}\n`);
+          }
+        } else {
+          // No project — add to general tasks
+          try {
+            const existing = await fileManager.readFile('tasks.md');
+            if (!existing.includes(t.task)) {
+              await fileManager.writeFile('tasks.md', existing.trimEnd() + `\n- [ ] ${t.task}\n`);
+            }
+          } catch {
+            await fileManager.writeFile('tasks.md', `# Tasks\n\n- [ ] ${t.task}\n`);
+          }
+        }
+      }
+      logActivity(brainPath, 'capture-tasks', `Extracted ${parsed.tasks.length} task(s) from capture`);
+    }
+  } catch (err) {
+    // Task extraction is best-effort
+    console.error('[capture] Task extraction failed:', err);
+  }
+
   return `Captured and filed to ${fileName}${projectFolder ? ` (related to ${projectFolder})` : ''}`;
 }
