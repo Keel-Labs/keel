@@ -27,14 +27,14 @@ function NavItem({ icon, label, active, onClick }: {
       style={{
         width: '100%', display: 'flex', alignItems: 'center', gap: 10,
         padding: '7px 12px', borderRadius: 'var(--radius-base)', border: 'none',
-        background: active ? '#2d2d2d' : 'transparent',
+        background: active ? '#252525' : 'transparent',
         color: active ? '#f0f0f0' : '#999',
         fontSize: 'var(--text-sm)', cursor: 'pointer', transition: 'var(--transition-fast)',
         textAlign: 'left', fontFamily: 'inherit', fontWeight: active ? 500 : 400,
       }}
       onMouseEnter={(e) => {
         if (!active) {
-          e.currentTarget.style.background = '#2a2a2a';
+          e.currentTarget.style.background = '#222222';
           e.currentTarget.style.color = '#ddd';
         }
       }}
@@ -85,7 +85,7 @@ export default function Sidebar({ currentSessionId, onSelectSession, onNewChat, 
             transition: 'var(--transition-fast)', textAlign: 'left', fontFamily: 'inherit',
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.background = '#2a2a2a';
+            e.currentTarget.style.background = '#222222';
             e.currentTarget.style.color = '#ddd';
           }}
           onMouseLeave={(e) => {
@@ -130,7 +130,7 @@ export default function Sidebar({ currentSessionId, onSelectSession, onNewChat, 
               style={{
                 width: '100%', textAlign: 'left', display: 'block',
                 padding: '8px 12px', borderRadius: 8, border: 'none',
-                background: isActive ? '#2d2d2d' : 'transparent',
+                background: isActive ? '#252525' : 'transparent',
                 color: isActive ? '#f0f0f0' : '#888',
                 fontSize: 'var(--text-sm)', cursor: 'pointer', transition: 'var(--transition-fast)',
                 overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
@@ -138,7 +138,7 @@ export default function Sidebar({ currentSessionId, onSelectSession, onNewChat, 
               }}
               onMouseEnter={(e) => {
                 if (!isActive) {
-                  e.currentTarget.style.background = '#2a2a2a';
+                  e.currentTarget.style.background = '#222222';
                   e.currentTarget.style.color = '#ddd';
                 }
               }}
