@@ -519,6 +519,32 @@ function parseTimeToDate(base: Date, hours: string, minutes: string, ampm?: stri
   return new Date(guess.getTime() - offsetMs);
 }
 
+function getGreetingName(name: string): string {
+  const first = name.trim().split(/\s+/)[0];
+  return first || 'there';
+}
+
+function getTimeOfDayGreeting(name: string, timezone?: string): string {
+  const tz = timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const hourPart = new Intl.DateTimeFormat('en-US', {
+    hour: 'numeric',
+    hour12: false,
+    timeZone: tz,
+  }).formatToParts(new Date()).find((part) => part.type === 'hour');
+  const hour = Number(hourPart?.value ?? 12);
+
+  let greeting = 'Hello';
+  if (hour >= 5 && hour < 12) {
+    greeting = 'Good morning';
+  } else if (hour >= 12 && hour < 17) {
+    greeting = 'Good afternoon';
+  } else if (hour >= 17 || hour < 5) {
+    greeting = 'Good evening';
+  }
+
+  return `${greeting}, ${getGreetingName(name)}.`;
+}
+
 function generateSessionId(): string {
   return `session-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -538,6 +564,7 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [userTimezone, setUserTimezone] = useState<string>('');
+  const [userName, setUserName] = useState<string>('');
   const [thinkingSteps, setThinkingSteps] = useState<string[]>([]);
   const [thinkingContent, setThinkingContent] = useState<string>('');
   const [attachedImages, setAttachedImages] = useState<MessageImage[]>([]);
@@ -555,6 +582,7 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
   useEffect(() => {
     window.keel.getSettings().then((s) => {
       setUserTimezone(s.timezone || '');
+      setUserName(s.userName || '');
       setCurrentProvider(s.provider);
       switch (s.provider) {
         case 'claude': setCurrentModel(s.claudeModel || 'claude-sonnet-4-20250514'); break;
@@ -718,6 +746,7 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
   const conversationTitle = getConversationTitle();
   const isCommandMode = input.startsWith('/');
   const showHeader = messages.length > 0 || isStreaming;
+  const emptyStateGreeting = getTimeOfDayGreeting(userName, userTimezone || undefined);
 
   const handleImageAttach = () => {
     fileInputRef.current?.click();
@@ -1029,9 +1058,9 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
           {messages.length === 0 && !isStreaming && (
             <div className="chat-empty-state">
               <div className="chat-empty-state__glyph">✦</div>
-              <h2 className="chat-empty-state__title">Hello. What needs attention?</h2>
+              <h2 className="chat-empty-state__title">{emptyStateGreeting}</h2>
               <p className="chat-empty-state__description">
-                Keel can help you review active work, pull a daily brief, capture context, or turn scattered notes into an organized next step.
+                Keel can help you review active work, pull a daily brief, capture context, or turn scattered notes into a clear next step.
               </p>
               <div className="chat-empty-state__suggestions">
                 {WELCOME_SUGGESTIONS.map((s) => (
