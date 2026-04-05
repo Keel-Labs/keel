@@ -1,4 +1,5 @@
 import { readBrainFile, listBrainFilesByPattern } from './brain.js';
+import { readTeamFile, listTeamFilesByPattern } from './team-brain.js';
 
 const SYSTEM_PROMPT_PREFIX = `You are Keel, a personal AI chief of staff. You know the user's projects, priorities, people, and preferences because they are loaded into your context below.
 
@@ -15,6 +16,7 @@ IMPORTANT: When the user asks you to schedule or create a meeting/event, tell th
 CONTEXT SOURCES:
 - Your personal brain files contain the user's profile, projects, and daily logs.
 - The pulse file (pulse.md) contains the user's current priorities and recent activity.
+- Team brain files contain shared context across your team (goals, members, shared projects).
 
 Here is everything you know about the user:
 
@@ -71,6 +73,34 @@ export async function assembleContext(
       addSection(`daily-log/${date}.md`, content);
     } catch { /* log doesn't exist */ }
   }
+
+  // 5. Team brain files (shared across all users)
+  try {
+    onStep?.('Loading team context...');
+    const teamMd = await readTeamFile('team.md');
+    addSection('[TEAM] team.md', teamMd);
+  } catch { /* no team.md */ }
+
+  try {
+    const teamProjects = await listTeamFilesByPattern('projects/%/context.md');
+    for (const file of teamProjects) {
+      try {
+        const content = await readTeamFile(file);
+        addSection(`[TEAM] ${file}`, content);
+      } catch { /* skip */ }
+    }
+  } catch { /* no team projects */ }
+
+  try {
+    const teamUpdates = await listTeamFilesByPattern('updates/%.md');
+    const recent = teamUpdates.sort().reverse().slice(0, 10);
+    for (const file of recent) {
+      try {
+        const content = await readTeamFile(file);
+        addSection(`[TEAM] ${file}`, content);
+      } catch { /* skip */ }
+    }
+  } catch { /* no team updates */ }
 
   if (parts.length > 0) {
     onStep?.(`Found ${parts.length} relevant section(s)`);

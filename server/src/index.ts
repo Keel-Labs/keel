@@ -9,6 +9,7 @@ import { reminderRoutes } from './routes/reminders.js';
 import { workflowRoutes } from './routes/workflows.js';
 import { fileRoutes } from './routes/files.js';
 import { migrateRoutes } from './routes/migrate.js';
+import { teamBrainRoutes } from './routes/team-brain.js';
 import { closeDb } from './db/index.js';
 import { migrate } from './db/migrate.js';
 
@@ -55,6 +56,7 @@ async function main() {
   await app.register(workflowRoutes);
   await app.register(fileRoutes);
   await app.register(migrateRoutes);
+  await app.register(teamBrainRoutes);
 
   // Graceful shutdown
   const shutdown = async () => {
