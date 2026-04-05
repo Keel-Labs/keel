@@ -289,9 +289,9 @@ function ThinkingSteps({ steps, thinkingContent }: { steps: string[]; thinkingCo
       display: 'flex', justifyContent: 'flex-start', marginBottom: 12, paddingRight: 48,
     }}>
       <div style={{
-        background: 'rgba(207,122,92,0.06)',
-        border: '1px solid rgba(207,122,92,0.15)',
-        borderRadius: 12, padding: '8px 14px',
+        background: 'var(--accent-bg-subtle)',
+        border: '1px solid var(--accent-border-subtle)',
+        borderRadius: 'var(--radius-xl)', padding: '8px 14px',
         maxWidth: '80%', fontSize: 12,
       }}>
         <button
@@ -1034,31 +1034,32 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
               <div style={{ margin: '0 auto 20px', width: 56 }}>
                 <KeelIcon size={56} />
               </div>
-              <h2 style={{ fontSize: 18, fontWeight: 600, color: 'rgba(255,255,255,0.9)', marginBottom: 8 }}>Good to see you</h2>
-              <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.4)', marginBottom: 24, lineHeight: 1.6 }}>
+              <h2 style={{ fontSize: 'var(--text-xl)', fontWeight: 600, color: 'var(--text-primary)', marginBottom: 8 }}>Good to see you</h2>
+              <p style={{ fontSize: 'var(--text-base)', color: 'var(--text-subtle)', marginBottom: 'var(--space-4xl)', lineHeight: 1.6 }}>
                 I'm Keel, your AI chief of staff. I know your projects, priorities, and people.
               </p>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-base)' }}>
                 {WELCOME_SUGGESTIONS.map((s) => (
                   <button
                     key={s.label}
                     onClick={() => sendMessage(s.label)}
                     style={{
-                      display: 'flex', alignItems: 'center', gap: 8,
-                      padding: '10px 12px', borderRadius: 12,
-                      background: '#252525', border: '1px solid rgba(255,255,255,0.08)',
-                      color: 'rgba(255,255,255,0.6)', fontSize: 12,
-                      cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s',
+                      display: 'flex', alignItems: 'center', gap: 'var(--space-base)',
+                      padding: '10px 12px', borderRadius: 'var(--radius-xl)',
+                      background: 'var(--bg-surface)', border: '1px solid var(--border-default)',
+                      color: 'var(--text-tertiary)', fontSize: 12,
+                      cursor: 'pointer', textAlign: 'left', transition: 'var(--transition-base)',
+                      fontFamily: 'inherit',
                     }}
                     onMouseEnter={(e) => {
-                      e.currentTarget.style.background = '#2a2a2a';
-                      e.currentTarget.style.borderColor = 'rgba(255,255,255,0.15)';
+                      e.currentTarget.style.background = 'var(--bg-surface-hover)';
+                      e.currentTarget.style.borderColor = 'var(--border-btn)';
                       e.currentTarget.style.color = 'rgba(255,255,255,0.8)';
                     }}
                     onMouseLeave={(e) => {
-                      e.currentTarget.style.background = '#252525';
-                      e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)';
-                      e.currentTarget.style.color = 'rgba(255,255,255,0.6)';
+                      e.currentTarget.style.background = 'var(--bg-surface)';
+                      e.currentTarget.style.borderColor = 'var(--border-default)';
+                      e.currentTarget.style.color = 'var(--text-tertiary)';
                     }}
                   >
                     <span>{s.icon}</span>
@@ -1095,9 +1096,9 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
 
       {/* Input area */}
       <div style={{
-        borderTop: '1px solid rgba(255,255,255,0.08)',
+        borderTop: '1px solid var(--border-default)',
         padding: '12px 24px',
-        background: '#1a1a1a',
+        background: 'var(--bg-base)',
       }}>
         {/* Image thumbnails */}
         {attachedImages.length > 0 && (
@@ -1108,8 +1109,8 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
                   src={`data:${img.mediaType};base64,${img.data}`}
                   alt=""
                   style={{
-                    width: 56, height: 56, borderRadius: 8, objectFit: 'cover',
-                    border: '1px solid rgba(255,255,255,0.12)',
+                    width: 56, height: 56, borderRadius: 'var(--radius-base)', objectFit: 'cover',
+                    border: '1px solid var(--border-emphasis)',
                   }}
                 />
                 <button
@@ -1117,7 +1118,7 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
                   style={{
                     position: 'absolute', top: -6, right: -6,
                     width: 18, height: 18, borderRadius: '50%',
-                    background: '#CF7A5C', border: 'none', color: 'white',
+                    background: 'var(--accent)', border: 'none', color: 'white',
                     fontSize: 11, cursor: 'pointer', display: 'flex',
                     alignItems: 'center', justifyContent: 'center',
                     lineHeight: 1, padding: 0,
@@ -1145,7 +1146,7 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
             {input.startsWith('/') && (
               <div style={{
                 position: 'absolute', top: -24, left: 4,
-                fontSize: 11, fontWeight: 600, color: '#CF7A5C',
+                fontSize: 'var(--text-xs)', fontWeight: 600, color: 'var(--accent)',
                 letterSpacing: '0.03em', opacity: 0.8,
               }}>
                 / COMMAND
@@ -1160,25 +1161,25 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
               disabled={isStreaming}
               rows={1}
               style={{
-                width: '100%', background: input.startsWith('/') ? 'rgba(207,122,92,0.06)' : '#252525',
-                border: `1px solid ${input.startsWith('/') ? 'rgba(207,122,92,0.35)' : 'rgba(255,255,255,0.08)'}`,
-                color: 'rgba(255,255,255,0.9)', fontSize: 14, borderRadius: 12,
+                width: '100%', background: input.startsWith('/') ? 'var(--accent-bg-subtle)' : 'var(--bg-surface)',
+                border: `1px solid ${input.startsWith('/') ? 'rgba(207,122,92,0.35)' : 'var(--border-default)'}`,
+                color: 'var(--text-primary)', fontSize: 'var(--text-base)', borderRadius: 'var(--radius-xl)',
                 padding: '10px 16px', resize: 'none', outline: 'none',
-                fontFamily: 'inherit', transition: 'all 0.15s',
+                fontFamily: 'inherit', transition: 'var(--transition-base)',
                 overflow: 'hidden',
                 opacity: isStreaming ? 0.4 : 1,
                 boxSizing: 'border-box',
               }}
               onFocus={(e) => {
                 if (!input.startsWith('/')) {
-                  e.currentTarget.style.borderColor = 'rgba(207,122,92,0.4)';
-                  e.currentTarget.style.background = '#282828';
+                  e.currentTarget.style.borderColor = 'var(--accent-border)';
+                  e.currentTarget.style.background = 'var(--bg-input-focus)';
                 }
               }}
               onBlur={(e) => {
                 if (!input.startsWith('/')) {
-                  e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)';
-                  e.currentTarget.style.background = '#252525';
+                  e.currentTarget.style.borderColor = 'var(--border-default)';
+                  e.currentTarget.style.background = 'var(--bg-surface)';
                 }
               }}
             />
@@ -1190,21 +1191,21 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
             disabled={isStreaming}
             title="Attach image"
             style={{
-              background: 'transparent', border: '1px solid rgba(255,255,255,0.08)',
-              color: 'rgba(255,255,255,0.4)', fontSize: 18, borderRadius: 12,
+              background: 'transparent', border: '1px solid var(--border-default)',
+              color: 'var(--text-subtle)', fontSize: 'var(--text-xl)', borderRadius: 'var(--radius-xl)',
               padding: '8px 10px', cursor: isStreaming ? 'default' : 'pointer',
-              transition: 'all 0.15s', flexShrink: 0, lineHeight: 1,
+              transition: 'var(--transition-base)', flexShrink: 0, lineHeight: 1,
               opacity: isStreaming ? 0.4 : 1,
             }}
             onMouseEnter={(e) => {
               if (!isStreaming) {
-                e.currentTarget.style.borderColor = 'rgba(207,122,92,0.4)';
-                e.currentTarget.style.color = 'rgba(255,255,255,0.7)';
+                e.currentTarget.style.borderColor = 'var(--accent-border)';
+                e.currentTarget.style.color = 'var(--text-secondary)';
               }
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)';
-              e.currentTarget.style.color = 'rgba(255,255,255,0.4)';
+              e.currentTarget.style.borderColor = 'var(--border-default)';
+              e.currentTarget.style.color = 'var(--text-subtle)';
             }}
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -1218,12 +1219,12 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
             onClick={() => sendMessage()}
             disabled={isStreaming || (!input.trim() && attachedImages.length === 0)}
             style={{
-              background: isStreaming || (!input.trim() && attachedImages.length === 0) ? '#252525' : '#CF7A5C',
-              border: isStreaming || (!input.trim() && attachedImages.length === 0) ? '1px solid rgba(255,255,255,0.08)' : '1px solid transparent',
-              color: isStreaming || (!input.trim() && attachedImages.length === 0) ? 'rgba(255,255,255,0.2)' : 'white',
-              fontSize: 14, fontWeight: 500, borderRadius: 12,
+              background: isStreaming || (!input.trim() && attachedImages.length === 0) ? 'var(--bg-surface)' : 'var(--accent)',
+              border: isStreaming || (!input.trim() && attachedImages.length === 0) ? '1px solid var(--border-default)' : '1px solid transparent',
+              color: isStreaming || (!input.trim() && attachedImages.length === 0) ? 'var(--text-ghost)' : 'white',
+              fontSize: 'var(--text-base)', fontWeight: 500, borderRadius: 'var(--radius-xl)',
               padding: '10px 16px', cursor: isStreaming || (!input.trim() && attachedImages.length === 0) ? 'default' : 'pointer',
-              transition: 'all 0.15s', flexShrink: 0,
+              transition: 'var(--transition-base)', flexShrink: 0, fontFamily: 'inherit',
             }}
           >
             Send
@@ -1265,8 +1266,8 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
               />
               <div style={{
                 position: 'absolute', bottom: '100%', right: 0, marginBottom: 4,
-                background: '#2a2a2a', border: '1px solid rgba(255,255,255,0.12)',
-                borderRadius: 10, padding: '4px 0', minWidth: 180,
+                background: 'var(--bg-surface-hover)', border: '1px solid var(--border-emphasis)',
+                borderRadius: 'var(--radius-lg)', padding: '4px 0', minWidth: 180,
                 boxShadow: '0 8px 24px rgba(0,0,0,0.4)', zIndex: 100,
                 maxHeight: 320, overflowY: 'auto',
               }}>

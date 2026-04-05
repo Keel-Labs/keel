@@ -55,13 +55,13 @@ export default function MobileNav({ activeView, onNavigate, onNewChat }: Props) 
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'space-around',
-      borderTop: '1px solid rgba(255,255,255,0.08)',
-      background: '#151515',
+      borderTop: '1px solid var(--border-default)',
+      background: 'var(--bg-sidebar)',
       paddingBottom: 'env(safe-area-inset-bottom, 0px)',
     }}>
       {NAV_ITEMS.map((item) => {
         const isActive = activeView === item.view;
-        const color = isActive ? '#CF7A5C' : 'rgba(255,255,255,0.4)';
+        const color = isActive ? 'var(--accent)' : 'var(--text-subtle)';
         return (
           <button
             key={item.view}
@@ -78,17 +78,18 @@ export default function MobileNav({ activeView, onNavigate, onNewChat }: Props) 
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
-              gap: 2,
+              gap: 'var(--space-xs)',
               padding: '8px 0 6px',
               background: 'none',
               border: 'none',
               cursor: 'pointer',
               color,
               fontSize: 10,
-              transition: 'color 0.15s',
+              fontFamily: 'inherit',
+              transition: 'var(--transition-base)',
             }}
           >
-            {item.icon(color)}
+            {item.icon(isActive ? '#CF7A5C' : 'rgba(255,255,255,0.4)')}
             <span>{item.label}</span>
           </button>
         );

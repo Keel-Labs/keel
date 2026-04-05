@@ -28,15 +28,15 @@ export default function MobileHistory({ onSelectSession, refreshSignal }: Props)
     }}>
       <div style={{
         padding: '16px 20px 12px',
-        borderBottom: '1px solid rgba(255,255,255,0.08)',
+        borderBottom: '1px solid var(--border-default)',
       }}>
-        <h2 style={{ fontSize: 18, fontWeight: 600, color: 'rgba(255,255,255,0.9)', margin: 0 }}>
+        <h2 style={{ fontSize: 'var(--text-xl)', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
           History
         </h2>
       </div>
       <div style={{ flex: 1, overflowY: 'auto', padding: '8px 12px' }}>
         {sessions.length === 0 && (
-          <div style={{ padding: 24, color: 'rgba(255,255,255,0.3)', fontSize: 14, textAlign: 'center' }}>
+          <div style={{ padding: 24, color: 'var(--text-disabled)', fontSize: 'var(--text-base)', textAlign: 'center' }}>
             No conversations yet
           </div>
         )}
@@ -49,23 +49,24 @@ export default function MobileHistory({ onSelectSession, refreshSignal }: Props)
               textAlign: 'left',
               display: 'block',
               padding: '12px 14px',
-              borderRadius: 10,
+              borderRadius: 'var(--radius-lg)',
               border: 'none',
               background: 'transparent',
-              color: 'rgba(255,255,255,0.7)',
-              fontSize: 14,
+              color: 'var(--text-secondary)',
+              fontSize: 'var(--text-base)',
               cursor: 'pointer',
               overflow: 'hidden',
               textOverflow: 'ellipsis',
               whiteSpace: 'nowrap',
               marginBottom: 2,
-              transition: 'background 0.12s',
+              transition: 'var(--transition-fast)',
+              fontFamily: 'inherit',
             }}
             onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; }}
             onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
           >
             <div>{s.title}</div>
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', marginTop: 2 }}>
+            <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-disabled)', marginTop: 2 }}>
               {new Date(s.updatedAt).toLocaleDateString()}
             </div>
           </button>
