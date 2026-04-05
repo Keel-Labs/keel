@@ -16,6 +16,7 @@ Categories to extract:
 - Projects: names (and only details the user explicitly provided)
 - People: names and roles (only if stated)
 - Priorities: only if explicitly listed
+- Tasks/To-Dos: specific action items, things the user needs to do, wants to work on, or is tracking. Include which project they belong to if mentioned.
 
 If there IS new info, respond with JSON:
 {
@@ -23,8 +24,11 @@ If there IS new info, respond with JSON:
   "profile": { "name": "...", "role": "..." },
   "projects": [{ "name": "...", "status": "", "summary": "", "deadline": "" }],
   "people": [{ "name": "...", "role": "", "notes": "" }],
-  "priorities": ["..."]
+  "priorities": ["..."],
+  "tasks": [{ "task": "...", "project": "..." }]
 }
+
+For tasks: "task" is the to-do description, "project" is the project name it belongs to (empty string if not associated with a project).
 
 Only include fields with new info. Use empty strings for unknown fields — NEVER guess.
 
@@ -40,6 +44,7 @@ interface MemoryUpdate {
   people?: Array<{ name: string; role?: string; notes?: string }>;
   priorities?: string[];
   conventions?: string[];
+  tasks?: Array<{ task: string; project?: string }>;
 }
 
 export async function extractAndSaveMemory(
@@ -164,6 +169,64 @@ export async function extractAndSaveMemory(
       const brainPath = fileManager.getBrainPath();
       logActivity(brainPath, 'memory-update', `Updated keel.md from chat conversation`);
       console.log('[memory-extract] Successfully updated keel.md');
+    }
+
+    // Save tasks to project task files
+    if (update.tasks && update.tasks.length > 0) {
+      const tasksByProject = new Map<string, string[]>();
+      for (const t of update.tasks) {
+        const projectKey = t.project?.trim() || '';
+        if (!tasksByProject.has(projectKey)) {
+          tasksByProject.set(projectKey, []);
+        }
+        tasksByProject.get(projectKey)!.push(t.task);
+      }
+
+      for (const [projectName, tasks] of tasksByProject) {
+        if (projectName) {
+          const slug = projectName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+          const tasksPath = `projects/${slug}/tasks.md`;
+          const contextPath = `projects/${slug}/context.md`;
+
+          // Ensure project context file exists
+          if (!(await fileManager.fileExists(contextPath))) {
+            await fileManager.writeFile(contextPath, `# ${projectName}\n\nProject context and notes.\n`);
+            console.log(`[memory-extract] Created project context: ${contextPath}`);
+          }
+
+          // Append tasks to project tasks file
+          try {
+            const existing = await fileManager.readFile(tasksPath);
+            const tasksToAdd = tasks.filter(t => !existing.includes(t));
+            if (tasksToAdd.length > 0) {
+              const newContent = tasksToAdd.map(t => `- [ ] ${t}`).join('\n');
+              await fileManager.writeFile(tasksPath, existing.trimEnd() + '\n' + newContent + '\n');
+              console.log(`[memory-extract] Added ${tasksToAdd.length} task(s) to ${tasksPath}`);
+            }
+          } catch {
+            const newTasks = tasks.map(t => `- [ ] ${t}`).join('\n');
+            await fileManager.writeFile(tasksPath, `# ${projectName} — Tasks\n\n${newTasks}\n`);
+            console.log(`[memory-extract] Created ${tasksPath} with ${tasks.length} task(s)`);
+          }
+        } else {
+          // Tasks without a project go to general tasks file
+          const tasksPath = 'tasks.md';
+          const newTasks = tasks.map(t => `- [ ] ${t}`).join('\n');
+          try {
+            const existing = await fileManager.readFile(tasksPath);
+            const tasksToAdd = tasks.filter(t => !existing.includes(t));
+            if (tasksToAdd.length > 0) {
+              const newContent = tasksToAdd.map(t => `- [ ] ${t}`).join('\n');
+              await fileManager.writeFile(tasksPath, existing.trimEnd() + '\n' + newContent + '\n');
+            }
+          } catch {
+            await fileManager.writeFile(tasksPath, `# Tasks\n\n${newTasks}\n`);
+          }
+        }
+      }
+
+      const brainPath = fileManager.getBrainPath();
+      logActivity(brainPath, 'memory-update', `Saved ${update.tasks.length} task(s) from conversation`);
     }
   } catch (err) {
     // Memory extraction is best-effort — never fail the chat

@@ -165,6 +165,49 @@ export class ContextAssembler {
       // no daily logs
     }
 
+    // 3b. Project task files
+    try {
+      const taskFiles = await this.fileManager.listFiles('projects/*/tasks.md');
+      if (taskFiles.length > 0) onStep?.(`Loading ${taskFiles.length} project task file(s)...`);
+      for (const file of taskFiles) {
+        try {
+          const content = await this.fileManager.readFile(file);
+          if (!addSection(file, content)) break;
+        } catch {
+          // skip unreadable files
+        }
+      }
+    } catch {
+      // no task files
+    }
+
+    // 3c. General tasks file
+    try {
+      const tasksContent = await this.fileManager.readFile('tasks.md');
+      addSection('tasks.md', tasksContent);
+    } catch {
+      // no general tasks
+    }
+
+    // 3d. Recent captures
+    try {
+      const captureFiles = await this.fileManager.listFiles('projects/captures/*.md');
+      if (captureFiles.length > 0) {
+        onStep?.(`Loading ${captureFiles.length} capture(s)...`);
+        const recentCaptures = captureFiles.sort().reverse().slice(0, 20);
+        for (const file of recentCaptures) {
+          try {
+            const content = await this.fileManager.readFile(file);
+            if (!addSection(file, content)) break;
+          } catch {
+            // skip unreadable files
+          }
+        }
+      }
+    } catch {
+      // no captures
+    }
+
     // 4. Team brain context (if configured)
     if (this.teamFileManager) {
       onStep?.('Checking team brain...');
@@ -270,6 +313,49 @@ export class ContextAssembler {
       }
     } catch {
       // no project files
+    }
+
+    // 2c. Project task files
+    try {
+      const taskFiles = await this.fileManager.listFiles('projects/*/tasks.md');
+      if (taskFiles.length > 0) onStep?.(`Loading ${taskFiles.length} project task file(s)...`);
+      for (const file of taskFiles) {
+        try {
+          const content = await this.fileManager.readFile(file);
+          addSection(file, content);
+        } catch {
+          // skip unreadable files
+        }
+      }
+    } catch {
+      // no task files
+    }
+
+    // 2d. General tasks file
+    try {
+      const tasksContent = await this.fileManager.readFile('tasks.md');
+      addSection('tasks.md', tasksContent);
+    } catch {
+      // no general tasks
+    }
+
+    // 2e. Recent captures
+    try {
+      const captureFiles = await this.fileManager.listFiles('projects/captures/*.md');
+      if (captureFiles.length > 0) {
+        onStep?.(`Loading ${captureFiles.length} capture(s)...`);
+        const recentCaptures = captureFiles.sort().reverse().slice(0, 20);
+        for (const file of recentCaptures) {
+          try {
+            const content = await this.fileManager.readFile(file);
+            addSection(file, content);
+          } catch {
+            // skip unreadable files
+          }
+        }
+      }
+    } catch {
+      // no captures
     }
 
     // 3. Retrieve: vector search (top-20) + FTS5 keyword search (top-10), then re-rank
