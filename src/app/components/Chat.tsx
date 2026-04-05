@@ -1175,7 +1175,7 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
             style={{
               width: '100%', background: 'transparent',
               border: 'none',
-              color: '#ececec', fontSize: 'var(--text-base)',
+              color: '#f5f5f5', fontSize: 'var(--text-base)',
               padding: '14px 16px 8px', resize: 'none', outline: 'none',
               fontFamily: 'inherit',
               overflow: 'hidden',
