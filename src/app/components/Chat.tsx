@@ -1021,9 +1021,10 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
   };
 
   return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, background: 'var(--bg-chat)' }}>
       {/* Message list */}
       <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', padding: '24px 32px' }}>
+        <div style={{ maxWidth: 720, margin: '0 auto' }}>
         {messages.length === 0 && !isStreaming && (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
             <div style={{ textAlign: 'center', maxWidth: 380 }}>
@@ -1081,24 +1082,26 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
           />
         )}
 
-      </div>
+        {/* Thinking status — inline in chat where the response will appear */}
+        {isStreaming && (!streamingContent || thinkingSteps.length > 0 || thinkingContent) && (
+          <div style={{ padding: '4px 24px', marginBottom: 16 }}>
+            {!streamingContent && <ThinkingIndicator />}
+            {(thinkingSteps.length > 0 || thinkingContent) && (
+              <ThinkingSteps steps={thinkingSteps} thinkingContent={thinkingContent} />
+            )}
+          </div>
+        )}
 
-      {/* Thinking status — pinned above input */}
-      {isStreaming && (!streamingContent || thinkingSteps.length > 0 || thinkingContent) && (
-        <div style={{ padding: '0 32px' }}>
-          {!streamingContent && <ThinkingIndicator />}
-          {(thinkingSteps.length > 0 || thinkingContent) && (
-            <ThinkingSteps steps={thinkingSteps} thinkingContent={thinkingContent} />
-          )}
-        </div>
-      )}
+        </div>{/* end centering wrapper */}
+      </div>
 
       {/* Input area */}
       <div style={{
         borderTop: '1px solid var(--border-subtle)',
-        padding: '14px 28px',
-        background: 'var(--bg-base)',
+        padding: '14px 32px',
+        background: 'var(--bg-chat)',
       }}>
+      <div style={{ maxWidth: 720, margin: '0 auto' }}>
         {/* Image thumbnails */}
         {attachedImages.length > 0 && (
           <div style={{ display: 'flex', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
@@ -1333,6 +1336,7 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
             </>
           )}
         </div>
+      </div>{/* end centering wrapper */}
       </div>
     </div>
   );

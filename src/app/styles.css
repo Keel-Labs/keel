@@ -6,8 +6,9 @@
   /* Backgrounds — warm charcoal tones */
   --bg-base: #1f1d1b;
   --bg-sidebar: #171513;
-  --bg-surface: #2a2724;
-  --bg-surface-hover: #332f2b;
+  --bg-chat: #2b2926;
+  --bg-surface: #353230;
+  --bg-surface-hover: #3d3a37;
   --bg-input-focus: #2e2a27;
   --bg-elevated: #242120;
   --bg-raw-editor: #1a1816;
