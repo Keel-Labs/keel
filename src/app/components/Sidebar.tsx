@@ -5,7 +5,7 @@ interface Session {
   updatedAt: number;
 }
 
-export type DesktopView = 'chat' | 'search' | 'chats' | 'teams' | 'inbox' | 'settings';
+export type DesktopView = 'chat' | 'search' | 'chats' | 'wiki' | 'inbox' | 'settings';
 
 interface Props {
   collapsed: boolean;
@@ -79,7 +79,7 @@ const PRIMARY_ITEMS: Array<{
 }> = [
   { id: 'search', label: 'Search', icon: <SearchIcon /> },
   { id: 'chats', label: 'Chats', icon: <ChatIcon /> },
-  { id: 'teams', label: 'Teams', icon: <TeamIcon /> },
+  { id: 'wiki', label: 'Wiki', icon: <TeamIcon /> },
   { id: 'inbox', label: 'Inbox', icon: <InboxIcon /> },
 ];
 

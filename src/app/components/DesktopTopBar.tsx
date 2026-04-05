@@ -1,6 +1,6 @@
 import React from 'react';
 
-type DesktopMode = 'chat' | 'team-brain';
+type DesktopMode = 'chat' | 'wiki';
 
 interface Props {
   activeMode: DesktopMode;
@@ -84,7 +84,7 @@ function ArrowRightIcon() {
 
 const MODES: Array<{ id: DesktopMode; label: string }> = [
   { id: 'chat', label: 'Chat' },
-  { id: 'team-brain', label: 'Team Brain' },
+  { id: 'wiki', label: 'Wiki' },
 ];
 
 export default function DesktopTopBar({
