@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Chat from './components/Chat';
-import Sidebar, { type DesktopView } from './components/Sidebar';
+import Sidebar, { type DesktopView, type WikiNavId, type WikiSidebarState } from './components/Sidebar';
 import Settings from './components/Settings';
-import WikiWorkspace from './components/WikiWorkspace';
+import WikiWorkspace, { type WikiCommand } from './components/WikiWorkspace';
 import Onboarding from './components/Onboarding';
 import AuthScreen from './components/AuthScreen';
 import MobileNav from './components/MobileNav';
@@ -103,6 +103,9 @@ export default function App() {
   const [mobileView, setMobileView] = useState<MobileView>('chat');
   const [desktopView, setDesktopView] = useState<DesktopView>('chat');
   const [desktopMode, setDesktopMode] = useState<DesktopMode>('chat');
+  const [wikiContextOpen, setWikiContextOpen] = useState(false);
+  const [wikiSidebarState, setWikiSidebarState] = useState<WikiSidebarState | null>(null);
+  const [wikiCommand, setWikiCommand] = useState<WikiCommand | null>(null);
   const [showOnboarding, setShowOnboarding] = useState<boolean | null>(null);
   const [initialSettings, setInitialSettings] = useState<SettingsType | null>(null);
   const [needsAuth, setNeedsAuth] = useState<boolean | null>(null);
@@ -261,11 +264,16 @@ export default function App() {
     setRefreshSidebar((value) => value + 1);
   };
 
+  const openWikiLanding = useCallback(() => {
+    setWikiCommand({ type: 'nav', target: 'synthesis', nonce: Date.now() });
+  }, []);
+
   const handleDesktopModeChange = (mode: DesktopMode) => {
     if (mode === 'chat') {
       navigateDesktop('chat', { mode: 'chat' });
       return;
     }
+    openWikiLanding();
     navigateDesktop('wiki', { mode: 'wiki' });
   };
 
@@ -275,7 +283,18 @@ export default function App() {
       : view === 'chat' || view === 'chats'
         ? 'chat'
         : undefined;
+    if (view === 'wiki') {
+      openWikiLanding();
+    }
     navigateDesktop(view, { mode });
+  };
+
+  const handleWikiNavigate = (nav: WikiNavId) => {
+    setWikiCommand({ type: 'nav', target: nav, nonce: Date.now() });
+  };
+
+  const handleWikiOpenPage = (path: string) => {
+    setWikiCommand({ type: 'page', target: path, nonce: Date.now() });
   };
 
   const handleToggleSidebar = () => {
@@ -334,6 +353,9 @@ export default function App() {
           <div className="wiki-surface">
             <WikiWorkspace
               showBack={false}
+              contextOpen={wikiContextOpen}
+              command={wikiCommand}
+              onSidebarStateChange={setWikiSidebarState}
             />
           </div>
         );
@@ -395,7 +417,7 @@ export default function App() {
             <Settings onBack={() => setMobileView('chat')} />
           )}
           {mobileView === 'wiki' && (
-            <WikiWorkspace onBack={() => setMobileView('chat')} />
+            <WikiWorkspace onBack={() => setMobileView('chat')} contextOpen={false} />
           )}
         </div>
         <MobileNav
@@ -414,10 +436,12 @@ export default function App() {
         canGoBack={desktopHistory.index > 0}
         canGoForward={desktopHistory.index < desktopHistory.entries.length - 1}
         isSidebarCollapsed={effectiveSidebarCollapsed}
+        isContextOpen={wikiContextOpen}
         onGoBack={() => stepDesktopHistory(-1)}
         onGoForward={() => stepDesktopHistory(1)}
         onSetMode={handleDesktopModeChange}
         onToggleSidebar={handleToggleSidebar}
+        onToggleContext={() => setWikiContextOpen((value) => !value)}
       />
 
       <div className="desktop-shell__body">
@@ -433,6 +457,9 @@ export default function App() {
             onNewChat={handleNewChat}
             onSelectSession={handleSelectSession}
             refreshSignal={refreshSidebar}
+            wikiState={wikiSidebarState}
+            onWikiNavigate={handleWikiNavigate}
+            onWikiOpenPage={handleWikiOpenPage}
           />
           {!effectiveSidebarCollapsed && (
             <div

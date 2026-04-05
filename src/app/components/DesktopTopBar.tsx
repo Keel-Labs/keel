@@ -7,10 +7,12 @@ interface Props {
   canGoBack: boolean;
   canGoForward: boolean;
   isSidebarCollapsed: boolean;
+  isContextOpen: boolean;
   onGoBack: () => void;
   onGoForward: () => void;
   onSetMode: (mode: DesktopMode) => void;
   onToggleSidebar: () => void;
+  onToggleContext: () => void;
 }
 
 function ChromeButton({
@@ -82,6 +84,16 @@ function ArrowRightIcon() {
   );
 }
 
+function PanelIcon({ open }: { open: boolean }) {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <path d="M15 4v16" />
+      {!open && <path d="m11 9 3 3-3 3" />}
+    </svg>
+  );
+}
+
 const MODES: Array<{ id: DesktopMode; label: string }> = [
   { id: 'chat', label: 'Chat' },
   { id: 'wiki', label: 'Wiki' },
@@ -92,10 +104,12 @@ export default function DesktopTopBar({
   canGoBack,
   canGoForward,
   isSidebarCollapsed,
+  isContextOpen,
   onGoBack,
   onGoForward,
   onSetMode,
   onToggleSidebar,
+  onToggleContext,
 }: Props) {
   return (
     <div className="desktop-topbar">
@@ -131,7 +145,16 @@ export default function DesktopTopBar({
         })}
       </div>
 
-      <div className="desktop-topbar__trailing" />
+      <div className="desktop-topbar__trailing">
+        {activeMode === 'wiki' && (
+          <ChromeButton
+            title={isContextOpen ? 'Hide page context' : 'Show page context'}
+            onClick={onToggleContext}
+          >
+            <PanelIcon open={isContextOpen} />
+          </ChromeButton>
+        )}
+      </div>
     </div>
   );
 }
