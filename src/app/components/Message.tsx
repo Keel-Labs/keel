@@ -25,9 +25,9 @@ export default function Message({ message }: Props) {
     return (
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16, paddingLeft: 80 }}>
         <div style={{
-          background: 'var(--bg-surface)', color: 'var(--text-primary)',
-          borderRadius: '20px',
-          padding: '12px 18px', fontSize: 'var(--text-base)', lineHeight: 1.65,
+          background: '#353535', color: '#e8e8e8',
+          borderRadius: '18px',
+          padding: '10px 16px', fontSize: 'var(--text-base)', lineHeight: 1.55,
           whiteSpace: 'pre-wrap', maxWidth: 600,
         }}>
           {message.images && message.images.length > 0 && (
