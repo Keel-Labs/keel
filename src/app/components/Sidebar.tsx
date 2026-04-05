@@ -27,7 +27,7 @@ function NavItem({ icon, label, active, onClick }: {
       style={{
         width: '100%', display: 'flex', alignItems: 'center', gap: 10,
         padding: '7px 12px', borderRadius: 'var(--radius-base)', border: 'none',
-        background: active ? '#252525' : 'transparent',
+        background: active ? '#1f1f1f' : 'transparent',
         color: active ? '#f0f0f0' : '#999',
         fontSize: 'var(--text-sm)', cursor: 'pointer', transition: 'var(--transition-fast)',
         textAlign: 'left', fontFamily: 'inherit', fontWeight: active ? 500 : 400,
@@ -130,7 +130,7 @@ export default function Sidebar({ currentSessionId, onSelectSession, onNewChat, 
               style={{
                 width: '100%', textAlign: 'left', display: 'block',
                 padding: '8px 12px', borderRadius: 8, border: 'none',
-                background: isActive ? '#252525' : 'transparent',
+                background: isActive ? '#1f1f1f' : 'transparent',
                 color: isActive ? '#f0f0f0' : '#888',
                 fontSize: 'var(--text-sm)', cursor: 'pointer', transition: 'var(--transition-fast)',
                 overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
