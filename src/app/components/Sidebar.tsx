@@ -26,11 +26,11 @@ function NavItem({ icon, label, active, onClick }: {
       onClick={onClick}
       style={{
         width: '100%', display: 'flex', alignItems: 'center', gap: 10,
-        padding: '8px 10px', borderRadius: 8, border: 'none',
-        background: active ? 'rgba(207,122,92,0.12)' : 'transparent',
-        color: active ? '#CF7A5C' : 'rgba(255,255,255,0.55)',
-        fontSize: 13, cursor: 'pointer', transition: 'all 0.12s',
-        textAlign: 'left',
+        padding: '8px 10px', borderRadius: 'var(--radius-base)', border: 'none',
+        background: active ? 'var(--accent-bg)' : 'transparent',
+        color: active ? 'var(--accent)' : 'rgba(255,255,255,0.55)',
+        fontSize: 'var(--text-sm)', cursor: 'pointer', transition: 'var(--transition-fast)',
+        textAlign: 'left', fontFamily: 'inherit',
       }}
       onMouseEnter={(e) => {
         if (!active) {
@@ -60,14 +60,14 @@ export default function Sidebar({ currentSessionId, onSelectSession, onNewChat, 
 
   return (
     <div style={{
-      width: 260, height: '100%', borderRight: '1px solid rgba(255,255,255,0.08)',
-      background: '#151515', display: 'flex', flexDirection: 'column',
+      width: 'var(--sidebar-width)', height: '100%', borderRight: '1px solid var(--border-default)',
+      background: 'var(--bg-sidebar)', display: 'flex', flexDirection: 'column',
       flexShrink: 0, overflow: 'hidden',
     }}>
       {/* Logo */}
       <div style={{
         display: 'flex', alignItems: 'center', padding: '16px 16px 12px',
-        borderBottom: '1px solid rgba(255,255,255,0.06)',
+        borderBottom: '1px solid var(--border-subtle)',
       }}>
         <div style={{ marginRight: 10, flexShrink: 0 }}><KeelIcon size={30} /></div>
         <KeelWordmark height={18} />
@@ -79,10 +79,10 @@ export default function Sidebar({ currentSessionId, onSelectSession, onNewChat, 
           onClick={onNewChat}
           style={{
             width: '100%', display: 'flex', alignItems: 'center', gap: 10,
-            padding: '8px 10px', borderRadius: 8,
+            padding: '8px 10px', borderRadius: 'var(--radius-base)',
             background: 'transparent', border: 'none',
-            color: 'rgba(255,255,255,0.55)', fontSize: 13, cursor: 'pointer',
-            transition: 'all 0.12s', textAlign: 'left',
+            color: 'rgba(255,255,255,0.55)', fontSize: 'var(--text-sm)', cursor: 'pointer',
+            transition: 'var(--transition-fast)', textAlign: 'left', fontFamily: 'inherit',
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.background = 'rgba(255,255,255,0.06)';
@@ -114,7 +114,7 @@ export default function Sidebar({ currentSessionId, onSelectSession, onNewChat, 
       <div style={{ flex: 1, overflowY: 'auto', padding: '4px 8px 16px' }}>
         {sessions.length > 0 && (
           <div style={{
-            fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.3)',
+            fontSize: 'var(--text-xs)', fontWeight: 600, color: 'var(--text-disabled)',
             padding: '14px 8px 6px', textTransform: 'uppercase', letterSpacing: '0.05em',
           }}>
             History
@@ -129,17 +129,17 @@ export default function Sidebar({ currentSessionId, onSelectSession, onNewChat, 
               onClick={() => onSelectSession(s.id)}
               style={{
                 width: '100%', textAlign: 'left', display: 'block',
-                padding: '9px 10px', borderRadius: 8, border: 'none',
+                padding: '9px 10px', borderRadius: 'var(--radius-base)', border: 'none',
                 background: isActive ? 'rgba(255,255,255,0.1)' : 'transparent',
-                color: isActive ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.45)',
-                fontSize: 13, cursor: 'pointer', transition: 'all 0.12s',
+                color: isActive ? 'var(--text-primary)' : 'rgba(255,255,255,0.45)',
+                fontSize: 'var(--text-sm)', cursor: 'pointer', transition: 'var(--transition-fast)',
                 overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                marginBottom: 1, lineHeight: 1.4,
+                marginBottom: 1, lineHeight: 1.4, fontFamily: 'inherit',
               }}
               onMouseEnter={(e) => {
                 if (!isActive) {
                   e.currentTarget.style.background = 'rgba(255,255,255,0.06)';
-                  e.currentTarget.style.color = 'rgba(255,255,255,0.7)';
+                  e.currentTarget.style.color = 'var(--text-secondary)';
                 }
               }}
               onMouseLeave={(e) => {
@@ -155,7 +155,7 @@ export default function Sidebar({ currentSessionId, onSelectSession, onNewChat, 
         })}
 
         {sessions.length === 0 && (
-          <div style={{ padding: '24px 8px', color: 'rgba(255,255,255,0.2)', fontSize: 12, textAlign: 'center' }}>
+          <div style={{ padding: '24px 8px', color: 'var(--text-ghost)', fontSize: 12, textAlign: 'center' }}>
             No conversations yet
           </div>
         )}
