@@ -1,10 +1,12 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { glob as globFn } from 'glob';
+import { getStarWarsWikiFiles } from './wikiSample';
 
 const BRAIN_DIRS = [
   'projects',
   'daily-log',
+  'knowledge-bases',
 ];
 
 export const KEEL_MD_TEMPLATE = `# Profile
@@ -122,6 +124,8 @@ export class FileManager {
       await fs.mkdir(exampleDir, { recursive: true });
       await fs.writeFile(exampleContext, EXAMPLE_PROJECT_CONTEXT, 'utf-8');
     }
+
+    await this.ensureSampleWikiBase();
   }
 
   async resetProfile(): Promise<void> {
@@ -176,6 +180,20 @@ export class FileManager {
 
   getBrainPath(): string {
     return this.brainPath;
+  }
+
+  private async ensureSampleWikiBase(): Promise<void> {
+    const sampleFiles = getStarWarsWikiFiles();
+
+    for (const sample of sampleFiles) {
+      const fullPath = this.resolve(sample.path);
+      try {
+        await fs.access(fullPath);
+      } catch {
+        await fs.mkdir(path.dirname(fullPath), { recursive: true });
+        await fs.writeFile(fullPath, sample.content, 'utf-8');
+      }
+    }
   }
 }
 

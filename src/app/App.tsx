@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Chat from './components/Chat';
 import Sidebar, { type DesktopView } from './components/Sidebar';
 import Settings from './components/Settings';
-import KnowledgeBrowser from './components/KnowledgeBrowser';
+import WikiWorkspace from './components/WikiWorkspace';
 import Onboarding from './components/Onboarding';
 import AuthScreen from './components/AuthScreen';
 import MobileNav from './components/MobileNav';
@@ -20,8 +20,8 @@ import {
   shouldShowOnboarding,
 } from './onboarding';
 
-type MobileView = 'chat' | 'settings' | 'knowledge' | 'history';
-type DesktopMode = 'chat' | 'team-brain';
+type MobileView = 'chat' | 'settings' | 'wiki' | 'history';
+type DesktopMode = 'chat' | 'wiki';
 
 const isElectron = typeof window !== 'undefined' && !!(window as any).keel;
 
@@ -232,8 +232,8 @@ export default function App() {
 
     if (nextView === 'chat' || nextView === 'chats') {
       setDesktopMode('chat');
-    } else if (nextView === 'teams') {
-      setDesktopMode('team-brain');
+    } else if (nextView === 'wiki') {
+      setDesktopMode('wiki');
     }
   }, []);
 
@@ -266,12 +266,12 @@ export default function App() {
       navigateDesktop('chat', { mode: 'chat' });
       return;
     }
-    navigateDesktop('teams', { mode: 'team-brain' });
+    navigateDesktop('wiki', { mode: 'wiki' });
   };
 
   const handleDesktopNavigation = (view: DesktopView) => {
-    const mode = view === 'teams'
-      ? 'team-brain'
+    const mode = view === 'wiki'
+      ? 'wiki'
       : view === 'chat' || view === 'chats'
         ? 'chat'
         : undefined;
@@ -329,14 +329,11 @@ export default function App() {
             onOpenSession={handleSelectSession}
           />
         );
-      case 'teams':
+      case 'wiki':
         return (
-          <div className="team-brain-surface">
-            <KnowledgeBrowser
+          <div className="wiki-surface">
+            <WikiWorkspace
               showBack={false}
-              title="Team Brain"
-              subtitle="Shared notes, team projects, and updates live here."
-              focus="team"
             />
           </div>
         );
@@ -397,8 +394,8 @@ export default function App() {
           {mobileView === 'settings' && (
             <Settings onBack={() => setMobileView('chat')} />
           )}
-          {mobileView === 'knowledge' && (
-            <KnowledgeBrowser onBack={() => setMobileView('chat')} />
+          {mobileView === 'wiki' && (
+            <WikiWorkspace onBack={() => setMobileView('chat')} />
           )}
         </div>
         <MobileNav
