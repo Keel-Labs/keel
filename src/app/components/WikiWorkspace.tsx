@@ -1,8 +1,9 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { marked } from 'marked';
 import { useIsMobile } from '../../lib/useIsMobile';
+import type { WikiNavId, WikiSidebarBranch, WikiSidebarState } from './Sidebar';
 
-type WikiSectionId = 'home' | 'sources' | 'concepts' | 'open-questions' | 'outputs' | 'health' | 'activity-log';
+type WikiPageSection = 'home' | 'sources' | 'concepts' | 'open-questions' | 'outputs' | 'health' | 'activity-log';
 
 interface WikiBaseSummary {
   path: string;
@@ -14,7 +15,7 @@ interface WikiBaseSummary {
 interface WikiPage {
   path: string;
   relativePath: string;
-  section: WikiSectionId;
+  section: WikiPageSection;
   title: string;
   summary: string;
   content: string;
@@ -28,20 +29,25 @@ interface TreeNode {
   children?: TreeNode[];
 }
 
+interface BreadcrumbItem {
+  id: string;
+  label: string;
+  onClick?: () => void;
+}
+
+export interface WikiCommand {
+  type: 'nav' | 'page';
+  target: string;
+  nonce: number;
+}
+
 interface Props {
   onBack?: () => void;
   showBack?: boolean;
+  contextOpen?: boolean;
+  command?: WikiCommand | null;
+  onSidebarStateChange?: (state: WikiSidebarState) => void;
 }
-
-const SECTIONS: Array<{ id: WikiSectionId; label: string }> = [
-  { id: 'home', label: 'Home' },
-  { id: 'sources', label: 'Sources' },
-  { id: 'concepts', label: 'Concepts' },
-  { id: 'open-questions', label: 'Open Questions' },
-  { id: 'outputs', label: 'Outputs' },
-  { id: 'health', label: 'Health' },
-  { id: 'activity-log', label: 'Activity Log' },
-];
 
 function formatTitle(input: string): string {
   return input
@@ -69,7 +75,7 @@ function extractSummary(content: string): string {
   return '';
 }
 
-function classifySection(relativePath: string): WikiSectionId | null {
+function classifySection(relativePath: string): WikiPageSection | null {
   if (relativePath === 'overview.md' || relativePath === 'wiki/index.md') return 'home';
   if (relativePath === 'wiki/log.md') return 'activity-log';
   if (relativePath.startsWith('wiki/sources/')) return 'sources';
@@ -80,17 +86,74 @@ function classifySection(relativePath: string): WikiSectionId | null {
   return null;
 }
 
+function mapPageSectionToNav(section: WikiPageSection): WikiNavId {
+  switch (section) {
+    case 'sources':
+      return 'sources';
+    case 'concepts':
+      return 'concepts';
+    case 'open-questions':
+      return 'open-questions';
+    case 'outputs':
+      return 'artifacts';
+    case 'health':
+      return 'health';
+    case 'activity-log':
+    case 'home':
+    default:
+      return 'synthesis';
+  }
+}
+
+function navLabel(nav: WikiNavId): string {
+  switch (nav) {
+    case 'sources':
+      return 'Source';
+    case 'concepts':
+      return 'Concepts';
+    case 'open-questions':
+      return 'Open Questions';
+    case 'artifacts':
+      return 'Artifacts';
+    case 'health':
+      return 'Health';
+    case 'synthesis':
+    default:
+      return 'Synthesis';
+  }
+}
+
 function sortPages(pages: WikiPage[]): WikiPage[] {
   return [...pages].sort((a, b) => a.title.localeCompare(b.title));
 }
 
-function buildTree(pages: WikiPage[], section: WikiSectionId): TreeNode[] {
-  const sectionPrefix = getSectionPrefix(section);
+function getTreePrefixForNav(nav: WikiNavId): string | null {
+  switch (nav) {
+    case 'sources':
+      return 'wiki/sources/';
+    case 'concepts':
+      return 'wiki/concepts/';
+    case 'open-questions':
+      return 'wiki/open-questions/';
+    case 'artifacts':
+      return 'outputs/';
+    case 'health':
+      return 'health/';
+    case 'synthesis':
+    default:
+      return null;
+  }
+}
+
+function buildTreeForNav(pages: WikiPage[], nav: WikiNavId): TreeNode[] {
+  const prefix = getTreePrefixForNav(nav);
+  if (!prefix) return [];
+
+  const relevantPages = pages.filter((page) => mapPageSectionToNav(page.section) === nav);
   const root: TreeNode[] = [];
 
-  for (const page of pages) {
-    if (page.section !== section) continue;
-    const suffix = sectionPrefix ? page.relativePath.slice(sectionPrefix.length) : page.relativePath;
+  for (const page of relevantPages) {
+    const suffix = page.relativePath.slice(prefix.length);
     const parts = suffix.split('/').filter(Boolean);
     if (parts.length === 0) continue;
 
@@ -125,24 +188,27 @@ function buildTree(pages: WikiPage[], section: WikiSectionId): TreeNode[] {
   return root;
 }
 
-function getSectionPrefix(section: WikiSectionId): string {
-  switch (section) {
-    case 'sources':
-      return 'wiki/sources/';
-    case 'concepts':
-      return 'wiki/concepts/';
-    case 'open-questions':
-      return 'wiki/open-questions/';
-    case 'outputs':
-      return 'outputs/';
-    case 'health':
-      return 'health/';
-    case 'activity-log':
-      return 'wiki/';
-    case 'home':
-    default:
-      return '';
-  }
+function treeToBranches(nodes: TreeNode[]): WikiSidebarBranch[] {
+  return nodes.map((node) => {
+    if (!node.isDirectory) {
+      return {
+        id: node.path || node.name,
+        label: formatTitle(node.name.replace(/\.md$/, '')),
+        path: node.path,
+      };
+    }
+
+    return {
+      id: node.name,
+      label: formatTitle(node.name),
+      children: (node.children || [])
+        .filter((child) => !child.isDirectory && child.path)
+        .map((child) => ({
+          path: child.path as string,
+          label: formatTitle(child.name.replace(/\.md$/, '')),
+        })),
+    };
+  });
 }
 
 function parseMarkdownLinks(content: string): string[] {
@@ -155,17 +221,6 @@ function parseMarkdownLinks(content: string): string[] {
   }
 
   return links;
-}
-
-function resolveInternalPath(basePath: string, href: string): string | null {
-  if (!href || href.startsWith('#') || /^https?:\/\//.test(href)) {
-    return null;
-  }
-
-  const normalized = href.replace(/^\.?\//, '').replace(/^\/+/, '');
-  if (!normalized) return null;
-  if (normalized.startsWith('knowledge-bases/')) return normalized;
-  return `${basePath}/${normalized}`;
 }
 
 function formatRelativeTime(timestamp: number): string {
@@ -197,12 +252,50 @@ async function listMarkdownFiles(dirPath: string): Promise<Array<{ path: string;
   return files.sort((a, b) => a.path.localeCompare(b.path));
 }
 
-function renderWikiMarkdown(basePath: string, content: string): string {
+function normalizeRelativePath(pathValue: string): string {
+  const parts = pathValue.split('/');
+  const stack: string[] = [];
+
+  for (const part of parts) {
+    if (!part || part === '.') continue;
+    if (part === '..') {
+      stack.pop();
+      continue;
+    }
+    stack.push(part);
+  }
+
+  return stack.join('/');
+}
+
+function resolveWikiHref(basePath: string, currentRelativePath: string, href: string): string | null {
+  if (!href || href.startsWith('#') || /^https?:\/\//.test(href)) return null;
+  if (href.startsWith('knowledge-bases/')) return href;
+
+  const normalizedHref = href.replace(/^\/+/, '');
+  const isBaseRelative =
+    normalizedHref === 'overview.md' ||
+    normalizedHref.startsWith('wiki/') ||
+    normalizedHref.startsWith('outputs/') ||
+    normalizedHref.startsWith('health/');
+
+  if (isBaseRelative) {
+    return `${basePath}/${normalizeRelativePath(normalizedHref)}`;
+  }
+
+  const currentDir = currentRelativePath.includes('/')
+    ? currentRelativePath.slice(0, currentRelativePath.lastIndexOf('/') + 1)
+    : '';
+
+  return `${basePath}/${normalizeRelativePath(`${currentDir}${normalizedHref}`)}`;
+}
+
+function renderWikiMarkdown(basePath: string, currentRelativePath: string, content: string): string {
   const renderer = new marked.Renderer();
   renderer.link = ({ href = '', text }) => {
-    const resolved = resolveInternalPath(basePath, href);
+    const resolved = resolveWikiHref(basePath, currentRelativePath, href);
     if (resolved) {
-      return `<a href="#" data-wiki-path="${encodeURIComponent(resolved)}">${text}</a>`;
+      return `<button type="button" class="wiki-inline-link" data-wiki-path="${encodeURIComponent(resolved)}">${text}</button>`;
     }
     return `<a href="${href}" target="_blank" rel="noopener noreferrer">${text}</a>`;
   };
@@ -210,65 +303,49 @@ function renderWikiMarkdown(basePath: string, content: string): string {
   return marked.parse(content, { breaks: true, gfm: true, renderer }) as string;
 }
 
-function TreeItem({
-  node,
-  depth,
-  activePath,
-  onOpen,
-}: {
-  node: TreeNode;
-  depth: number;
-  activePath: string | null;
-  onOpen: (path: string) => void;
-}) {
-  const [expanded, setExpanded] = useState(depth < 1);
-
-  if (node.isDirectory) {
-    return (
-      <div>
-        <button
-          className="wiki-tree__row"
-          onClick={() => setExpanded((value) => !value)}
-          style={{ paddingLeft: 12 + depth * 14 }}
-        >
-          <span className="wiki-tree__chevron">{expanded ? '▾' : '▸'}</span>
-          <span>{formatTitle(node.name)}</span>
-        </button>
-        {expanded && node.children?.map((child) => (
-          <TreeItem
-            key={`${node.name}-${child.name}`}
-            node={child}
-            depth={depth + 1}
-            activePath={activePath}
-            onOpen={onOpen}
-          />
-        ))}
-      </div>
-    );
+function getBranchesForNav(pages: WikiPage[], nav: WikiNavId): WikiSidebarBranch[] {
+  if (nav === 'synthesis') {
+    return [
+      { id: 'overview', label: 'Overview', path: pages.find((page) => page.relativePath === 'overview.md')?.path },
+      { id: 'index', label: 'Wiki Index', path: pages.find((page) => page.relativePath === 'wiki/index.md')?.path },
+      { id: 'log', label: 'Activity Log', path: pages.find((page) => page.relativePath === 'wiki/log.md')?.path },
+    ].filter((branch) => branch.path) as WikiSidebarBranch[];
   }
 
-  const isActive = node.path === activePath;
-
-  return (
-    <button
-      className={isActive ? 'wiki-tree__row is-active' : 'wiki-tree__row'}
-      onClick={() => node.path && onOpen(node.path)}
-      style={{ paddingLeft: 12 + depth * 14 }}
-    >
-      <span className="wiki-tree__dot">•</span>
-      <span>{formatTitle(node.name.replace(/\.md$/, ''))}</span>
-    </button>
-  );
+  return treeToBranches(buildTreeForNav(pages, nav));
 }
 
-export default function WikiWorkspace({ onBack, showBack = true }: Props) {
+function getCollectionPrefixForPage(relativePath: string, nav: WikiNavId): string | null {
+  const treePrefix = getTreePrefixForNav(nav);
+  if (!treePrefix) return null;
+
+  const suffix = relativePath.startsWith(treePrefix)
+    ? relativePath.slice(treePrefix.length)
+    : relativePath;
+  const lastSlashIndex = suffix.lastIndexOf('/');
+  if (lastSlashIndex === -1) return null;
+
+  return `${treePrefix}${suffix.slice(0, lastSlashIndex + 1)}`;
+}
+
+export default function WikiWorkspace({
+  onBack,
+  showBack = true,
+  contextOpen = false,
+  command,
+  onSidebarStateChange,
+}: Props) {
   const isMobile = useIsMobile();
+  const baseMenuRef = useRef<HTMLDivElement | null>(null);
+  const handledCommandNonceRef = useRef<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [bases, setBases] = useState<WikiBaseSummary[]>([]);
   const [currentBasePath, setCurrentBasePath] = useState('');
+  const [baseMenuOpen, setBaseMenuOpen] = useState(false);
   const [pages, setPages] = useState<WikiPage[]>([]);
-  const [activeSection, setActiveSection] = useState<WikiSectionId>('home');
+  const [activeNav, setActiveNav] = useState<WikiNavId>('synthesis');
+  const [activeCollectionPrefix, setActiveCollectionPrefix] = useState<string | null>(null);
   const [selectedPagePath, setSelectedPagePath] = useState<string | null>(null);
 
   const loadBaseSummaries = useCallback(async () => {
@@ -326,14 +403,13 @@ export default function WikiWorkspace({ onBack, showBack = true }: Props) {
     }));
 
     const filtered = nextPages.filter(Boolean) as WikiPage[];
-    setPages(filtered);
+      setPages(filtered);
 
-    if (!selectedPagePath) {
-      setActiveSection('home');
-    } else if (!filtered.some((page) => page.path === selectedPagePath)) {
-      setSelectedPagePath(null);
-      setActiveSection('home');
-    }
+      if (selectedPagePath && !filtered.some((page) => page.path === selectedPagePath)) {
+        setSelectedPagePath(null);
+        setActiveNav('synthesis');
+        setActiveCollectionPrefix(null);
+      }
   }, [currentBasePath, selectedPagePath]);
 
   useEffect(() => {
@@ -389,36 +465,64 @@ export default function WikiWorkspace({ onBack, showBack = true }: Props) {
     [bases, currentBasePath]
   );
 
-  const sectionPages = useMemo(
-    () => sortPages(pages.filter((page) => page.section === activeSection)),
-    [activeSection, pages]
-  );
-
   const selectedPage = useMemo(
     () => pages.find((page) => page.path === selectedPagePath) || null,
     [pages, selectedPagePath]
   );
 
-  const conceptPages = useMemo(() => sortPages(pages.filter((page) => page.section === 'concepts')), [pages]);
   const sourcePages = useMemo(() => sortPages(pages.filter((page) => page.section === 'sources')), [pages]);
+  const conceptPages = useMemo(() => sortPages(pages.filter((page) => page.section === 'concepts')), [pages]);
   const questionPages = useMemo(() => sortPages(pages.filter((page) => page.section === 'open-questions')), [pages]);
-  const outputPages = useMemo(() => sortPages(pages.filter((page) => page.section === 'outputs')), [pages]);
+  const artifactPages = useMemo(() => sortPages(pages.filter((page) => page.section === 'outputs')), [pages]);
+  const healthPages = useMemo(() => sortPages(pages.filter((page) => page.section === 'health')), [pages]);
 
-  const sectionTree = useMemo(
-    () => buildTree(pages, activeSection),
-    [activeSection, pages]
+  const currentCollectionPages = useMemo(() => {
+    let sectionPages: WikiPage[];
+
+    switch (activeNav) {
+      case 'sources':
+        sectionPages = sourcePages;
+        break;
+      case 'concepts':
+        sectionPages = conceptPages;
+        break;
+      case 'open-questions':
+        sectionPages = questionPages;
+        break;
+      case 'artifacts':
+        sectionPages = artifactPages;
+        break;
+      case 'health':
+        sectionPages = healthPages;
+        break;
+      case 'synthesis':
+      default:
+        sectionPages = [];
+        break;
+    }
+
+    if (!activeCollectionPrefix) {
+      return sectionPages;
+    }
+
+    return sectionPages.filter((page) => page.relativePath.startsWith(activeCollectionPrefix));
+  }, [activeCollectionPrefix, activeNav, artifactPages, conceptPages, healthPages, questionPages, sourcePages]);
+
+  const lastUpdatedAt = useMemo(
+    () => pages.reduce((latest, page) => Math.max(latest, page.updatedAt), 0),
+    [pages]
   );
 
   const renderedPage = useMemo(() => {
     if (!selectedPage || !currentBasePath) return '';
-    return renderWikiMarkdown(currentBasePath, selectedPage.content);
+    return renderWikiMarkdown(currentBasePath, selectedPage.relativePath, selectedPage.content);
   }, [currentBasePath, selectedPage]);
 
   const outgoingLinks = useMemo(() => {
     if (!selectedPage || !currentBasePath) return [] as WikiPage[];
     const targets = new Set(
       parseMarkdownLinks(selectedPage.content)
-        .map((link) => resolveInternalPath(currentBasePath, link))
+        .map((link) => resolveWikiHref(currentBasePath, selectedPage.relativePath, link))
         .filter(Boolean) as string[]
     );
 
@@ -430,7 +534,7 @@ export default function WikiWorkspace({ onBack, showBack = true }: Props) {
     return pages.filter((page) => {
       if (page.path === selectedPage.path) return false;
       return parseMarkdownLinks(page.content)
-        .map((link) => resolveInternalPath(currentBasePath, link))
+        .map((link) => resolveWikiHref(currentBasePath, page.relativePath, link))
         .some((resolved) => resolved === selectedPage.path);
     });
   }, [currentBasePath, pages, selectedPage]);
@@ -440,39 +544,143 @@ export default function WikiWorkspace({ onBack, showBack = true }: Props) {
     [outgoingLinks]
   );
 
-  const openPage = useCallback((path: string) => {
+  const branches = useMemo(
+    () => getBranchesForNav(pages, activeNav),
+    [activeNav, pages]
+  );
+
+  const openPage = useCallback((path: string): boolean => {
     const page = pages.find((candidate) => candidate.path === path);
-    if (!page) return;
-    setActiveSection(page.section);
+    if (!page) return false;
+    const nav = mapPageSectionToNav(page.section);
     setSelectedPagePath(page.path);
+    setActiveNav(nav);
+    setActiveCollectionPrefix(getCollectionPrefixForPage(page.relativePath, nav));
+    setBaseMenuOpen(false);
+    return true;
   }, [pages]);
+
+  const openNav = useCallback((nav: WikiNavId) => {
+    setActiveNav(nav);
+    setActiveCollectionPrefix(null);
+    setSelectedPagePath(null);
+    setBaseMenuOpen(false);
+  }, []);
+
+  const openCollection = useCallback((nav: WikiNavId, prefix: string | null) => {
+    setActiveNav(nav);
+    setActiveCollectionPrefix(prefix);
+    setSelectedPagePath(null);
+    setBaseMenuOpen(false);
+  }, []);
+
+  useEffect(() => {
+    if (!command) return;
+    if (handledCommandNonceRef.current === command.nonce) return;
+
+    if (command.type === 'nav') {
+      openNav(command.target as WikiNavId);
+      handledCommandNonceRef.current = command.nonce;
+      return;
+    }
+
+    if (command.type === 'page') {
+      const opened = openPage(command.target);
+      if (opened) {
+        handledCommandNonceRef.current = command.nonce;
+      }
+    }
+  }, [command, openNav, openPage]);
+
+  useEffect(() => {
+    onSidebarStateChange?.({
+      activeNav,
+      selectedPagePath,
+      branches,
+    });
+  }, [activeNav, branches, onSidebarStateChange, selectedPagePath]);
+
+  useEffect(() => {
+    if (!baseMenuOpen) return;
+
+    const handleClick = (event: MouseEvent) => {
+      if (!baseMenuRef.current?.contains(event.target as Node)) {
+        setBaseMenuOpen(false);
+      }
+    };
+
+    window.addEventListener('mousedown', handleClick);
+    return () => window.removeEventListener('mousedown', handleClick);
+  }, [baseMenuOpen]);
 
   const handleRenderedPageClick = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
     const target = event.target as HTMLElement;
-    const anchor = target.closest('a[data-wiki-path]') as HTMLAnchorElement | null;
-    if (!anchor) return;
+    const linkTarget = target.closest('[data-wiki-path]') as HTMLElement | null;
+    if (!linkTarget) return;
     event.preventDefault();
-    const encoded = anchor.dataset.wikiPath;
+    event.stopPropagation();
+    const encoded = linkTarget.dataset.wikiPath;
     if (!encoded) return;
     openPage(decodeURIComponent(encoded));
   }, [openPage]);
 
-  const openSection = useCallback((section: WikiSectionId) => {
-    setActiveSection(section);
-    setSelectedPagePath(null);
+  const pageBreadcrumbs = useMemo(() => {
+    if (!selectedPage) return [] as BreadcrumbItem[];
 
-    if (section === 'activity-log') {
-      const logPage = pages.find((page) => page.relativePath === 'wiki/log.md');
-      if (logPage) {
-        setSelectedPagePath(logPage.path);
-      }
+    const nav = mapPageSectionToNav(selectedPage.section);
+    const items: BreadcrumbItem[] = [
+      {
+        id: 'base',
+        label: currentBase?.title || 'Wiki',
+        onClick: () => openNav('synthesis'),
+      },
+    ];
+
+    if (!(nav === 'synthesis' && selectedPage.relativePath === 'overview.md')) {
+      items.push({
+        id: 'nav',
+        label: navLabel(nav),
+        onClick: () => openNav(nav),
+      });
     }
-  }, [pages]);
 
-  const lastUpdatedAt = useMemo(
-    () => pages.reduce((latest, page) => Math.max(latest, page.updatedAt), 0),
-    [pages]
-  );
+    const treePrefix = getTreePrefixForNav(nav);
+    if (treePrefix && selectedPage.relativePath.startsWith(treePrefix)) {
+      const suffix = selectedPage.relativePath.slice(treePrefix.length);
+      const parts = suffix.split('/').filter(Boolean);
+      const folderParts = parts.slice(0, -1);
+      let prefixAccumulator = treePrefix;
+
+      folderParts.forEach((part, index) => {
+        prefixAccumulator = `${prefixAccumulator}${part}/`;
+        items.push({
+          id: `folder-${index}-${part}`,
+          label: formatTitle(part),
+          onClick: () => openCollection(nav, prefixAccumulator),
+        });
+      });
+    }
+
+    const lastLabel = items[items.length - 1]?.label;
+    if (lastLabel !== selectedPage.title) {
+      items.push({
+        id: 'page',
+        label: selectedPage.title,
+      });
+    }
+
+    return items;
+  }, [currentBase?.title, openCollection, openNav, selectedPage]);
+
+  const collectionTitle = useMemo(() => {
+    if (!activeCollectionPrefix) {
+      return navLabel(activeNav);
+    }
+
+    const trimmed = activeCollectionPrefix.replace(/\/$/, '');
+    const parts = trimmed.split('/');
+    return formatTitle(parts[parts.length - 1] || navLabel(activeNav));
+  }, [activeCollectionPrefix, activeNav]);
 
   const renderHome = () => (
     <div className="wiki-home">
@@ -483,7 +691,7 @@ export default function WikiWorkspace({ onBack, showBack = true }: Props) {
         <div className="wiki-home__stats">
           <div className="wiki-home__stat"><strong>{sourcePages.length}</strong><span>Sources</span></div>
           <div className="wiki-home__stat"><strong>{conceptPages.length}</strong><span>Concepts</span></div>
-          <div className="wiki-home__stat"><strong>{outputPages.length}</strong><span>Outputs</span></div>
+          <div className="wiki-home__stat"><strong>{artifactPages.length}</strong><span>Artifacts</span></div>
           <div className="wiki-home__stat"><strong>{formatRelativeTime(lastUpdatedAt)}</strong><span>Last updated</span></div>
         </div>
       </div>
@@ -514,8 +722,8 @@ export default function WikiWorkspace({ onBack, showBack = true }: Props) {
           ))}
         </div>
         <div className="wiki-home__card">
-          <div className="wiki-home__card-title">Recent Outputs</div>
-          {outputPages.slice(0, 4).map((page) => (
+          <div className="wiki-home__card-title">Artifacts</div>
+          {artifactPages.slice(0, 4).map((page) => (
             <button key={page.path} className="wiki-home__link" onClick={() => openPage(page.path)}>
               {page.title}
             </button>
@@ -527,18 +735,16 @@ export default function WikiWorkspace({ onBack, showBack = true }: Props) {
 
   const renderCollection = () => (
     <div className="wiki-collection">
-      <div className="wiki-collection__eyebrow">{SECTIONS.find((section) => section.id === activeSection)?.label}</div>
-      <h2 className="wiki-collection__title">
-        {SECTIONS.find((section) => section.id === activeSection)?.label}
-      </h2>
+      <div className="wiki-collection__eyebrow">Wiki</div>
+      <h2 className="wiki-collection__title">{collectionTitle}</h2>
       <div className="wiki-collection__list">
-        {sectionPages.map((page) => (
+        {currentCollectionPages.map((page) => (
           <button key={page.path} className="wiki-collection__item" onClick={() => openPage(page.path)}>
             <div className="wiki-collection__item-title">{page.title}</div>
             {page.summary && <div className="wiki-collection__item-summary">{page.summary}</div>}
           </button>
         ))}
-        {sectionPages.length === 0 && (
+        {currentCollectionPages.length === 0 && (
           <div className="wiki-collection__empty">No pages in this section yet.</div>
         )}
       </div>
@@ -562,96 +768,78 @@ export default function WikiWorkspace({ onBack, showBack = true }: Props) {
           )}
           <div className="wiki-shell__eyebrow">Wiki</div>
           <div className="wiki-shell__title-row">
-            <select
-              className="wiki-shell__base-select"
-              value={currentBasePath}
-              onChange={(event) => {
-                setCurrentBasePath(event.target.value);
-                setActiveSection('home');
-                setSelectedPagePath(null);
-              }}
+            <div className="wiki-base-menu" ref={baseMenuRef}>
+              <button
+                type="button"
+                className={baseMenuOpen ? 'wiki-shell__base-select is-open' : 'wiki-shell__base-select'}
+                onClick={() => setBaseMenuOpen((value) => !value)}
+              >
+                <span>{currentBase?.title || 'Select wiki base'}</span>
+                <span className="wiki-base-menu__chevron">{baseMenuOpen ? '▴' : '▾'}</span>
+              </button>
+
+              {baseMenuOpen && (
+                <div className="wiki-base-menu__popover">
+                  {bases.map((base) => {
+                    const active = base.path === currentBasePath;
+                    return (
+                      <button
+                        type="button"
+                        key={base.path}
+                        className={active ? 'wiki-base-menu__option is-active' : 'wiki-base-menu__option'}
+                        onClick={() => {
+                          setCurrentBasePath(base.path);
+                          setActiveNav('synthesis');
+                          setSelectedPagePath(null);
+                          setBaseMenuOpen(false);
+                        }}
+                      >
+                        <span className="wiki-base-menu__option-title">{base.title}</span>
+                        <span className="wiki-base-menu__option-text">{base.description}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+            <button type="button" className="wiki-shell__action" onClick={() => openNav('sources')}>Add Source</button>
+            <button
+              type="button"
+              className="wiki-shell__action"
+                onClick={() => {
+                  const indexPage = pages.find((page) => page.relativePath === 'wiki/index.md');
+                  if (indexPage) openPage(indexPage.path);
+                }}
             >
-              {bases.map((base) => (
-                <option key={base.path} value={base.path}>{base.title}</option>
-              ))}
-            </select>
+              Compile
+            </button>
           </div>
           <div className="wiki-shell__subtitle">
             {currentBase?.description || 'LLM-maintained wiki workspace'}
           </div>
         </div>
-
-        <div className="wiki-shell__actions">
-          <button className="wiki-shell__action" onClick={() => openSection('sources')}>Add Source</button>
-          <button
-            className="wiki-shell__action"
-            onClick={() => {
-              const indexPage = pages.find((page) => page.relativePath === 'wiki/index.md');
-              if (indexPage) openPage(indexPage.path);
-            }}
-          >
-            Compile
-          </button>
-          <button
-            className="wiki-shell__action"
-            onClick={() => {
-              const defaultOutput = outputPages[0];
-              if (defaultOutput) openPage(defaultOutput.path);
-            }}
-          >
-            Ask
-          </button>
-          <button
-            className="wiki-shell__action"
-            onClick={() => {
-              const latestHealth = pages.find((page) => page.relativePath === 'health/latest.md');
-              if (latestHealth) openPage(latestHealth.path);
-            }}
-          >
-            Health Check
-          </button>
-        </div>
       </div>
 
       <div className={isMobile ? 'wiki-shell__body is-mobile' : 'wiki-shell__body'}>
-        <aside className="wiki-shell__nav">
-          <div className="wiki-nav__group">
-            {SECTIONS.map((section) => {
-              const isActive = activeSection === section.id && (section.id === 'home' || !selectedPage || selectedPage.section === section.id);
-              return (
-                <button
-                  key={section.id}
-                  className={isActive ? 'wiki-nav__section is-active' : 'wiki-nav__section'}
-                  onClick={() => openSection(section.id)}
-                >
-                  {section.label}
-                </button>
-              );
-            })}
-          </div>
-
-          {!isMobile && activeSection !== 'home' && (
-            <div className="wiki-nav__tree">
-              <div className="wiki-nav__label">Pages</div>
-              {sectionTree.map((node) => (
-                <TreeItem
-                  key={`${activeSection}-${node.name}`}
-                  node={node}
-                  depth={0}
-                  activePath={selectedPagePath}
-                  onOpen={openPage}
-                />
-              ))}
-            </div>
-          )}
-        </aside>
-
         <main className="wiki-shell__content">
-          {activeSection === 'home' && !selectedPage && renderHome()}
-          {activeSection !== 'home' && !selectedPage && renderCollection()}
+          {activeNav === 'synthesis' && !selectedPage && renderHome()}
+          {activeNav !== 'synthesis' && !selectedPage && renderCollection()}
           {selectedPage && (
             <div className="wiki-page">
-              <div className="wiki-page__path">{selectedPage.relativePath}</div>
+              <div className="wiki-page__path">
+                {pageBreadcrumbs.map((item, index) => (
+                  <React.Fragment key={item.id}>
+                    {index > 0 && <span className="wiki-page__path-separator">/</span>}
+                    {item.onClick ? (
+                      <button type="button" className="wiki-page__crumb" onClick={item.onClick}>
+                        {item.label}
+                      </button>
+                    ) : (
+                      <span className="wiki-page__crumb is-current">{item.label}</span>
+                    )}
+                  </React.Fragment>
+                ))}
+              </div>
               <h1 className="wiki-page__title">{selectedPage.title}</h1>
               {selectedPage.summary && <p className="wiki-page__summary">{selectedPage.summary}</p>}
               <div
@@ -663,7 +851,7 @@ export default function WikiWorkspace({ onBack, showBack = true }: Props) {
           )}
         </main>
 
-        {!isMobile && (
+        {!isMobile && contextOpen && (
           <aside className="wiki-shell__meta">
             {!selectedPage ? (
               <div className="wiki-meta">
