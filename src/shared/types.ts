@@ -11,6 +11,7 @@ export interface Message {
 }
 
 export interface Settings {
+  theme: 'dark' | 'light';
   provider: 'claude' | 'openai' | 'openrouter' | 'ollama';
   // Claude
   anthropicApiKey: string;
