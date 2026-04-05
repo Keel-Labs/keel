@@ -687,11 +687,25 @@ select {
   padding: 36px 20px 64px;
 }
 
+@keyframes chat-empty-state-star-drift {
+  0%, 100% {
+    transform: translateY(0) scale(1);
+    opacity: 0.82;
+  }
+  50% {
+    transform: translateY(-4px) scale(1.04);
+    opacity: 1;
+  }
+}
+
 .chat-empty-state__glyph {
   font-size: 28px;
   line-height: 1;
   color: var(--accent-link);
   margin-bottom: 18px;
+  animation: chat-empty-state-star-drift 3.2s ease-in-out infinite;
+  transform-origin: center;
+  will-change: transform, opacity;
 }
 
 .chat-empty-state__title {
