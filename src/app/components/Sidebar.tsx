@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+
 interface Session {
   id: string;
   title: string;
@@ -6,6 +7,20 @@ interface Session {
 }
 
 export type DesktopView = 'chat' | 'search' | 'chats' | 'wiki' | 'inbox' | 'settings';
+export type WikiNavId = 'sources' | 'concepts' | 'open-questions' | 'artifacts' | 'health' | 'synthesis';
+
+export interface WikiSidebarBranch {
+  id: string;
+  label: string;
+  path?: string;
+  children?: Array<{ path: string; label: string }>;
+}
+
+export interface WikiSidebarState {
+  activeNav: WikiNavId;
+  selectedPagePath: string | null;
+  branches: WikiSidebarBranch[];
+}
 
 interface Props {
   collapsed: boolean;
@@ -15,6 +30,9 @@ interface Props {
   onNewChat: () => void;
   onSelectSession: (id: string) => void;
   refreshSignal: number;
+  wikiState?: WikiSidebarState | null;
+  onWikiNavigate?: (nav: WikiNavId) => void;
+  onWikiOpenPage?: (path: string) => void;
 }
 
 function SearchIcon() {
@@ -72,6 +90,23 @@ function SettingsIcon() {
   );
 }
 
+function FileIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+      <path d="M14 2v6h6" />
+    </svg>
+  );
+}
+
+function SparkleIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="m12 3 1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8Z" />
+    </svg>
+  );
+}
+
 const PRIMARY_ITEMS: Array<{
   id: DesktopView;
   label: string;
@@ -79,8 +114,16 @@ const PRIMARY_ITEMS: Array<{
 }> = [
   { id: 'search', label: 'Search', icon: <SearchIcon /> },
   { id: 'chats', label: 'Chats', icon: <ChatIcon /> },
-  { id: 'wiki', label: 'Wiki', icon: <TeamIcon /> },
   { id: 'inbox', label: 'Inbox', icon: <InboxIcon /> },
+];
+
+const WIKI_ITEMS: Array<{ id: WikiNavId; label: string; icon: React.ReactNode }> = [
+  { id: 'synthesis', label: 'Synthesis', icon: <ChatIcon /> },
+  { id: 'sources', label: 'Source', icon: <SearchIcon /> },
+  { id: 'concepts', label: 'Concepts', icon: <TeamIcon /> },
+  { id: 'open-questions', label: 'Open Questions', icon: <FileIcon /> },
+  { id: 'artifacts', label: 'Artifacts', icon: <InboxIcon /> },
+  { id: 'health', label: 'Health', icon: <SparkleIcon /> },
 ];
 
 function NavRow({
@@ -109,6 +152,64 @@ function NavRow({
   );
 }
 
+function WikiBranch({
+  branch,
+  selectedPagePath,
+  onOpenPage,
+}: {
+  branch: WikiSidebarBranch;
+  selectedPagePath: string | null;
+  onOpenPage?: (path: string) => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const isLeaf = !branch.children || branch.children.length === 0;
+  const childIsActive = branch.children?.some((child) => child.path === selectedPagePath) || false;
+  const branchIsActive = branch.path === selectedPagePath || childIsActive;
+
+  useEffect(() => {
+    if (childIsActive) {
+      setExpanded(true);
+    }
+  }, [childIsActive]);
+
+  return (
+    <div className="desktop-sidebar__wiki-branch">
+      <button
+        className={branchIsActive ? 'desktop-sidebar__wiki-parent is-active' : 'desktop-sidebar__wiki-parent'}
+        onClick={() => {
+          if (isLeaf && branch.path && onOpenPage) {
+            onOpenPage(branch.path);
+            return;
+          }
+          setExpanded((value) => !value);
+        }}
+      >
+        <span className="desktop-sidebar__wiki-parent-icon">
+          {isLeaf ? '•' : expanded ? '▾' : '▸'}
+        </span>
+        <span>{branch.label}</span>
+      </button>
+
+      {!isLeaf && expanded && (
+        <div className="desktop-sidebar__wiki-children">
+          {branch.children?.slice(0, 12).map((child) => {
+            const active = child.path === selectedPagePath;
+            return (
+              <button
+                key={child.path}
+                className={active ? 'desktop-sidebar__wiki-child is-active' : 'desktop-sidebar__wiki-child'}
+                onClick={() => onOpenPage?.(child.path)}
+              >
+                {child.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Sidebar({
   collapsed,
   currentSessionId,
@@ -117,12 +218,18 @@ export default function Sidebar({
   onNewChat,
   onSelectSession,
   refreshSignal,
+  wikiState,
+  onWikiNavigate,
+  onWikiOpenPage,
 }: Props) {
   const [sessions, setSessions] = useState<Session[]>([]);
 
   useEffect(() => {
     window.keel.listSessions().then(setSessions).catch(() => {});
   }, [refreshSignal, currentSessionId]);
+
+  const recentSessions = useMemo(() => sessions.slice(0, 14), [sessions]);
+  const isWikiMode = activeView === 'wiki';
 
   return (
     <div className={collapsed ? 'desktop-sidebar is-collapsed' : 'desktop-sidebar'}>
@@ -136,47 +243,76 @@ export default function Sidebar({
           <span className="desktop-sidebar__nav-icon">
             <PlusIcon />
           </span>
-          {!collapsed && <span>New chat</span>}
+          {!collapsed && <span>New Chat</span>}
         </button>
       </div>
 
       <div className="desktop-sidebar__section" style={{ gap: 4 }}>
-        {PRIMARY_ITEMS.map((item) => {
-          const active = activeView === item.id;
-          return (
+        {isWikiMode
+          ? WIKI_ITEMS.map((item) => (
             <NavRow
               key={item.id}
-              active={active}
+              active={wikiState?.activeNav === item.id}
+              collapsed={collapsed}
+              icon={item.icon}
+              label={item.label}
+              onClick={() => onWikiNavigate?.(item.id)}
+            />
+          ))
+          : PRIMARY_ITEMS.map((item) => (
+            <NavRow
+              key={item.id}
+              active={activeView === item.id}
               collapsed={collapsed}
               icon={item.icon}
               label={item.label}
               onClick={() => onNavigate(item.id)}
             />
-          );
-        })}
+          ))}
       </div>
 
       {!collapsed && (
         <div className="desktop-sidebar__history">
-	          <div className="desktop-sidebar__label">Recents</div>
+          <div className="desktop-sidebar__label">{isWikiMode ? 'Pages' : 'Recents'}</div>
 
-          {sessions.slice(0, 14).map((session) => {
-            const active = activeView === 'chat' && session.id === currentSessionId;
-            return (
-              <button
-                key={session.id}
-                onClick={() => onSelectSession(session.id)}
-                className={active ? 'desktop-sidebar__session is-active' : 'desktop-sidebar__session'}
-              >
-                <span className="desktop-sidebar__session-title">{session.title}</span>
-              </button>
-            );
-          })}
+          {isWikiMode ? (
+            <>
+              {wikiState?.branches.map((branch) => (
+                <WikiBranch
+                  key={branch.id}
+                  branch={branch}
+                  selectedPagePath={wikiState.selectedPagePath}
+                  onOpenPage={onWikiOpenPage}
+                />
+              ))}
 
-          {sessions.length === 0 && (
-            <div className="desktop-sidebar__empty">
-              No conversations yet.
-            </div>
+              {(!wikiState || wikiState.branches.length === 0) && (
+                <div className="desktop-sidebar__empty">
+                  No pages available for this section.
+                </div>
+              )}
+            </>
+          ) : (
+            <>
+              {recentSessions.map((session) => {
+                const active = activeView === 'chat' && session.id === currentSessionId;
+                return (
+                  <button
+                    key={session.id}
+                    onClick={() => onSelectSession(session.id)}
+                    className={active ? 'desktop-sidebar__session is-active' : 'desktop-sidebar__session'}
+                  >
+                    <span className="desktop-sidebar__session-title">{session.title}</span>
+                  </button>
+                );
+              })}
+
+              {recentSessions.length === 0 && (
+                <div className="desktop-sidebar__empty">
+                  No conversations yet.
+                </div>
+              )}
+            </>
           )}
         </div>
       )}
