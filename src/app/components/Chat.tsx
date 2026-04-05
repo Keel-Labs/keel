@@ -261,16 +261,14 @@ function ThinkingIndicator() {
   }, []);
 
   return (
-    <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 20, paddingRight: 56 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 0' }}>
-        <NauticalLoader />
-        <span className="thinking-text" style={{
-          fontSize: 13, color: 'var(--text-subtle)',
-          fontStyle: 'italic',
-        }}>
-          {THINKING_MESSAGES[messageIndex]}
-        </span>
-      </div>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0' }}>
+      <NauticalLoader />
+      <span className="thinking-text" style={{
+        fontSize: 12, color: 'var(--text-subtle)',
+        fontStyle: 'italic',
+      }}>
+        {THINKING_MESSAGES[messageIndex]}
+      </span>
     </div>
   );
 }
@@ -285,14 +283,12 @@ function ThinkingSteps({ steps, thinkingContent }: { steps: string[]; thinkingCo
     : latest;
 
   return (
-    <div style={{
-      display: 'flex', justifyContent: 'flex-start', marginBottom: 14, paddingRight: 56,
-    }}>
+    <div style={{ padding: '4px 0' }}>
       <div style={{
         background: 'var(--accent-bg-subtle)',
         border: '1px solid var(--accent-border-subtle)',
-        borderRadius: 'var(--radius-lg)', padding: '8px 14px',
-        maxWidth: '80%', fontSize: 12,
+        borderRadius: 'var(--radius-md)', padding: '6px 12px',
+        fontSize: 12, display: 'inline-block',
       }}>
         <button
           onClick={() => setExpanded(!expanded)}
@@ -1075,13 +1071,6 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
           <Message key={i} message={msg} />
         ))}
 
-        {isStreaming && !streamingContent && <ThinkingIndicator />}
-
-        {/* Thinking steps — collapsible chain of thought */}
-        {isStreaming && (thinkingSteps.length > 0 || thinkingContent) && (
-          <ThinkingSteps steps={thinkingSteps} thinkingContent={thinkingContent} />
-        )}
-
         {isStreaming && streamingContent && (
           <Message
             message={{
@@ -1093,6 +1082,16 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
         )}
 
       </div>
+
+      {/* Thinking status — pinned above input */}
+      {isStreaming && (!streamingContent || thinkingSteps.length > 0 || thinkingContent) && (
+        <div style={{ padding: '0 32px' }}>
+          {!streamingContent && <ThinkingIndicator />}
+          {(thinkingSteps.length > 0 || thinkingContent) && (
+            <ThinkingSteps steps={thinkingSteps} thinkingContent={thinkingContent} />
+          )}
+        </div>
+      )}
 
       {/* Input area */}
       <div style={{
