@@ -263,7 +263,7 @@ function ThinkingIndicator() {
   return (
     <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 16, paddingRight: 48 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 0' }}>
-        <OrigamiBoatLoader />
+        <NauticalLoader />
         <span className="thinking-text" style={{
           fontSize: 13, color: 'rgba(255,255,255,0.4)',
           fontStyle: 'italic',
