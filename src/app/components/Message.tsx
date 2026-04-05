@@ -1,7 +1,6 @@
 import React, { useMemo } from 'react';
 import { marked } from 'marked';
 import type { Message as MessageType } from '../../shared/types';
-import { KeelIcon } from './KeelIcon';
 
 const renderer = new marked.Renderer();
 renderer.link = ({ href, text }) => {
@@ -24,12 +23,18 @@ export default function Message({ message }: Props) {
 
   if (isUser) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 20, paddingLeft: 72 }}>
+      <div style={{
+        display: 'flex', justifyContent: 'flex-end',
+        marginBottom: 6, padding: '0 8px',
+      }}>
         <div style={{
-          background: 'var(--accent)', color: 'white',
-          borderRadius: '20px 20px 6px 20px',
-          padding: '11px 18px', fontSize: 'var(--text-base)', lineHeight: 1.6,
+          maxWidth: '75%',
+          color: 'var(--text-primary)',
+          fontSize: 'var(--text-base)', lineHeight: 1.7,
           whiteSpace: 'pre-wrap',
+          padding: '10px 16px',
+          background: 'var(--bg-surface)',
+          borderRadius: 'var(--radius-lg)',
         }}>
           {message.images && message.images.length > 0 && (
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
@@ -40,7 +45,7 @@ export default function Message({ message }: Props) {
                   alt=""
                   style={{
                     maxWidth: 200, maxHeight: 200, borderRadius: 'var(--radius-base)',
-                    objectFit: 'cover', border: '2px solid rgba(255,255,255,0.15)',
+                    objectFit: 'cover',
                   }}
                 />
               ))}
@@ -53,14 +58,16 @@ export default function Message({ message }: Props) {
   }
 
   return (
-    <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 20, paddingRight: 56 }}>
+    <div style={{
+      marginBottom: 6, padding: '0 8px',
+    }}>
       <div
         className="markdown-body"
         style={{
-          background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
-          borderRadius: '20px 20px 20px 6px',
-          padding: '14px 18px', fontSize: 'var(--text-base)', lineHeight: 1.65,
-          color: 'var(--text-secondary)', minWidth: 0,
+          fontSize: 'var(--text-base)', lineHeight: 1.7,
+          color: 'var(--text-secondary)',
+          padding: '10px 16px',
+          minWidth: 0,
         }}
         dangerouslySetInnerHTML={{ __html: renderedContent || '' }}
       />
