@@ -777,7 +777,7 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
         ]);
       } else {
         try {
-          const url = await window.keel.googleExportDoc(lastContent, 'Keel Export');
+          const url = await window.keel.googleExportDoc(lastContent);
           setMessages((prev) => [
             ...prev,
             { role: 'assistant', content: `Exported to Google Doc: [Open document](${url})`, timestamp: Date.now() },
@@ -1082,22 +1082,24 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
           />
         )}
 
-        {/* Thinking status — inline in chat where the response will appear */}
-        {isStreaming && (!streamingContent || thinkingSteps.length > 0 || thinkingContent) && (
-          <div style={{ padding: '4px 24px', marginBottom: 16 }}>
+        </div>{/* end centering wrapper */}
+      </div>
+
+      {/* Thinking status — pinned just above input */}
+      {isStreaming && (!streamingContent || thinkingSteps.length > 0 || thinkingContent) && (
+        <div style={{ padding: '8px 32px 0', background: 'var(--bg-chat)' }}>
+          <div style={{ maxWidth: 720, margin: '0 auto' }}>
             {!streamingContent && <ThinkingIndicator />}
             {(thinkingSteps.length > 0 || thinkingContent) && (
               <ThinkingSteps steps={thinkingSteps} thinkingContent={thinkingContent} />
             )}
           </div>
-        )}
-
-        </div>{/* end centering wrapper */}
-      </div>
+        </div>
+      )}
 
       {/* Input area */}
       <div style={{
-        borderTop: '1px solid var(--border-subtle)',
+        borderTop: isStreaming ? 'none' : '1px solid var(--border-subtle)',
         padding: '14px 32px',
         background: 'var(--bg-chat)',
       }}>

@@ -1,18 +1,18 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Playfair+Display:wght@400;500;600;700;800&display=swap');
 @import "tailwindcss";
 
-/* ── Design Tokens — Warm Minimalist Dark ── */
+/* ── Design Tokens — Claude-matched Dark ── */
 :root {
-  /* Backgrounds — warm charcoal tones */
-  --bg-base: #1f1d1b;
-  --bg-sidebar: #171513;
-  --bg-chat: #2b2926;
-  --bg-surface: #353230;
-  --bg-surface-hover: #3d3a37;
-  --bg-input-focus: #2e2a27;
-  --bg-elevated: #242120;
-  --bg-raw-editor: #1a1816;
-  --bg-btn-secondary: #342f2c;
+  /* Backgrounds — neutral dark grays matching Claude */
+  --bg-base: #1e1e1e;
+  --bg-sidebar: #191919;
+  --bg-chat: #2b2b2b;
+  --bg-surface: #3d3d3d;
+  --bg-surface-hover: #474747;
+  --bg-input-focus: #333333;
+  --bg-elevated: #242424;
+  --bg-raw-editor: #1a1a1a;
+  --bg-btn-secondary: #363636;
 
   /* Accent — warm coral */
   --accent: #d4845e;
@@ -24,21 +24,21 @@
   --accent-border-faint: rgba(212, 132, 94, 0.20);
   --accent-link: #e0a888;
 
-  /* Text — warm off-whites */
-  --text-primary: #ede8e3;
-  --text-secondary: #c4bcb4;
-  --text-tertiary: #a69e96;
-  --text-muted: #8a827a;
-  --text-subtle: #6d6560;
-  --text-disabled: #524c48;
-  --text-ghost: #3a3532;
+  /* Text — neutral off-whites matching Claude */
+  --text-primary: #ececec;
+  --text-secondary: #d1d1d1;
+  --text-tertiary: #a0a0a0;
+  --text-muted: #8c8c8c;
+  --text-subtle: #6b6b6b;
+  --text-disabled: #4a4a4a;
+  --text-ghost: #3a3a3a;
 
-  /* Borders — warm tint */
-  --border-default: rgba(220, 200, 180, 0.10);
-  --border-subtle: rgba(220, 200, 180, 0.06);
-  --border-input: rgba(220, 200, 180, 0.12);
-  --border-emphasis: rgba(220, 200, 180, 0.16);
-  --border-btn: rgba(220, 200, 180, 0.18);
+  /* Borders — neutral */
+  --border-default: rgba(255, 255, 255, 0.10);
+  --border-subtle: rgba(255, 255, 255, 0.06);
+  --border-input: rgba(255, 255, 255, 0.12);
+  --border-emphasis: rgba(255, 255, 255, 0.16);
+  --border-btn: rgba(255, 255, 255, 0.18);
 
   /* Radius — more rounded for warm feel */
   --radius-sm: 6px;
@@ -112,12 +112,12 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 245, 235, 0.1);
+  background: rgba(255, 255, 255, 0.1);
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 245, 235, 0.16);
+  background: rgba(255, 255, 255, 0.16);
 }
 
 /* Focus ring for accessibility */
@@ -196,7 +196,7 @@ body {
 }
 
 .markdown-body code {
-  background: rgba(255, 245, 235, 0.07);
+  background: rgba(255, 255, 255, 0.07);
   padding: 0.15em 0.4em;
   border-radius: var(--radius-sm);
   font-size: 0.88em;
@@ -241,7 +241,7 @@ body {
 }
 
 .markdown-body th {
-  background: rgba(255, 245, 235, 0.04);
+  background: rgba(255, 255, 255, 0.04);
   font-weight: 600;
 }
 
