@@ -7,7 +7,10 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint . --max-warnings 0",
     "start": "node dist/index.js",
+    "test:integration": "vitest run --config vitest.config.ts",
     "db:setup": "node dist/db/migrate.js",
     "db:migrate": "drizzle-kit push",
     "db:generate": "drizzle-kit generate",
@@ -32,12 +35,17 @@
     "remark-parse": "^11.0.0"
   },
   "devDependencies": {
+    "@eslint/js": "^9.36.0",
     "@types/bcrypt": "^5.0.0",
     "@types/jsonwebtoken": "^9.0.0",
     "@types/node": "^25.5.0",
     "@types/pg": "^8.11.0",
     "drizzle-kit": "^0.30.0",
+    "eslint": "^9.36.0",
+    "globals": "^16.4.0",
     "tsx": "^4.19.0",
-    "typescript": "^6.0.2"
+    "typescript": "^6.0.2",
+    "typescript-eslint": "^8.44.0",
+    "vitest": "^4.1.2"
   }
 }

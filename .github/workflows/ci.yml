@@ -6,10 +6,53 @@ on:
   push:
     branches: [main]
 
+permissions:
+  contents: read
+
 jobs:
-  # Server typecheck + build
-  server:
-    name: Server Build
+  desktop-lint:
+    name: Desktop Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+
+  desktop-unit:
+    name: Desktop Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
+      - run: npm ci
+      - run: npm run test:unit
+
+  desktop-build:
+    name: Desktop Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
+      - run: npm ci
+      - run: npm run build
+      - run: npm run build:electron
+
+  server-lint:
+    name: Server Lint
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -22,18 +65,37 @@ jobs:
           cache: 'npm'
           cache-dependency-path: server/package-lock.json
       - run: npm ci
-      - run: npm run build
+      - run: npm run lint
+      - run: npm run typecheck
 
-  # Desktop app build
-  desktop:
-    name: Desktop Build
+  server-integration:
+    name: Server Integration Tests
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: 'npm'
-          cache-dependency-path: package-lock.json
+          cache-dependency-path: server/package-lock.json
+      - run: npm ci
+      - run: npm run test:integration
+
+  server-build:
+    name: Server Build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+          cache-dependency-path: server/package-lock.json
       - run: npm ci
       - run: npm run build
