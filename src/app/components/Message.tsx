@@ -26,9 +26,9 @@ export default function Message({ message }: Props) {
     return (
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16, paddingLeft: 64 }}>
         <div style={{
-          background: '#CF7A5C', color: 'white',
-          borderRadius: '16px 16px 4px 16px',
-          padding: '10px 16px', fontSize: 14, lineHeight: 1.6,
+          background: 'var(--accent)', color: 'white',
+          borderRadius: 'var(--radius-2xl) var(--radius-2xl) var(--radius-sm) var(--radius-2xl)',
+          padding: '10px 16px', fontSize: 'var(--text-base)', lineHeight: 1.6,
           whiteSpace: 'pre-wrap',
         }}>
           {message.images && message.images.length > 0 && (
@@ -39,7 +39,7 @@ export default function Message({ message }: Props) {
                   src={`data:${img.mediaType};base64,${img.data}`}
                   alt=""
                   style={{
-                    maxWidth: 200, maxHeight: 200, borderRadius: 8,
+                    maxWidth: 200, maxHeight: 200, borderRadius: 'var(--radius-base)',
                     objectFit: 'cover', border: '2px solid rgba(255,255,255,0.2)',
                   }}
                 />
@@ -57,10 +57,10 @@ export default function Message({ message }: Props) {
       <div
         className="markdown-body"
         style={{
-          background: '#252525', border: '1px solid rgba(255,255,255,0.08)',
-          borderRadius: '16px 16px 16px 4px',
-          padding: '12px 16px', fontSize: 14, lineHeight: 1.6,
-          color: 'rgba(255,255,255,0.9)', minWidth: 0,
+          background: 'var(--bg-surface)', border: '1px solid var(--border-default)',
+          borderRadius: 'var(--radius-2xl) var(--radius-2xl) var(--radius-2xl) var(--radius-sm)',
+          padding: '12px 16px', fontSize: 'var(--text-base)', lineHeight: 1.6,
+          color: 'var(--text-primary)', minWidth: 0,
         }}
         dangerouslySetInnerHTML={{ __html: renderedContent || '' }}
       />

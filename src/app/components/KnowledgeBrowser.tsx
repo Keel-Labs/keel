@@ -172,21 +172,22 @@ export default function KnowledgeBrowser({ onBack }: Props) {
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
       {/* Header */}
       <div style={{
-        padding: '16px 24px', borderBottom: '1px solid rgba(255,255,255,0.08)',
+        padding: '16px 24px', borderBottom: '1px solid var(--border-default)',
         display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0,
       }}>
         <button
           onClick={onBack}
           style={{
-            background: 'none', border: 'none', color: 'rgba(255,255,255,0.6)',
-            cursor: 'pointer', fontSize: 18, padding: '2px 6px', borderRadius: 6,
+            background: 'none', border: 'none', color: 'var(--text-tertiary)',
+            cursor: 'pointer', fontSize: 'var(--text-xl)', padding: '2px 6px', borderRadius: 'var(--radius-md)',
+            transition: 'var(--transition-fast)',
           }}
-          onMouseEnter={(e) => { e.currentTarget.style.color = 'rgba(255,255,255,0.9)'; }}
-          onMouseLeave={(e) => { e.currentTarget.style.color = 'rgba(255,255,255,0.6)'; }}
+          onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--text-primary)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-tertiary)'; }}
         >
           ←
         </button>
-        <span style={{ fontSize: 16, fontWeight: 600, color: 'rgba(255,255,255,0.9)' }}>Knowledge Browser</span>
+        <span style={{ fontSize: 'var(--text-lg)', fontWeight: 600, color: 'var(--text-primary)' }}>Knowledge Browser</span>
       </div>
 
       {/* Two-panel layout (stacked on mobile) */}
@@ -195,8 +196,8 @@ export default function KnowledgeBrowser({ onBack }: Props) {
         <div style={{
           width: isMobile ? '100%' : 220,
           display: isMobile && mobileShowEditor ? 'none' : 'block',
-          borderRight: isMobile ? 'none' : '1px solid rgba(255,255,255,0.06)',
-          borderBottom: isMobile ? '1px solid rgba(255,255,255,0.06)' : 'none',
+          borderRight: isMobile ? 'none' : '1px solid var(--border-subtle)',
+          borderBottom: isMobile ? '1px solid var(--border-subtle)' : 'none',
           overflowY: 'auto', padding: '8px 4px', flexShrink: 0,
           flex: isMobile && !mobileShowEditor ? 1 : undefined,
         }}>
@@ -219,7 +220,7 @@ export default function KnowledgeBrowser({ onBack }: Props) {
               <div style={{
                 padding: '12px 8px 4px', fontSize: 10, fontWeight: 700,
                 color: 'rgba(207,122,92,0.7)', textTransform: 'uppercase',
-                letterSpacing: '0.08em', borderTop: '1px solid rgba(255,255,255,0.06)',
+                letterSpacing: '0.08em', borderTop: '1px solid var(--border-subtle)',
                 marginTop: 8,
               }}>
                 Team Brain
@@ -253,11 +254,11 @@ export default function KnowledgeBrowser({ onBack }: Props) {
             <>
               {/* File header */}
               <div style={{
-                padding: '10px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)',
+                padding: '10px 16px', borderBottom: '1px solid var(--border-subtle)',
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                 flexShrink: 0,
               }}>
-                <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', fontFamily: 'monospace', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', display: 'flex', alignItems: 'center', gap: 8 }}>
                   {isMobile && (
                     <button
                       onClick={() => setMobileShowEditor(false)}
@@ -344,15 +345,15 @@ export default function KnowledgeBrowser({ onBack }: Props) {
                     })}
                   </div>
                   {/* Raw editor below */}
-                  <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', flexShrink: 0 }}>
+                  <div style={{ borderTop: '1px solid var(--border-subtle)', flexShrink: 0 }}>
                     <textarea
                       value={content}
                       onChange={(e) => handleChange(e.target.value)}
                       style={{
-                        width: '100%', height: 150, padding: '12px 20px', background: '#161616',
-                        color: 'rgba(255,255,255,0.7)', border: 'none', outline: 'none',
+                        width: '100%', height: 150, padding: '12px 20px', background: 'var(--bg-raw-editor)',
+                        color: 'var(--text-secondary)', border: 'none', outline: 'none',
                         fontSize: 12, lineHeight: 1.6, resize: 'vertical',
-                        fontFamily: "'SF Mono', 'Fira Code', 'Cascadia Code', monospace",
+                        fontFamily: 'var(--font-mono)',
                         boxSizing: 'border-box',
                       }}
                       placeholder="Edit markdown here..."
@@ -365,10 +366,10 @@ export default function KnowledgeBrowser({ onBack }: Props) {
                   value={content}
                   onChange={(e) => handleChange(e.target.value)}
                   style={{
-                    flex: 1, padding: '16px 20px', background: '#1a1a1a',
-                    color: 'rgba(255,255,255,0.9)', border: 'none', outline: 'none',
-                    fontSize: 13, lineHeight: 1.6, resize: 'none',
-                    fontFamily: "'SF Mono', 'Fira Code', 'Cascadia Code', monospace",
+                    flex: 1, padding: '16px 20px', background: 'var(--bg-base)',
+                    color: 'var(--text-primary)', border: 'none', outline: 'none',
+                    fontSize: 'var(--text-sm)', lineHeight: 1.6, resize: 'none',
+                    fontFamily: 'var(--font-mono)',
                   }}
                   placeholder="Start typing..."
                 />

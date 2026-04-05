@@ -111,10 +111,10 @@ export default function Settings({ onBack }: Props) {
   };
 
   const inputStyle: React.CSSProperties = {
-    width: '100%', padding: '10px 12px', borderRadius: 8,
-    background: '#252525', border: '1px solid rgba(255,255,255,0.1)',
-    color: 'rgba(255,255,255,0.9)', fontSize: 14, outline: 'none',
-    fontFamily: 'inherit',
+    width: '100%', padding: '10px 12px', borderRadius: 'var(--radius-lg)',
+    background: 'var(--bg-surface)', border: '1px solid var(--border-input)',
+    color: 'var(--text-primary)', fontSize: 'var(--text-base)', outline: 'none',
+    fontFamily: 'inherit', transition: 'var(--transition-base)',
   };
 
   const selectStyle: React.CSSProperties = {
@@ -125,13 +125,13 @@ export default function Settings({ onBack }: Props) {
   };
 
   const labelStyle: React.CSSProperties = {
-    fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.5)',
+    fontSize: 12, fontWeight: 600, color: 'var(--text-muted)',
     marginBottom: 6, display: 'block', textTransform: 'uppercase',
     letterSpacing: '0.04em',
   };
 
   const sectionStyle: React.CSSProperties = {
-    marginBottom: 28,
+    marginBottom: 'var(--space-5xl)',
   };
 
   const toggleKeyVisibility = (key: string) => {
@@ -172,21 +172,22 @@ export default function Settings({ onBack }: Props) {
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
       {/* Header */}
       <div style={{
-        padding: '16px 24px', borderBottom: '1px solid rgba(255,255,255,0.08)',
+        padding: '16px 24px', borderBottom: '1px solid var(--border-default)',
         display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0,
       }}>
         <button
           onClick={onBack}
           style={{
-            background: 'none', border: 'none', color: 'rgba(255,255,255,0.6)',
-            cursor: 'pointer', fontSize: 18, padding: '2px 6px', borderRadius: 6,
+            background: 'none', border: 'none', color: 'var(--text-tertiary)',
+            cursor: 'pointer', fontSize: 'var(--text-xl)', padding: '2px 6px', borderRadius: 'var(--radius-md)',
+            transition: 'var(--transition-fast)',
           }}
-          onMouseEnter={(e) => { e.currentTarget.style.color = 'rgba(255,255,255,0.9)'; }}
-          onMouseLeave={(e) => { e.currentTarget.style.color = 'rgba(255,255,255,0.6)'; }}
+          onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--text-primary)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-tertiary)'; }}
         >
           ←
         </button>
-        <span style={{ fontSize: 16, fontWeight: 600, color: 'rgba(255,255,255,0.9)' }}>Settings</span>
+        <span style={{ fontSize: 'var(--text-lg)', fontWeight: 600, color: 'var(--text-primary)' }}>Settings</span>
       </div>
 
       {/* Content */}
@@ -195,7 +196,7 @@ export default function Settings({ onBack }: Props) {
 
           {/* AI Provider */}
           <div style={sectionStyle}>
-            <div style={{ fontSize: 14, fontWeight: 600, color: 'rgba(255,255,255,0.85)', marginBottom: 14 }}>
+            <div style={{ fontSize: 'var(--text-base)', fontWeight: 600, color: 'rgba(255,255,255,0.85)', marginBottom: 14 }}>
               AI Provider
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -204,10 +205,10 @@ export default function Settings({ onBack }: Props) {
                   key={p.value}
                   style={{
                     display: 'flex', alignItems: 'center', gap: 12,
-                    padding: '12px 14px', borderRadius: 10,
-                    background: settings.provider === p.value ? 'rgba(207,122,92,0.12)' : '#252525',
-                    border: `1px solid ${settings.provider === p.value ? 'rgba(207,122,92,0.4)' : 'rgba(255,255,255,0.08)'}`,
-                    cursor: 'pointer', transition: 'all 0.15s',
+                    padding: '12px 14px', borderRadius: 'var(--radius-lg)',
+                    background: settings.provider === p.value ? 'var(--accent-bg)' : 'var(--bg-surface)',
+                    border: `1px solid ${settings.provider === p.value ? 'var(--accent-border)' : 'var(--border-default)'}`,
+                    cursor: 'pointer', transition: 'var(--transition-base)',
                   }}
                 >
                   <input
@@ -215,11 +216,11 @@ export default function Settings({ onBack }: Props) {
                     name="provider"
                     checked={settings.provider === p.value}
                     onChange={() => update({ provider: p.value })}
-                    style={{ accentColor: '#CF7A5C' }}
+                    style={{ accentColor: 'var(--accent)' }}
                   />
                   <div>
-                    <div style={{ fontSize: 14, fontWeight: 500, color: 'rgba(255,255,255,0.9)' }}>{p.label}</div>
-                    <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>{p.description}</div>
+                    <div style={{ fontSize: 'var(--text-base)', fontWeight: 500, color: 'var(--text-primary)' }}>{p.label}</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-subtle)', marginTop: 2 }}>{p.description}</div>
                   </div>
                 </label>
               ))}
@@ -228,7 +229,7 @@ export default function Settings({ onBack }: Props) {
 
           {/* Provider-specific config */}
           <div style={sectionStyle}>
-            <div style={{ fontSize: 14, fontWeight: 600, color: 'rgba(255,255,255,0.85)', marginBottom: 14 }}>
+            <div style={{ fontSize: 'var(--text-base)', fontWeight: 600, color: 'rgba(255,255,255,0.85)', marginBottom: 14 }}>
               Provider Configuration
             </div>
 
@@ -411,7 +412,7 @@ export default function Settings({ onBack }: Props) {
 
           {/* Timezone */}
           <div style={sectionStyle}>
-            <div style={{ fontSize: 14, fontWeight: 600, color: 'rgba(255,255,255,0.85)', marginBottom: 14 }}>
+            <div style={{ fontSize: 'var(--text-base)', fontWeight: 600, color: 'rgba(255,255,255,0.85)', marginBottom: 14 }}>
               Timezone
             </div>
             <div style={{ marginBottom: 16 }}>
@@ -443,7 +444,7 @@ export default function Settings({ onBack }: Props) {
 
           {/* Scheduler */}
           <div style={sectionStyle}>
-            <div style={{ fontSize: 14, fontWeight: 600, color: 'rgba(255,255,255,0.85)', marginBottom: 14 }}>
+            <div style={{ fontSize: 'var(--text-base)', fontWeight: 600, color: 'rgba(255,255,255,0.85)', marginBottom: 14 }}>
               Scheduled Briefs
             </div>
             <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
@@ -484,7 +485,7 @@ export default function Settings({ onBack }: Props) {
 
           {/* Google Integration */}
           <div style={sectionStyle}>
-            <div style={{ fontSize: 14, fontWeight: 600, color: 'rgba(255,255,255,0.85)', marginBottom: 6 }}>
+            <div style={{ fontSize: 'var(--text-base)', fontWeight: 600, color: 'rgba(255,255,255,0.85)', marginBottom: 6 }}>
               Google Integration
             </div>
             <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', marginBottom: 14 }}>
@@ -584,7 +585,7 @@ export default function Settings({ onBack }: Props) {
 
           {/* Brain Path */}
           <div style={sectionStyle}>
-            <div style={{ fontSize: 14, fontWeight: 600, color: 'rgba(255,255,255,0.85)', marginBottom: 14 }}>
+            <div style={{ fontSize: 'var(--text-base)', fontWeight: 600, color: 'rgba(255,255,255,0.85)', marginBottom: 14 }}>
               Data Storage
             </div>
             <div style={{ marginBottom: 16 }}>
@@ -603,8 +604,8 @@ export default function Settings({ onBack }: Props) {
                     if (picked) update({ brainPath: picked });
                   }}
                   style={{
-                    padding: '10px 14px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.12)',
-                    background: '#303030', color: 'rgba(255,255,255,0.6)', fontSize: 13,
+                    padding: '10px 14px', borderRadius: 8, border: '1px solid var(--border-emphasis)',
+                    background: 'var(--bg-btn-secondary)', color: 'var(--text-tertiary)', fontSize: 'var(--text-sm)',
                     cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
                   }}
                 >
@@ -619,7 +620,7 @@ export default function Settings({ onBack }: Props) {
 
           {/* Team Brain */}
           <div style={sectionStyle}>
-            <div style={{ fontSize: 14, fontWeight: 600, color: 'rgba(255,255,255,0.85)', marginBottom: 14 }}>
+            <div style={{ fontSize: 'var(--text-base)', fontWeight: 600, color: 'rgba(255,255,255,0.85)', marginBottom: 14 }}>
               Team Brain
             </div>
             <div style={{
@@ -660,8 +661,8 @@ export default function Settings({ onBack }: Props) {
                     if (picked) update({ teamBrainPath: picked });
                   }}
                   style={{
-                    padding: '10px 14px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.12)',
-                    background: '#303030', color: 'rgba(255,255,255,0.6)', fontSize: 13,
+                    padding: '10px 14px', borderRadius: 8, border: '1px solid var(--border-emphasis)',
+                    background: 'var(--bg-btn-secondary)', color: 'var(--text-tertiary)', fontSize: 'var(--text-sm)',
                     cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
                   }}
                 >
@@ -696,12 +697,13 @@ export default function Settings({ onBack }: Props) {
             onClick={save}
             disabled={saving}
             style={{
-              padding: '12px 28px', borderRadius: 10, border: 'none',
-              background: saved ? '#2a5a3a' : '#CF7A5C',
-              color: 'white', fontSize: 14, fontWeight: 600,
+              padding: '12px 28px', borderRadius: 'var(--radius-lg)', border: 'none',
+              background: saved ? '#2a5a3a' : 'var(--accent)',
+              color: 'white', fontSize: 'var(--text-base)', fontWeight: 600,
               cursor: saving ? 'default' : 'pointer',
               opacity: saving ? 0.6 : 1,
-              transition: 'all 0.2s',
+              transition: 'var(--transition-slow)',
+              fontFamily: 'inherit',
             }}
           >
             {saving ? 'Saving...' : saved ? 'Saved' : 'Save Settings'}
@@ -808,7 +810,7 @@ function CloudMigrationSection({ inputStyle, labelStyle, sectionStyle }: {
 
   return (
     <div style={sectionStyle}>
-      <div style={{ fontSize: 14, fontWeight: 600, color: 'rgba(255,255,255,0.85)', marginBottom: 6 }}>
+      <div style={{ fontSize: 'var(--text-base)', fontWeight: 600, color: 'rgba(255,255,255,0.85)', marginBottom: 6 }}>
         Sync to Cloud
       </div>
       <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', marginBottom: 14 }}>
