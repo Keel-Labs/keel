@@ -3,41 +3,41 @@
 
 /* ── Design Tokens — Warm Minimalist Dark ── */
 :root {
-  /* Backgrounds — warmer, softer darks */
-  --bg-base: #1c1b1b;
-  --bg-sidebar: #181717;
-  --bg-surface: #242323;
-  --bg-surface-hover: #2c2a2a;
-  --bg-input-focus: #272525;
-  --bg-elevated: #201f1f;
-  --bg-raw-editor: #1a1919;
-  --bg-btn-secondary: #2e2c2c;
+  /* Backgrounds — warm charcoal tones (TEMP: red bg for testing) */
+  --bg-base: #ff0000;
+  --bg-sidebar: #171513;
+  --bg-surface: #2a2724;
+  --bg-surface-hover: #332f2b;
+  --bg-input-focus: #2e2a27;
+  --bg-elevated: #242120;
+  --bg-raw-editor: #1a1816;
+  --bg-btn-secondary: #342f2c;
 
-  /* Accent — slightly warmer, softer terracotta */
-  --accent: #c4755a;
-  --accent-hover: #d08a70;
-  --accent-bg: rgba(196, 117, 90, 0.10);
-  --accent-bg-subtle: rgba(196, 117, 90, 0.05);
-  --accent-border: rgba(196, 117, 90, 0.30);
-  --accent-border-subtle: rgba(196, 117, 90, 0.12);
-  --accent-border-faint: rgba(196, 117, 90, 0.16);
-  --accent-link: #d49a82;
+  /* Accent — warm coral */
+  --accent: #d4845e;
+  --accent-hover: #e09676;
+  --accent-bg: rgba(212, 132, 94, 0.12);
+  --accent-bg-subtle: rgba(212, 132, 94, 0.06);
+  --accent-border: rgba(212, 132, 94, 0.35);
+  --accent-border-subtle: rgba(212, 132, 94, 0.15);
+  --accent-border-faint: rgba(212, 132, 94, 0.20);
+  --accent-link: #e0a888;
 
-  /* Text — warmer whites, softer contrast */
-  --text-primary: #e8e4e1;
-  --text-secondary: #b8b2ad;
-  --text-tertiary: #9e9893;
-  --text-muted: #86807b;
-  --text-subtle: #6e6964;
-  --text-disabled: #565150;
-  --text-ghost: #3e3a38;
+  /* Text — warm off-whites */
+  --text-primary: #ede8e3;
+  --text-secondary: #c4bcb4;
+  --text-tertiary: #a69e96;
+  --text-muted: #8a827a;
+  --text-subtle: #6d6560;
+  --text-disabled: #524c48;
+  --text-ghost: #3a3532;
 
-  /* Borders — warm-tinted */
-  --border-default: rgba(255, 245, 235, 0.07);
-  --border-subtle: rgba(255, 245, 235, 0.05);
-  --border-input: rgba(255, 245, 235, 0.09);
-  --border-emphasis: rgba(255, 245, 235, 0.11);
-  --border-btn: rgba(255, 245, 235, 0.13);
+  /* Borders — warm tint */
+  --border-default: rgba(220, 200, 180, 0.10);
+  --border-subtle: rgba(220, 200, 180, 0.06);
+  --border-input: rgba(220, 200, 180, 0.12);
+  --border-emphasis: rgba(220, 200, 180, 0.16);
+  --border-btn: rgba(220, 200, 180, 0.18);
 
   /* Radius — more rounded for warm feel */
   --radius-sm: 6px;
