@@ -8,6 +8,7 @@ import {
   nativeImage,
   dialog,
   Notification,
+  net,
 } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -50,12 +51,24 @@ import {
 import { GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_SCOPES } from '../src/core/connectors/googleConfig';
 import { syncCalendar, getUpcomingEventsFormatted, createCalendarEvent } from '../src/core/connectors/googleCalendar';
 import { exportToGoogleDoc, readGoogleDoc, extractDocId } from '../src/core/connectors/googleDocs';
-import type { Message, Settings } from '../src/shared/types';
+import {
+  connectProviderCliAuth,
+  disconnectProviderCliAuth,
+  getProviderCliAuthStatus,
+} from '../src/core/connectors/providerCli';
+import type {
+  Message,
+  ProviderCliAuthConnectOptions,
+  ProviderCliAuthProvider,
+  ProviderModelOption,
+  Settings,
+} from '../src/shared/types';
 
 let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 
 const settings = loadSettings();
+installElectronFetch();
 const fileManager = new FileManager(settings.brainPath);
 const llmClient = new LLMClient();
 const contextAssembler = new ContextAssembler(fileManager, false, settings.timezone || undefined);
@@ -64,6 +77,52 @@ let teamFileManager: TeamFileManager | null = settings.teamBrainPath
   : null;
 
 const isDev = process.env.NODE_ENV === 'development';
+
+function formatRuntimeError(error: unknown): string {
+  if (!(error instanceof Error)) {
+    return 'Unknown error';
+  }
+
+  const parts = [error.message];
+  const cause = (error as Error & { cause?: unknown }).cause;
+
+  if (cause instanceof Error && cause.message && cause.message !== error.message) {
+    parts.push(cause.message);
+  } else if (typeof cause === 'string' && cause && cause !== error.message) {
+    parts.push(cause);
+  }
+
+  return parts.filter(Boolean).join(' | ');
+}
+
+function installElectronFetch(): void {
+  const electronFetch: typeof fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
+    return net.fetch(input as any, init as any) as any;
+  }) as typeof fetch;
+
+  globalThis.fetch = electronFetch;
+}
+
+function formatModelLabel(modelId: string): string {
+  return modelId
+    .replace(/^gpt-/, 'GPT-')
+    .replace(/^o(\d)/, 'o$1')
+    .replace(/-/g, ' ');
+}
+
+function isPreferredOpenAIModel(modelId: string): boolean {
+  return /^(gpt-|o[1-9]|o4-mini|o3|o1)/i.test(modelId)
+    && !/(audio|realtime|transcribe|tts|embedding|moderation|image|whisper|davinci|babbage)/i.test(modelId);
+}
+
+function sortOpenAIModels(models: ProviderModelOption[]): ProviderModelOption[] {
+  return models.sort((a, b) => {
+    const aPreferred = /(gpt-5|gpt-4\.1|gpt-4o|o4|o3|o1)/i.test(a.id) ? 0 : 1;
+    const bPreferred = /(gpt-5|gpt-4\.1|gpt-4o|o4|o3|o1)/i.test(b.id) ? 0 : 1;
+    if (aPreferred !== bPreferred) return aPreferred - bPreferred;
+    return a.id.localeCompare(b.id);
+  });
+}
 
 function createWindow() {
   const windowOptions: Electron.BrowserWindowConstructorOptions = {
@@ -623,7 +682,8 @@ function registerIpcHandlers() {
         console.error('[main] Memory extraction failed:', err);
       });
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
+      const message = formatRuntimeError(error);
+      console.error('[keel:chat-stream] Error:', error);
       if (!sender.isDestroyed()) {
         sender.send('keel:chat-stream-error', message);
       }
@@ -870,6 +930,38 @@ function registerIpcHandlers() {
       ...eventData,
       timeZone: settings.timezone || undefined,
     });
+  });
+
+  ipcMain.handle('keel:provider-auth-status', async (_event, provider: ProviderCliAuthProvider) => {
+    return getProviderCliAuthStatus(provider);
+  });
+
+  ipcMain.handle('keel:provider-auth-connect', async (_event, provider: ProviderCliAuthProvider, options?: ProviderCliAuthConnectOptions) => {
+    const result = await connectProviderCliAuth(provider, options);
+    logActivity(settings.brainPath, `${provider}-cli-connect`, result.message);
+    return result;
+  });
+
+  ipcMain.handle('keel:provider-auth-disconnect', async (_event, provider: ProviderCliAuthProvider) => {
+    await disconnectProviderCliAuth(provider);
+    logActivity(settings.brainPath, `${provider}-cli-disconnect`, `Disconnected ${provider} CLI auth`);
+  });
+
+  ipcMain.handle('keel:openai-list-models', async () => {
+    if (!settings.openaiApiKey) {
+      return [];
+    }
+
+    const client = new (await import('openai')).default({ apiKey: settings.openaiApiKey });
+    const page = await client.models.list();
+    const models = page.data
+      .map((model) => model.id)
+      .filter(isPreferredOpenAIModel)
+      .map((id) => ({ id, label: formatModelLabel(id) }));
+
+    return sortOpenAIModels(
+      Array.from(new Map(models.map((model) => [model.id, model])).values())
+    );
   });
 
   ipcMain.handle('keel:ollama-list-models', async () => {

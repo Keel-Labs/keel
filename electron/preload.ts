@@ -91,6 +91,10 @@ const api: KeelAPI = {
 
   googleExportDoc: (markdownContent: string, title?: string) => ipcRenderer.invoke('keel:google-export-doc', markdownContent, title),
   googleCreateEvent: (event) => ipcRenderer.invoke('keel:google-create-event', event),
+  getProviderAuthStatus: (provider) => ipcRenderer.invoke('keel:provider-auth-status', provider),
+  connectProviderAuth: (provider, options) => ipcRenderer.invoke('keel:provider-auth-connect', provider, options),
+  disconnectProviderAuth: (provider) => ipcRenderer.invoke('keel:provider-auth-disconnect', provider),
+  openaiListModels: () => ipcRenderer.invoke('keel:openai-list-models'),
   ollamaListModels: () => ipcRenderer.invoke('keel:ollama-list-models'),
   listTeamFiles: (dirPath: string) => ipcRenderer.invoke('keel:list-team-files', dirPath),
   readTeamFile: (filePath: string) => ipcRenderer.invoke('keel:read-team-file', filePath),

@@ -1,5 +1,11 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import type { Settings as SettingsType, OllamaModelInfo } from '../../shared/types';
+import type {
+  Settings as SettingsType,
+  OllamaModelInfo,
+  ProviderCliAuthProvider,
+  ProviderCliAuthStatus,
+  ProviderModelOption,
+} from '../../shared/types';
 import { applyTheme } from '../theme';
 
 const isElectron = typeof window !== 'undefined' && !!(window as any).keelMigrate;
@@ -9,11 +15,11 @@ const CLAUDE_MODELS = [
   { value: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5' },
 ];
 
-const OPENAI_MODELS = [
-  { value: 'gpt-4o', label: 'GPT-4o' },
-  { value: 'gpt-4o-mini', label: 'GPT-4o Mini' },
-  { value: 'gpt-4.1', label: 'GPT-4.1' },
-  { value: 'gpt-4.1-mini', label: 'GPT-4.1 Mini' },
+const OPENAI_MODELS: ProviderModelOption[] = [
+  { id: 'gpt-4o', label: 'GPT-4o' },
+  { id: 'gpt-4o-mini', label: 'GPT-4o Mini' },
+  { id: 'gpt-4.1', label: 'GPT-4.1' },
+  { id: 'gpt-4.1-mini', label: 'GPT-4.1 Mini' },
 ];
 
 const PROVIDERS = [
@@ -182,6 +188,21 @@ export default function Settings({ onBack }: Props) {
   const [googleConfigured, setGoogleConfigured] = useState(false);
   const [googleSyncing, setGoogleSyncing] = useState(false);
   const [googleMessage, setGoogleMessage] = useState('');
+  const [providerAuthStatus, setProviderAuthStatus] = useState<Record<ProviderCliAuthProvider, ProviderCliAuthStatus | null>>({
+    claude: null,
+    openai: null,
+  });
+  const [providerAuthLoading, setProviderAuthLoading] = useState<Record<ProviderCliAuthProvider, boolean>>({
+    claude: false,
+    openai: false,
+  });
+  const [providerAuthMessage, setProviderAuthMessage] = useState<Record<ProviderCliAuthProvider, string>>({
+    claude: '',
+    openai: '',
+  });
+  const [openaiModels, setOpenaiModels] = useState<ProviderModelOption[]>(OPENAI_MODELS);
+  const [openaiModelsLoading, setOpenaiModelsLoading] = useState(false);
+  const [openaiModelsError, setOpenaiModelsError] = useState<string | null>(null);
   const [ollamaModels, setOllamaModels] = useState<OllamaModelInfo[]>([]);
   const [ollamaError, setOllamaError] = useState<string | null>(null);
   const [ollamaLoading, setOllamaLoading] = useState(false);
@@ -209,22 +230,67 @@ export default function Settings({ onBack }: Props) {
     setOllamaLoading(false);
   }, []);
 
+  const fetchOpenAIModels = useCallback(async () => {
+    setOpenaiModelsLoading(true);
+    setOpenaiModelsError(null);
+    try {
+      const models = await window.keel.openaiListModels();
+      setOpenaiModels(models.length > 0 ? models : OPENAI_MODELS);
+      if (models.length === 0) {
+        setOpenaiModelsError('No compatible chat models were returned.');
+      }
+    } catch (error) {
+      setOpenaiModels(OPENAI_MODELS);
+      setOpenaiModelsError(error instanceof Error ? error.message : 'Failed to fetch OpenAI models');
+    }
+    setOpenaiModelsLoading(false);
+  }, []);
+
+  const refreshProviderAuthStatus = useCallback(async (provider: ProviderCliAuthProvider) => {
+    setProviderAuthLoading((prev) => ({ ...prev, [provider]: true }));
+    try {
+      const status = await window.keel.getProviderAuthStatus(provider);
+      setProviderAuthStatus((prev) => ({ ...prev, [provider]: status }));
+    } finally {
+      setProviderAuthLoading((prev) => ({ ...prev, [provider]: false }));
+    }
+  }, []);
+
+  const setProviderMessage = useCallback((provider: ProviderCliAuthProvider, message: string) => {
+    setProviderAuthMessage((prev) => ({ ...prev, [provider]: message }));
+  }, []);
+
   useEffect(() => {
     window.keel.getSettings().then((s) => {
       setSettings(s);
       if (s.provider === 'ollama') fetchOllamaModels();
+      if (s.openaiAuthMode === 'api-key' && s.openaiApiKey) fetchOpenAIModels();
     }).catch(() => {});
     window.keel.googleStatus().then((s) => {
       setGoogleConnected(s.connected);
       setGoogleConfigured(s.configured ?? false);
     }).catch(() => {});
-  }, [fetchOllamaModels]);
+    if (isElectron) {
+      refreshProviderAuthStatus('claude').catch(() => {});
+      refreshProviderAuthStatus('openai').catch(() => {});
+    }
+  }, [fetchOllamaModels, fetchOpenAIModels, refreshProviderAuthStatus]);
 
   useEffect(() => {
     const onResize = () => setIsCompactLayout(window.innerWidth < 980);
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);
+
+  useEffect(() => {
+    if (!settings) return;
+    if (settings.openaiAuthMode === 'api-key' && settings.openaiApiKey) {
+      fetchOpenAIModels().catch(() => {});
+      return;
+    }
+    setOpenaiModels(OPENAI_MODELS);
+    setOpenaiModelsError(null);
+  }, [fetchOpenAIModels, settings?.openaiApiKey, settings?.openaiAuthMode]);
 
   useEffect(() => () => {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
@@ -345,12 +411,223 @@ export default function Settings({ onBack }: Props) {
     </FieldRow>
   );
 
+  const getProviderAuthMode = (provider: ProviderCliAuthProvider) => (
+    provider === 'claude' ? settings.anthropicAuthMode : settings.openaiAuthMode
+  );
+
+  const setProviderAuthMode = (provider: ProviderCliAuthProvider, mode: 'api-key' | 'cli') => {
+    update(provider === 'claude' ? { anthropicAuthMode: mode } : { openaiAuthMode: mode });
+  };
+
+  const renderCliProviderAuth = (provider: ProviderCliAuthProvider) => {
+    const status = providerAuthStatus[provider];
+    const loading = providerAuthLoading[provider];
+    const message = providerAuthMessage[provider];
+    const selected = getProviderAuthMode(provider) === 'cli';
+    const productLabel = provider === 'claude' ? 'Claude Code' : 'Codex';
+    const commandHint = provider === 'claude'
+      ? 'claude auth login'
+      : settings.openaiCliUseDeviceAuth
+        ? 'codex login --device-auth'
+        : 'codex login';
+    const badge = !status
+      ? { label: 'Checking…', tone: 'neutral' as const }
+      : !status.installed
+        ? { label: 'Not installed', tone: 'warning' as const }
+        : status.connected
+          ? { label: 'Connected', tone: 'success' as const }
+          : status.authKind === 'api-key'
+            ? { label: 'API key only', tone: 'warning' as const }
+            : { label: 'Disconnected', tone: 'warning' as const };
+
+    return (
+      <>
+        <StatusPanel
+          title={`${productLabel} login`}
+          badge={badge}
+          description={
+            status
+              ? status.summary
+              : `Checking ${productLabel} status...`
+          }
+          actions={(
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button
+                onClick={async () => {
+                  setProviderMessage(provider, '');
+                  try {
+                    const result = await window.keel.connectProviderAuth(
+                      provider,
+                      provider === 'openai'
+                        ? { useDeviceAuth: settings.openaiCliUseDeviceAuth }
+                        : undefined
+                    );
+                    setProviderMessage(provider, result.message);
+                  } catch (err) {
+                    setProviderMessage(provider, err instanceof Error ? err.message : 'Could not launch login');
+                  }
+                }}
+                disabled={loading || status?.installed === false}
+                style={primaryButtonStyle(loading || status?.installed === false)}
+              >
+                {status?.connected ? 'Reconnect' : 'Connect'}
+              </button>
+              <button
+                onClick={async () => {
+                  setProviderMessage(provider, '');
+                  try {
+                    await refreshProviderAuthStatus(provider);
+                  } catch (err) {
+                    setProviderMessage(provider, err instanceof Error ? err.message : 'Status refresh failed');
+                  }
+                }}
+                disabled={loading}
+                style={secondaryButtonStyle(loading)}
+              >
+                {loading ? 'Refreshing...' : 'Refresh'}
+              </button>
+              <button
+                onClick={async () => {
+                  setProviderMessage(provider, '');
+                  try {
+                    await window.keel.disconnectProviderAuth(provider);
+                    await refreshProviderAuthStatus(provider);
+                    setProviderMessage(provider, `${productLabel} login disconnected.`);
+                  } catch (err) {
+                    setProviderMessage(provider, err instanceof Error ? err.message : 'Disconnect failed');
+                  }
+                }}
+                disabled={loading || !status?.connected}
+                style={secondaryButtonStyle(loading || !status?.connected)}
+              >
+                Disconnect
+              </button>
+            </div>
+          )}
+        />
+        {provider === 'openai' && (
+          <FieldRow
+            label="Login Mode"
+            description="Device auth is preferred and enabled by default. Turn it off only if your organization does not allow device auth and requires the standard Codex login flow."
+          >
+            <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={settings.openaiCliUseDeviceAuth}
+                onChange={(e) => update({ openaiCliUseDeviceAuth: e.target.checked })}
+                style={{ marginTop: 3, accentColor: 'var(--accent)' }}
+              />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <span style={{ fontSize: 14, color: 'var(--text-primary)', fontWeight: 600 }}>
+                  Use `--device-auth`
+                </span>
+                <span style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                  Checked: launch <code style={inlineCodeStyle}>codex login --device-auth</code>. Unchecked: launch <code style={inlineCodeStyle}>codex login</code>.
+                </span>
+              </div>
+            </label>
+          </FieldRow>
+        )}
+        {!status?.installed && (
+          <InlineNote>
+            Install {productLabel} first, then run <code style={inlineCodeStyle}>{commandHint}</code>.
+          </InlineNote>
+        )}
+        {selected && message && (
+          <InlineMessage
+            tone={message.toLowerCase().includes('failed') || message.toLowerCase().includes('could not') ? 'danger' : 'success'}
+          >
+            {message}
+          </InlineMessage>
+        )}
+      </>
+    );
+  };
+
   const renderProviderCredentials = () => {
     if (settings.provider === 'claude') {
-      return renderApiKeyInput('Anthropic API Key', settings.anthropicApiKey, 'anthropicApiKey', 'claude');
+      return (
+        <>
+          {isElectron && (
+            <FieldRow
+              label="Credential Source"
+              description="Use your Claude Code login or a direct Anthropic API key."
+            >
+              <div style={{ display: 'inline-flex', gap: 6, padding: 4, borderRadius: 14, background: 'var(--surface-muted)', border: '1px solid var(--panel-border)' }}>
+                {([
+                  { value: 'cli' as const, label: 'Claude Code Login' },
+                  { value: 'api-key' as const, label: 'API Key' },
+                ]).map((option) => {
+                  const active = settings.anthropicAuthMode === option.value;
+                  return (
+                    <button
+                      key={option.value}
+                      onClick={() => setProviderAuthMode('claude', option.value)}
+                      style={{
+                        border: 'none',
+                        borderRadius: 10,
+                        padding: '9px 14px',
+                        background: active ? 'var(--surface-selected)' : 'transparent',
+                        color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
+                        fontSize: 13,
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {option.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </FieldRow>
+          )}
+          {isElectron && settings.anthropicAuthMode === 'cli'
+            ? renderCliProviderAuth('claude')
+            : renderApiKeyInput('Anthropic API Key', settings.anthropicApiKey, 'anthropicApiKey', 'claude')}
+        </>
+      );
     }
     if (settings.provider === 'openai') {
-      return renderApiKeyInput('OpenAI API Key', settings.openaiApiKey, 'openaiApiKey', 'openai');
+      return (
+        <>
+          {isElectron && (
+            <FieldRow
+              label="Credential Source"
+              description="Use your Codex login or a direct OpenAI API key."
+            >
+              <div style={{ display: 'inline-flex', gap: 6, padding: 4, borderRadius: 14, background: 'var(--surface-muted)', border: '1px solid var(--panel-border)' }}>
+                {([
+                  { value: 'cli' as const, label: 'Codex Login' },
+                  { value: 'api-key' as const, label: 'API Key' },
+                ]).map((option) => {
+                  const active = settings.openaiAuthMode === option.value;
+                  return (
+                    <button
+                      key={option.value}
+                      onClick={() => setProviderAuthMode('openai', option.value)}
+                      style={{
+                        border: 'none',
+                        borderRadius: 10,
+                        padding: '9px 14px',
+                        background: active ? 'var(--surface-selected)' : 'transparent',
+                        color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
+                        fontSize: 13,
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {option.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </FieldRow>
+          )}
+          {isElectron && settings.openaiAuthMode === 'cli'
+            ? renderCliProviderAuth('openai')
+            : renderApiKeyInput('OpenAI API Key', settings.openaiApiKey, 'openaiApiKey', 'openai')}
+        </>
+      );
     }
     if (settings.provider === 'openrouter') {
       return renderApiKeyInput('OpenRouter API Key', settings.openrouterApiKey, 'openrouterApiKey', 'openrouter');
@@ -370,9 +647,13 @@ export default function Settings({ onBack }: Props) {
       settings.provider === 'ollama'
         ? Boolean(settings.ollamaModel)
         : settings.provider === 'claude'
-          ? Boolean(settings.anthropicApiKey)
+          ? settings.anthropicAuthMode === 'cli'
+            ? Boolean(providerAuthStatus.claude?.connected)
+            : Boolean(settings.anthropicApiKey)
           : settings.provider === 'openai'
-            ? Boolean(settings.openaiApiKey)
+            ? settings.openaiAuthMode === 'cli'
+              ? Boolean(providerAuthStatus.openai?.connected)
+              : Boolean(settings.openaiApiKey)
             : Boolean(settings.openrouterApiKey);
 
     return (
@@ -393,6 +674,25 @@ export default function Settings({ onBack }: Props) {
 
   const renderModelFields = () => {
     if (settings.provider === 'claude') {
+      if (settings.anthropicAuthMode === 'cli') {
+        return (
+          <SectionCard
+            title="Claude Code Runtime"
+            description="Optionally override the model alias Claude Code should use. Leave this blank to use your CLI default."
+          >
+            <FieldRow label="Model Override" description="Examples: sonnet, opus">
+              <input
+                type="text"
+                value={settings.anthropicCliModel}
+                onChange={(e) => update({ anthropicCliModel: e.target.value })}
+                placeholder="Leave blank to use Claude Code default"
+                style={inputStyle}
+              />
+            </FieldRow>
+          </SectionCard>
+        );
+      }
+
       return (
         <SectionCard
           title="Model Selection"
@@ -414,6 +714,25 @@ export default function Settings({ onBack }: Props) {
     }
 
     if (settings.provider === 'openai') {
+      if (settings.openaiAuthMode === 'cli') {
+        return (
+          <SectionCard
+            title="Codex Runtime"
+            description="Optionally override the model Codex should use. Leave this blank to use your Codex default."
+          >
+            <FieldRow label="Model Override" description="Example: gpt-5">
+              <input
+                type="text"
+                value={settings.openaiCliModel}
+                onChange={(e) => update({ openaiCliModel: e.target.value })}
+                placeholder="Leave blank to use Codex default"
+                style={inputStyle}
+              />
+            </FieldRow>
+          </SectionCard>
+        );
+      }
+
       return (
         <SectionCard
           title="Model Selection"
@@ -425,11 +744,18 @@ export default function Settings({ onBack }: Props) {
               onChange={(e) => update({ openaiModel: e.target.value })}
               style={selectStyle}
             >
-              {OPENAI_MODELS.map((model) => (
-                <option key={model.value} value={model.value}>{model.label}</option>
+              {openaiModels.map((model) => (
+                <option key={model.id} value={model.id}>{model.label}</option>
               ))}
             </select>
           </FieldRow>
+          <InlineNote>
+            {openaiModelsLoading
+              ? 'Refreshing models from OpenAI...'
+              : openaiModelsError
+                ? `Using fallback list: ${openaiModelsError}`
+                : `Loaded ${openaiModels.length} OpenAI models from the API.`}
+          </InlineNote>
         </SectionCard>
       );
     }

@@ -15,11 +15,16 @@ export interface Settings {
   hasCompletedOnboarding: boolean;
   provider: 'claude' | 'openai' | 'openrouter' | 'ollama';
   // Claude
+  anthropicAuthMode: 'api-key' | 'cli';
   anthropicApiKey: string;
   claudeModel: string;
+  anthropicCliModel: string;
   // OpenAI
+  openaiAuthMode: 'api-key' | 'cli';
   openaiApiKey: string;
   openaiModel: string;
+  openaiCliModel: string;
+  openaiCliUseDeviceAuth: boolean;
   // OpenRouter / custom OpenAI-compatible endpoint
   openrouterApiKey: string;
   openrouterModel: string;
@@ -84,6 +89,32 @@ export interface OllamaListResult {
   error: string | null;
 }
 
+export type ProviderCliAuthProvider = 'claude' | 'openai';
+
+export interface ProviderCliAuthStatus {
+  provider: ProviderCliAuthProvider;
+  installed: boolean;
+  connected: boolean;
+  authKind: 'oauth' | 'api-key' | 'unknown' | 'none';
+  command: string;
+  summary: string;
+  accountLabel?: string;
+}
+
+export interface ProviderCliAuthLaunchResult {
+  launched: boolean;
+  message: string;
+}
+
+export interface ProviderCliAuthConnectOptions {
+  useDeviceAuth?: boolean;
+}
+
+export interface ProviderModelOption {
+  id: string;
+  label: string;
+}
+
 // IPC channel types
 export interface ScheduledNotification {
   type: 'daily-brief' | 'eod' | 'reminder';
@@ -130,6 +161,9 @@ export type IpcChannels =
   | 'keel:google-status'
   | 'keel:google-sync-calendar'
   | 'keel:google-export-doc'
+  | 'keel:provider-auth-status'
+  | 'keel:provider-auth-connect'
+  | 'keel:provider-auth-disconnect'
   | 'keel:ollama-list-models'
   | 'keel:list-team-files'
   | 'keel:read-team-file'
@@ -174,6 +208,10 @@ export interface KeelAPI {
   googleSyncCalendar: () => Promise<{ eventCount: number; filesWritten: number }>;
   googleExportDoc: (markdownContent: string, title?: string) => Promise<string>;
   googleCreateEvent: (event: { summary: string; startTime: string; endTime: string; description?: string; attendees?: string[] }) => Promise<{ id: string; htmlLink: string }>;
+  getProviderAuthStatus: (provider: ProviderCliAuthProvider) => Promise<ProviderCliAuthStatus>;
+  connectProviderAuth: (provider: ProviderCliAuthProvider, options?: ProviderCliAuthConnectOptions) => Promise<ProviderCliAuthLaunchResult>;
+  disconnectProviderAuth: (provider: ProviderCliAuthProvider) => Promise<void>;
+  openaiListModels: () => Promise<ProviderModelOption[]>;
   // Ollama
   ollamaListModels: () => Promise<OllamaListResult>;
   // Team Brain

@@ -1,17 +1,27 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import type { Message as MessageType, MessageImage, Settings as SettingsType, OllamaModelInfo } from '../../shared/types';
+import type {
+  Message as MessageType,
+  MessageImage,
+  Settings as SettingsType,
+  OllamaModelInfo,
+  ProviderCliAuthProvider,
+  ProviderCliAuthStatus,
+  ProviderModelOption,
+} from '../../shared/types';
 import Message from './Message';
+
+const isElectron = typeof window !== 'undefined' && !!(window as any).keelMigrate;
 
 const CLAUDE_MODELS = [
   { value: 'claude-sonnet-4-20250514', label: 'Sonnet 4' },
   { value: 'claude-haiku-4-5-20251001', label: 'Haiku 4.5' },
 ];
 
-const OPENAI_MODELS = [
-  { value: 'gpt-4o', label: 'GPT-4o' },
-  { value: 'gpt-4o-mini', label: 'GPT-4o Mini' },
-  { value: 'gpt-4.1', label: 'GPT-4.1' },
-  { value: 'gpt-4.1-mini', label: 'GPT-4.1 Mini' },
+const OPENAI_MODELS: ProviderModelOption[] = [
+  { id: 'gpt-4o', label: 'GPT-4o' },
+  { id: 'gpt-4o-mini', label: 'GPT-4o Mini' },
+  { id: 'gpt-4.1', label: 'GPT-4.1' },
+  { id: 'gpt-4.1-mini', label: 'GPT-4.1 Mini' },
 ];
 
 const THINKING_MESSAGES = [
@@ -544,42 +554,95 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [currentProvider, setCurrentProvider] = useState<string>('claude');
   const [currentModel, setCurrentModel] = useState<string>('');
+  const [openaiModels, setOpenaiModels] = useState<ProviderModelOption[]>(OPENAI_MODELS);
   const [ollamaModels, setOllamaModels] = useState<OllamaModelInfo[]>([]);
   const [showModelDropdown, setShowModelDropdown] = useState(false);
   const [composerExpanded, setComposerExpanded] = useState(false);
   const justLoadedRef = useRef(false);
   const [availableProviders, setAvailableProviders] = useState<Set<string>>(new Set());
   const [openrouterModelName, setOpenrouterModelName] = useState<string>('');
+  const [providerAuthModes, setProviderAuthModes] = useState<Record<ProviderCliAuthProvider, 'api-key' | 'cli'>>({
+    claude: 'api-key',
+    openai: 'api-key',
+  });
+  const [providerAuthStatus, setProviderAuthStatus] = useState<Record<ProviderCliAuthProvider, ProviderCliAuthStatus | null>>({
+    claude: null,
+    openai: null,
+  });
 
   // Load settings (timezone, model, provider) and detect all available providers
   useEffect(() => {
-    window.keel.getSettings().then((s) => {
-      setUserTimezone(s.timezone || '');
-      setCurrentProvider(s.provider);
-      switch (s.provider) {
-        case 'claude': setCurrentModel(s.claudeModel || 'claude-sonnet-4-20250514'); break;
-        case 'openai': setCurrentModel(s.openaiModel || 'gpt-4o'); break;
-        case 'openrouter': setCurrentModel(s.openrouterModel || ''); break;
-        case 'ollama': setCurrentModel(s.ollamaModel || 'llama3.2'); break;
-      }
-      // Detect all available providers
-      const available = new Set<string>();
-      if (s.anthropicApiKey) available.add('claude');
-      if (s.openaiApiKey) available.add('openai');
-      if (s.openrouterApiKey) {
-        available.add('openrouter');
-        setOpenrouterModelName(s.openrouterModel || '');
-      }
-      // Always try Ollama
-      window.keel.ollamaListModels().then((r) => {
-        if (!r.error && r.models.length > 0) {
-          setOllamaModels(r.models);
-          available.add('ollama');
-          setAvailableProviders(new Set(available));
+    (async () => {
+      try {
+        const s = await window.keel.getSettings();
+        setUserTimezone(s.timezone || '');
+        setCurrentProvider(s.provider);
+        setProviderAuthModes({
+          claude: s.anthropicAuthMode,
+          openai: s.openaiAuthMode,
+        });
+
+        switch (s.provider) {
+          case 'claude':
+            setCurrentModel(s.anthropicAuthMode === 'cli' ? (s.anthropicCliModel || '') : (s.claudeModel || 'claude-sonnet-4-20250514'));
+            break;
+          case 'openai':
+            setCurrentModel(s.openaiAuthMode === 'cli' ? (s.openaiCliModel || '') : (s.openaiModel || 'gpt-4o'));
+            break;
+          case 'openrouter':
+            setCurrentModel(s.openrouterModel || '');
+            break;
+          case 'ollama':
+            setCurrentModel(s.ollamaModel || 'llama3.2');
+            break;
         }
-      }).catch(() => {});
-      setAvailableProviders(new Set(available));
-    }).catch(() => {});
+
+        const available = new Set<string>();
+        const nextProviderStatus: Record<ProviderCliAuthProvider, ProviderCliAuthStatus | null> = {
+          claude: null,
+          openai: null,
+        };
+
+        if (s.anthropicAuthMode === 'cli' && isElectron) {
+          nextProviderStatus.claude = await window.keel.getProviderAuthStatus('claude');
+          if (nextProviderStatus.claude.connected) available.add('claude');
+        } else if (s.anthropicApiKey) {
+          available.add('claude');
+        }
+
+        if (s.openaiAuthMode === 'cli' && isElectron) {
+          nextProviderStatus.openai = await window.keel.getProviderAuthStatus('openai');
+          if (nextProviderStatus.openai.connected) available.add('openai');
+        } else if (s.openaiApiKey) {
+          available.add('openai');
+          try {
+            const models = await window.keel.openaiListModels();
+            if (models.length > 0) setOpenaiModels(models);
+          } catch {
+            setOpenaiModels(OPENAI_MODELS);
+          }
+        }
+
+        setProviderAuthStatus(nextProviderStatus);
+
+        if (s.openrouterApiKey) {
+          available.add('openrouter');
+          setOpenrouterModelName(s.openrouterModel || '');
+        }
+
+        window.keel.ollamaListModels().then((r) => {
+          if (!r.error && r.models.length > 0) {
+            setOllamaModels(r.models);
+            available.add('ollama');
+            setAvailableProviders(new Set(available));
+          }
+        }).catch(() => {});
+
+        setAvailableProviders(new Set(available));
+      } catch {
+        // ignore initial load failure
+      }
+    })();
   }, []);
 
   const formatTime = (ms: number) => {
@@ -685,8 +748,20 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
       const settings = await window.keel.getSettings();
       settings.provider = provider as SettingsType['provider'];
       switch (provider) {
-        case 'claude': settings.claudeModel = model; break;
-        case 'openai': settings.openaiModel = model; break;
+        case 'claude':
+          if (providerAuthModes.claude === 'cli') {
+            settings.anthropicCliModel = model;
+          } else {
+            settings.claudeModel = model;
+          }
+          break;
+        case 'openai':
+          if (providerAuthModes.openai === 'cli') {
+            settings.openaiCliModel = model;
+          } else {
+            settings.openaiModel = model;
+          }
+          break;
         case 'openrouter': settings.openrouterModel = model; break;
         case 'ollama': settings.ollamaModel = model; break;
       }
@@ -696,10 +771,16 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
 
   const getModelLabel = (): string => {
     if (currentProvider === 'claude') {
+      if (providerAuthModes.claude === 'cli') {
+        return currentModel || 'Claude Code default';
+      }
       return CLAUDE_MODELS.find((m) => m.value === currentModel)?.label || currentModel;
     }
     if (currentProvider === 'openai') {
-      return OPENAI_MODELS.find((m) => m.value === currentModel)?.label || currentModel;
+      if (providerAuthModes.openai === 'cli') {
+        return currentModel || 'Codex default';
+      }
+      return openaiModels.find((m) => m.id === currentModel)?.label || currentModel;
     }
     if (currentProvider === 'ollama') {
       const found = ollamaModels.find((m) => m.name === currentModel);
@@ -1183,10 +1264,19 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
 	                      boxShadow: '0 8px 24px rgba(0,0,0,0.25)', zIndex: 100,
 	                      maxHeight: 320, overflowY: 'auto',
 	                    }}>
-	                {availableProviders.has('claude') && (
-	                  <>
+                {availableProviders.has('claude') && (
+                  <>
 	                    <div style={{ fontSize: 10, color: 'var(--text-disabled)', padding: '6px 14px 2px', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600 }}>Claude</div>
-	                    {CLAUDE_MODELS.map((m) => {
+	                    {providerAuthModes.claude === 'cli' ? (
+	                      <button
+	                        onClick={() => handleModelChange('claude', currentModel)}
+	                        style={{ display: 'block', width: '100%', textAlign: 'left', padding: '7px 14px', border: 'none', cursor: 'pointer', background: currentProvider === 'claude' ? 'var(--accent-bg)' : 'transparent', color: currentProvider === 'claude' ? 'var(--accent-link)' : 'var(--text-secondary)', fontSize: 12, transition: 'background 0.1s' }}
+	                        onMouseEnter={(e) => { if (currentProvider !== 'claude') e.currentTarget.style.background = 'var(--surface-muted)'; }}
+	                        onMouseLeave={(e) => { if (currentProvider !== 'claude') e.currentTarget.style.background = 'transparent'; }}
+	                      >
+	                        {currentModel || 'Claude Code default'}
+	                      </button>
+	                    ) : CLAUDE_MODELS.map((m) => {
 	                      const active = currentProvider === 'claude' && currentModel === m.value;
 	                      return (
 	                        <button key={`claude-${m.value}`} onClick={() => handleModelChange('claude', m.value)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '7px 14px', border: 'none', cursor: 'pointer', background: active ? 'var(--accent-bg)' : 'transparent', color: active ? 'var(--accent-link)' : 'var(--text-secondary)', fontSize: 12, transition: 'background 0.1s' }}
@@ -1201,10 +1291,19 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
                   <>
 	                    {availableProviders.has('claude') && <div style={{ height: 1, background: 'var(--panel-border)', margin: '4px 0' }} />}
 	                    <div style={{ fontSize: 10, color: 'var(--text-disabled)', padding: '6px 14px 2px', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600 }}>OpenAI</div>
-	                    {OPENAI_MODELS.map((m) => {
-	                      const active = currentProvider === 'openai' && currentModel === m.value;
+	                    {providerAuthModes.openai === 'cli' ? (
+	                      <button
+	                        onClick={() => handleModelChange('openai', currentModel)}
+	                        style={{ display: 'block', width: '100%', textAlign: 'left', padding: '7px 14px', border: 'none', cursor: 'pointer', background: currentProvider === 'openai' ? 'var(--accent-bg)' : 'transparent', color: currentProvider === 'openai' ? 'var(--accent-link)' : 'var(--text-secondary)', fontSize: 12, transition: 'background 0.1s' }}
+	                        onMouseEnter={(e) => { if (currentProvider !== 'openai') e.currentTarget.style.background = 'var(--surface-muted)'; }}
+	                        onMouseLeave={(e) => { if (currentProvider !== 'openai') e.currentTarget.style.background = 'transparent'; }}
+	                      >
+	                        {currentModel || 'Codex default'}
+	                      </button>
+	                    ) : openaiModels.map((m) => {
+	                      const active = currentProvider === 'openai' && currentModel === m.id;
 	                      return (
-	                        <button key={`openai-${m.value}`} onClick={() => handleModelChange('openai', m.value)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '7px 14px', border: 'none', cursor: 'pointer', background: active ? 'var(--accent-bg)' : 'transparent', color: active ? 'var(--accent-link)' : 'var(--text-secondary)', fontSize: 12, transition: 'background 0.1s' }}
+	                        <button key={`openai-${m.id}`} onClick={() => handleModelChange('openai', m.id)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '7px 14px', border: 'none', cursor: 'pointer', background: active ? 'var(--accent-bg)' : 'transparent', color: active ? 'var(--accent-link)' : 'var(--text-secondary)', fontSize: 12, transition: 'background 0.1s' }}
 	                          onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = 'var(--surface-muted)'; }}
 	                          onMouseLeave={(e) => { if (!active) e.currentTarget.style.background = 'transparent'; }}
 	                        >{m.label}</button>
@@ -1239,7 +1338,7 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
                 )}
                 {availableProviders.size === 0 && (
 	                  <div style={{ padding: '10px 14px', color: 'var(--text-muted)', fontSize: 12 }}>
-	                    No providers configured. Add an API key in Settings.
+	                    No providers configured. Add an API key or connect a provider CLI in Settings.
 	                  </div>
                 )}
                     </div>

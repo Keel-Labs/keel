@@ -14,6 +14,11 @@ import type {
   FileEntry,
   KeelAPI,
   OllamaListResult,
+  ProviderCliAuthLaunchResult,
+  ProviderCliAuthConnectOptions,
+  ProviderCliAuthProvider,
+  ProviderCliAuthStatus,
+  ProviderModelOption,
   ScheduledNotification,
   Reminder,
 } from '../shared/types';
@@ -298,6 +303,11 @@ export const apiClient: KeelAPI = {
     const data = await apiGet<any>('/api/settings');
     return {
       ...data,
+      anthropicAuthMode: data.anthropicAuthMode || 'api-key',
+      anthropicCliModel: data.anthropicCliModel || '',
+      openaiAuthMode: data.openaiAuthMode || 'api-key',
+      openaiCliModel: data.openaiCliModel || '',
+      openaiCliUseDeviceAuth: data.openaiCliUseDeviceAuth ?? true,
       brainPath: data.brainPath || 'cloud', // Not relevant in cloud mode
       teamBrainPath: data.teamBrainPath || '',
     } as Settings;
@@ -449,6 +459,29 @@ export const apiClient: KeelAPI = {
 
   async googleCreateEvent(): Promise<{ id: string; htmlLink: string }> {
     throw new Error('Google Calendar coming soon to cloud mode.');
+  },
+
+  async getProviderAuthStatus(provider: ProviderCliAuthProvider): Promise<ProviderCliAuthStatus> {
+    return {
+      provider,
+      installed: false,
+      connected: false,
+      authKind: 'none',
+      command: provider === 'claude' ? 'claude' : 'codex',
+      summary: 'CLI auth is only available in desktop mode.',
+    };
+  },
+
+  async connectProviderAuth(_provider: ProviderCliAuthProvider, _options?: ProviderCliAuthConnectOptions): Promise<ProviderCliAuthLaunchResult> {
+    throw new Error('CLI auth is only available in desktop mode.');
+  },
+
+  async disconnectProviderAuth(): Promise<void> {
+    throw new Error('CLI auth is only available in desktop mode.');
+  },
+
+  async openaiListModels(): Promise<ProviderModelOption[]> {
+    return [];
   },
 
   // Ollama (not available in cloud mode — Ollama is local only)
