@@ -72,6 +72,42 @@ export async function assembleContext(
     } catch { /* log doesn't exist */ }
   }
 
+  // 5. Recent captures (last 7 days)
+  try {
+    const captureFiles = await listBrainFilesByPattern(userId, 'captures/%');
+    if (captureFiles.length > 0) {
+      onStep?.(`Loading ${captureFiles.length} capture(s)...`);
+      // Sort by path (date-prefixed) descending and take recent ones
+      const recentCaptures = captureFiles.sort().reverse().slice(0, 20);
+      for (const file of recentCaptures) {
+        try {
+          const content = await readBrainFile(userId, file);
+          addSection(file, content);
+        } catch { /* skip */ }
+      }
+    }
+  } catch { /* no captures */ }
+
+  // 6. Project task files
+  try {
+    const taskFiles = await listBrainFilesByPattern(userId, 'projects/%/tasks.md');
+    if (taskFiles.length > 0) {
+      onStep?.(`Loading ${taskFiles.length} project task file(s)...`);
+      for (const file of taskFiles) {
+        try {
+          const content = await readBrainFile(userId, file);
+          addSection(file, content);
+        } catch { /* skip */ }
+      }
+    }
+  } catch { /* no task files */ }
+
+  // 7. General tasks file
+  try {
+    const tasksContent = await readBrainFile(userId, 'tasks.md');
+    addSection('tasks.md', tasksContent);
+  } catch { /* no general tasks */ }
+
   if (parts.length > 0) {
     onStep?.(`Found ${parts.length} relevant section(s)`);
   }
