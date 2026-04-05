@@ -24,11 +24,11 @@ export default function Message({ message }: Props) {
 
   if (isUser) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16, paddingLeft: 64 }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 20, paddingLeft: 72 }}>
         <div style={{
           background: 'var(--accent)', color: 'white',
-          borderRadius: 'var(--radius-2xl) var(--radius-2xl) var(--radius-sm) var(--radius-2xl)',
-          padding: '10px 16px', fontSize: 'var(--text-base)', lineHeight: 1.6,
+          borderRadius: '20px 20px 6px 20px',
+          padding: '11px 18px', fontSize: 'var(--text-base)', lineHeight: 1.6,
           whiteSpace: 'pre-wrap',
         }}>
           {message.images && message.images.length > 0 && (
@@ -40,7 +40,7 @@ export default function Message({ message }: Props) {
                   alt=""
                   style={{
                     maxWidth: 200, maxHeight: 200, borderRadius: 'var(--radius-base)',
-                    objectFit: 'cover', border: '2px solid rgba(255,255,255,0.2)',
+                    objectFit: 'cover', border: '2px solid rgba(255,255,255,0.15)',
                   }}
                 />
               ))}
@@ -53,14 +53,14 @@ export default function Message({ message }: Props) {
   }
 
   return (
-    <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 16, paddingRight: 48 }}>
+    <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 20, paddingRight: 56 }}>
       <div
         className="markdown-body"
         style={{
-          background: 'var(--bg-surface)', border: '1px solid var(--border-default)',
-          borderRadius: 'var(--radius-2xl) var(--radius-2xl) var(--radius-2xl) var(--radius-sm)',
-          padding: '12px 16px', fontSize: 'var(--text-base)', lineHeight: 1.6,
-          color: 'var(--text-primary)', minWidth: 0,
+          background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
+          borderRadius: '20px 20px 20px 6px',
+          padding: '14px 18px', fontSize: 'var(--text-base)', lineHeight: 1.65,
+          color: 'var(--text-secondary)', minWidth: 0,
         }}
         dangerouslySetInnerHTML={{ __html: renderedContent || '' }}
       />

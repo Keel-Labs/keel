@@ -1,50 +1,51 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
 @import "tailwindcss";
 
-/* ── Design Tokens (from UI_STYLE_GUIDE.md) ── */
+/* ── Design Tokens — Warm Minimalist Dark ── */
 :root {
-  /* Backgrounds */
-  --bg-base: #1a1a1a;
-  --bg-sidebar: #151515;
-  --bg-surface: #252525;
-  --bg-surface-hover: #2a2a2a;
-  --bg-input-focus: #282828;
-  --bg-elevated: #1e1e1e;
-  --bg-raw-editor: #161616;
-  --bg-btn-secondary: #303030;
+  /* Backgrounds — warmer, softer darks */
+  --bg-base: #1c1b1b;
+  --bg-sidebar: #181717;
+  --bg-surface: #242323;
+  --bg-surface-hover: #2c2a2a;
+  --bg-input-focus: #272525;
+  --bg-elevated: #201f1f;
+  --bg-raw-editor: #1a1919;
+  --bg-btn-secondary: #2e2c2c;
 
-  /* Accent */
-  --accent: #CF7A5C;
-  --accent-hover: #d98b6f;
-  --accent-bg: rgba(207, 122, 92, 0.12);
-  --accent-bg-subtle: rgba(207, 122, 92, 0.06);
-  --accent-border: rgba(207, 122, 92, 0.4);
-  --accent-border-subtle: rgba(207, 122, 92, 0.15);
-  --accent-border-faint: rgba(207, 122, 92, 0.2);
-  --accent-link: #E09A80;
+  /* Accent — slightly warmer, softer terracotta */
+  --accent: #c4755a;
+  --accent-hover: #d08a70;
+  --accent-bg: rgba(196, 117, 90, 0.10);
+  --accent-bg-subtle: rgba(196, 117, 90, 0.05);
+  --accent-border: rgba(196, 117, 90, 0.30);
+  --accent-border-subtle: rgba(196, 117, 90, 0.12);
+  --accent-border-faint: rgba(196, 117, 90, 0.16);
+  --accent-link: #d49a82;
 
-  /* Text */
-  --text-primary: rgba(255, 255, 255, 0.9);
-  --text-secondary: rgba(255, 255, 255, 0.7);
-  --text-tertiary: rgba(255, 255, 255, 0.6);
-  --text-muted: rgba(255, 255, 255, 0.5);
-  --text-subtle: rgba(255, 255, 255, 0.4);
-  --text-disabled: rgba(255, 255, 255, 0.3);
-  --text-ghost: rgba(255, 255, 255, 0.2);
+  /* Text — warmer whites, softer contrast */
+  --text-primary: #e8e4e1;
+  --text-secondary: #b8b2ad;
+  --text-tertiary: #9e9893;
+  --text-muted: #86807b;
+  --text-subtle: #6e6964;
+  --text-disabled: #565150;
+  --text-ghost: #3e3a38;
 
-  /* Borders */
-  --border-default: rgba(255, 255, 255, 0.08);
-  --border-subtle: rgba(255, 255, 255, 0.06);
-  --border-input: rgba(255, 255, 255, 0.1);
-  --border-emphasis: rgba(255, 255, 255, 0.12);
-  --border-btn: rgba(255, 255, 255, 0.15);
+  /* Borders — warm-tinted */
+  --border-default: rgba(255, 245, 235, 0.07);
+  --border-subtle: rgba(255, 245, 235, 0.05);
+  --border-input: rgba(255, 245, 235, 0.09);
+  --border-emphasis: rgba(255, 245, 235, 0.11);
+  --border-btn: rgba(255, 245, 235, 0.13);
 
-  /* Radius */
-  --radius-sm: 4px;
-  --radius-md: 6px;
-  --radius-base: 8px;
-  --radius-lg: 10px;
-  --radius-xl: 12px;
-  --radius-2xl: 16px;
+  /* Radius — more rounded for warm feel */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-base: 10px;
+  --radius-lg: 12px;
+  --radius-xl: 14px;
+  --radius-2xl: 18px;
 
   /* Spacing */
   --space-xs: 2px;
@@ -59,8 +60,8 @@
   --space-5xl: 28px;
   --space-6xl: 32px;
 
-  /* Typography */
-  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  /* Typography — Inter for clean geometric feel */
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --font-mono: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
   --text-xs: 11px;
   --text-sm: 13px;
@@ -70,12 +71,12 @@
   --text-2xl: 20px;
 
   /* Transitions */
-  --transition-fast: all 0.12s ease;
-  --transition-base: all 0.15s ease;
-  --transition-slow: all 0.2s ease;
+  --transition-fast: all 0.15s ease;
+  --transition-base: all 0.2s ease;
+  --transition-slow: all 0.25s ease;
 
   /* Sidebar */
-  --sidebar-width: 260px;
+  --sidebar-width: 240px;
 }
 
 * {
@@ -86,11 +87,14 @@
 
 body {
   background-color: var(--bg-base);
-  color: #e5e5e5;
+  color: var(--text-primary);
   font-family: var(--font-sans);
   height: 100vh;
   overflow: hidden;
-  line-height: 1.5;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  letter-spacing: -0.01em;
 }
 
 #root {
@@ -107,12 +111,12 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #444;
+  background: rgba(255, 245, 235, 0.1);
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #555;
+  background: rgba(255, 245, 235, 0.16);
 }
 
 /* Focus ring for accessibility */
@@ -150,7 +154,7 @@ body {
 .markdown-body h3 {
   font-weight: 600;
   margin: 0.8em 0 0.3em 0;
-  color: rgba(255, 255, 255, 0.95);
+  color: var(--text-primary);
 }
 
 .markdown-body h1 { font-size: 1.15em; }
@@ -191,18 +195,18 @@ body {
 }
 
 .markdown-body code {
-  background: rgba(255, 255, 255, 0.1);
-  padding: 0.1em 0.35em;
+  background: rgba(255, 245, 235, 0.07);
+  padding: 0.15em 0.4em;
   border-radius: var(--radius-sm);
   font-size: 0.88em;
   font-family: var(--font-mono);
 }
 
 .markdown-body pre {
-  background: rgba(0, 0, 0, 0.4);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-md);
-  padding: 0.6em 0.8em;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-base);
+  padding: 0.75em 1em;
   margin: 0 0 0.5em 0;
   overflow-x: auto;
 }
@@ -236,7 +240,7 @@ body {
 }
 
 .markdown-body th {
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(255, 245, 235, 0.04);
   font-weight: 600;
 }
 
@@ -250,7 +254,8 @@ body {
 }
 
 .markdown-body strong {
-  color: rgba(255, 255, 255, 0.95);
+  color: var(--text-primary);
+  font-weight: 600;
 }
 
 .markdown-body hr {

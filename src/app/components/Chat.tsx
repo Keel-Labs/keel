@@ -261,11 +261,11 @@ function ThinkingIndicator() {
   }, []);
 
   return (
-    <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 16, paddingRight: 48 }}>
+    <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 20, paddingRight: 56 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 0' }}>
         <OrigamiBoatLoader />
         <span className="thinking-text" style={{
-          fontSize: 13, color: 'rgba(255,255,255,0.4)',
+          fontSize: 13, color: 'var(--text-subtle)',
           fontStyle: 'italic',
         }}>
           {THINKING_MESSAGES[messageIndex]}
@@ -286,12 +286,12 @@ function ThinkingSteps({ steps, thinkingContent }: { steps: string[]; thinkingCo
 
   return (
     <div style={{
-      display: 'flex', justifyContent: 'flex-start', marginBottom: 12, paddingRight: 48,
+      display: 'flex', justifyContent: 'flex-start', marginBottom: 14, paddingRight: 56,
     }}>
       <div style={{
         background: 'var(--accent-bg-subtle)',
         border: '1px solid var(--accent-border-subtle)',
-        borderRadius: 'var(--radius-xl)', padding: '8px 14px',
+        borderRadius: 'var(--radius-lg)', padding: '8px 14px',
         maxWidth: '80%', fontSize: 12,
       }}>
         <button
@@ -299,7 +299,7 @@ function ThinkingSteps({ steps, thinkingContent }: { steps: string[]; thinkingCo
           style={{
             background: 'none', border: 'none', padding: 0, cursor: 'pointer',
             display: 'flex', alignItems: 'center', gap: 6, width: '100%',
-            color: 'rgba(255,255,255,0.5)',
+            color: 'var(--text-muted)',
           }}
         >
           <span style={{
@@ -314,8 +314,8 @@ function ThinkingSteps({ steps, thinkingContent }: { steps: string[]; thinkingCo
           <div style={{ marginTop: 6, paddingLeft: 14 }}>
             {steps.map((step, i) => (
               <div key={i} style={{
-                color: 'rgba(255,255,255,0.4)', padding: '2px 0',
-                borderLeft: '2px solid rgba(207,122,92,0.2)',
+                color: 'var(--text-subtle)', padding: '2px 0',
+                borderLeft: '2px solid var(--accent-border-faint)',
                 paddingLeft: 10, marginBottom: 2,
               }}>
                 {step}
@@ -323,8 +323,8 @@ function ThinkingSteps({ steps, thinkingContent }: { steps: string[]; thinkingCo
             ))}
             {hasRealThinking && (
               <div style={{
-                color: 'rgba(255,255,255,0.45)', padding: '6px 0 2px',
-                borderLeft: '2px solid rgba(207,122,92,0.3)',
+                color: 'var(--text-muted)', padding: '6px 0 2px',
+                borderLeft: '2px solid var(--accent-border)',
                 paddingLeft: 10, marginTop: 4,
                 whiteSpace: 'pre-wrap', lineHeight: 1.5,
                 maxHeight: 300, overflowY: 'auto',
@@ -1027,39 +1027,39 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
       {/* Message list */}
-      <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', padding: '20px 24px' }}>
+      <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', padding: '24px 28px' }}>
         {messages.length === 0 && !isStreaming && (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-            <div style={{ textAlign: 'center', maxWidth: 360 }}>
-              <div style={{ margin: '0 auto 20px', width: 56 }}>
-                <KeelIcon size={56} />
+            <div style={{ textAlign: 'center', maxWidth: 380 }}>
+              <div style={{ margin: '0 auto 24px', width: 52 }}>
+                <KeelIcon size={52} />
               </div>
-              <h2 style={{ fontSize: 'var(--text-xl)', fontWeight: 600, color: 'var(--text-primary)', marginBottom: 8 }}>Good to see you</h2>
-              <p style={{ fontSize: 'var(--text-base)', color: 'var(--text-subtle)', marginBottom: 'var(--space-4xl)', lineHeight: 1.6 }}>
+              <h2 style={{ fontSize: 'var(--text-xl)', fontWeight: 500, color: 'var(--text-primary)', marginBottom: 6, letterSpacing: '-0.02em' }}>Good to see you</h2>
+              <p style={{ fontSize: 'var(--text-base)', color: 'var(--text-muted)', marginBottom: 28, lineHeight: 1.6 }}>
                 I'm Keel, your AI chief of staff. I know your projects, priorities, and people.
               </p>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-base)' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                 {WELCOME_SUGGESTIONS.map((s) => (
                   <button
                     key={s.label}
                     onClick={() => sendMessage(s.label)}
                     style={{
-                      display: 'flex', alignItems: 'center', gap: 'var(--space-base)',
-                      padding: '10px 12px', borderRadius: 'var(--radius-xl)',
-                      background: 'var(--bg-surface)', border: '1px solid var(--border-default)',
-                      color: 'var(--text-tertiary)', fontSize: 12,
+                      display: 'flex', alignItems: 'center', gap: 10,
+                      padding: '11px 14px', borderRadius: 'var(--radius-lg)',
+                      background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
+                      color: 'var(--text-muted)', fontSize: 12,
                       cursor: 'pointer', textAlign: 'left', transition: 'var(--transition-base)',
                       fontFamily: 'inherit',
                     }}
                     onMouseEnter={(e) => {
                       e.currentTarget.style.background = 'var(--bg-surface-hover)';
-                      e.currentTarget.style.borderColor = 'var(--border-btn)';
-                      e.currentTarget.style.color = 'rgba(255,255,255,0.8)';
+                      e.currentTarget.style.borderColor = 'var(--border-emphasis)';
+                      e.currentTarget.style.color = 'var(--text-secondary)';
                     }}
                     onMouseLeave={(e) => {
                       e.currentTarget.style.background = 'var(--bg-surface)';
-                      e.currentTarget.style.borderColor = 'var(--border-default)';
-                      e.currentTarget.style.color = 'var(--text-tertiary)';
+                      e.currentTarget.style.borderColor = 'var(--border-subtle)';
+                      e.currentTarget.style.color = 'var(--text-muted)';
                     }}
                   >
                     <span>{s.icon}</span>
@@ -1096,8 +1096,8 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
 
       {/* Input area */}
       <div style={{
-        borderTop: '1px solid var(--border-default)',
-        padding: '12px 24px',
+        borderTop: '1px solid var(--border-subtle)',
+        padding: '14px 28px',
         background: 'var(--bg-base)',
       }}>
         {/* Image thumbnails */}
@@ -1162,9 +1162,9 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
               rows={1}
               style={{
                 width: '100%', background: input.startsWith('/') ? 'var(--accent-bg-subtle)' : 'var(--bg-surface)',
-                border: `1px solid ${input.startsWith('/') ? 'rgba(207,122,92,0.35)' : 'var(--border-default)'}`,
+                border: `1px solid ${input.startsWith('/') ? 'var(--accent-border)' : 'var(--border-subtle)'}`,
                 color: 'var(--text-primary)', fontSize: 'var(--text-base)', borderRadius: 'var(--radius-xl)',
-                padding: '10px 16px', resize: 'none', outline: 'none',
+                padding: '11px 18px', resize: 'none', outline: 'none',
                 fontFamily: 'inherit', transition: 'var(--transition-base)',
                 overflow: 'hidden',
                 opacity: isStreaming ? 0.4 : 1,
@@ -1178,7 +1178,7 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
               }}
               onBlur={(e) => {
                 if (!input.startsWith('/')) {
-                  e.currentTarget.style.borderColor = 'var(--border-default)';
+                  e.currentTarget.style.borderColor = 'var(--border-subtle)';
                   e.currentTarget.style.background = 'var(--bg-surface)';
                 }
               }}
@@ -1191,9 +1191,9 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
             disabled={isStreaming}
             title="Attach image"
             style={{
-              background: 'transparent', border: '1px solid var(--border-default)',
-              color: 'var(--text-subtle)', fontSize: 'var(--text-xl)', borderRadius: 'var(--radius-xl)',
-              padding: '8px 10px', cursor: isStreaming ? 'default' : 'pointer',
+              background: 'transparent', border: '1px solid var(--border-subtle)',
+              color: 'var(--text-disabled)', fontSize: 'var(--text-xl)', borderRadius: 'var(--radius-xl)',
+              padding: '9px 11px', cursor: isStreaming ? 'default' : 'pointer',
               transition: 'var(--transition-base)', flexShrink: 0, lineHeight: 1,
               opacity: isStreaming ? 0.4 : 1,
             }}
@@ -1204,8 +1204,8 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
               }
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.borderColor = 'var(--border-default)';
-              e.currentTarget.style.color = 'var(--text-subtle)';
+              e.currentTarget.style.borderColor = 'var(--border-subtle)';
+              e.currentTarget.style.color = 'var(--text-disabled)';
             }}
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -1220,10 +1220,10 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
             disabled={isStreaming || (!input.trim() && attachedImages.length === 0)}
             style={{
               background: isStreaming || (!input.trim() && attachedImages.length === 0) ? 'var(--bg-surface)' : 'var(--accent)',
-              border: isStreaming || (!input.trim() && attachedImages.length === 0) ? '1px solid var(--border-default)' : '1px solid transparent',
+              border: isStreaming || (!input.trim() && attachedImages.length === 0) ? '1px solid var(--border-subtle)' : '1px solid transparent',
               color: isStreaming || (!input.trim() && attachedImages.length === 0) ? 'var(--text-ghost)' : 'white',
-              fontSize: 'var(--text-base)', fontWeight: 500, borderRadius: 'var(--radius-xl)',
-              padding: '10px 16px', cursor: isStreaming || (!input.trim() && attachedImages.length === 0) ? 'default' : 'pointer',
+              fontSize: 'var(--text-sm)', fontWeight: 500, borderRadius: 'var(--radius-xl)',
+              padding: '10px 18px', cursor: isStreaming || (!input.trim() && attachedImages.length === 0) ? 'default' : 'pointer',
               transition: 'var(--transition-base)', flexShrink: 0, fontFamily: 'inherit',
             }}
           >
@@ -1240,16 +1240,16 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
             onClick={() => setShowModelDropdown(!showModelDropdown)}
             style={{
               background: 'none', border: 'none', padding: '2px 6px',
-              color: 'rgba(255,255,255,0.3)', fontSize: 11,
+              color: 'var(--text-disabled)', fontSize: 11,
               cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4,
-              borderRadius: 6, transition: 'all 0.15s',
+              borderRadius: 'var(--radius-sm)', transition: 'var(--transition-fast)',
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.color = 'rgba(255,255,255,0.6)';
-              e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
+              e.currentTarget.style.color = 'var(--text-muted)';
+              e.currentTarget.style.background = 'var(--bg-surface)';
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.color = 'rgba(255,255,255,0.3)';
+              e.currentTarget.style.color = 'var(--text-disabled)';
               e.currentTarget.style.background = 'none';
             }}
           >
@@ -1266,19 +1266,19 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
               />
               <div style={{
                 position: 'absolute', bottom: '100%', right: 0, marginBottom: 4,
-                background: 'var(--bg-surface-hover)', border: '1px solid var(--border-emphasis)',
-                borderRadius: 'var(--radius-lg)', padding: '4px 0', minWidth: 180,
-                boxShadow: '0 8px 24px rgba(0,0,0,0.4)', zIndex: 100,
+                background: 'var(--bg-elevated)', border: '1px solid var(--border-emphasis)',
+                borderRadius: 'var(--radius-lg)', padding: '6px 0', minWidth: 180,
+                boxShadow: '0 8px 32px rgba(0,0,0,0.5)', zIndex: 100,
                 maxHeight: 320, overflowY: 'auto',
               }}>
                 {availableProviders.has('claude') && (
                   <>
-                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', padding: '6px 14px 2px', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600 }}>Claude</div>
+                    <div style={{ fontSize: 10, color: 'var(--text-disabled)', padding: '6px 14px 2px', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>Claude</div>
                     {CLAUDE_MODELS.map((m) => {
                       const active = currentProvider === 'claude' && currentModel === m.value;
                       return (
-                        <button key={`claude-${m.value}`} onClick={() => handleModelChange('claude', m.value)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '7px 14px', border: 'none', cursor: 'pointer', background: active ? 'rgba(207,122,92,0.15)' : 'transparent', color: active ? '#CF7A5C' : 'rgba(255,255,255,0.7)', fontSize: 12, transition: 'background 0.1s' }}
-                          onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; }}
+                        <button key={`claude-${m.value}`} onClick={() => handleModelChange('claude', m.value)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '7px 14px', border: 'none', cursor: 'pointer', background: active ? 'var(--accent-bg)' : 'transparent', color: active ? 'var(--accent)' : 'var(--text-secondary)', fontSize: 12, transition: 'var(--transition-fast)' }}
+                          onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = 'var(--bg-surface)'; }}
                           onMouseLeave={(e) => { if (!active) e.currentTarget.style.background = 'transparent'; }}
                         >{m.label}</button>
                       );
@@ -1287,13 +1287,13 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
                 )}
                 {availableProviders.has('openai') && (
                   <>
-                    {availableProviders.has('claude') && <div style={{ height: 1, background: 'rgba(255,255,255,0.08)', margin: '4px 0' }} />}
-                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', padding: '6px 14px 2px', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600 }}>OpenAI</div>
+                    {availableProviders.has('claude') && <div style={{ height: 1, background: 'var(--border-default)', margin: '4px 0' }} />}
+                    <div style={{ fontSize: 10, color: 'var(--text-disabled)', padding: '6px 14px 2px', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>OpenAI</div>
                     {OPENAI_MODELS.map((m) => {
                       const active = currentProvider === 'openai' && currentModel === m.value;
                       return (
-                        <button key={`openai-${m.value}`} onClick={() => handleModelChange('openai', m.value)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '7px 14px', border: 'none', cursor: 'pointer', background: active ? 'rgba(207,122,92,0.15)' : 'transparent', color: active ? '#CF7A5C' : 'rgba(255,255,255,0.7)', fontSize: 12, transition: 'background 0.1s' }}
-                          onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; }}
+                        <button key={`openai-${m.value}`} onClick={() => handleModelChange('openai', m.value)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '7px 14px', border: 'none', cursor: 'pointer', background: active ? 'var(--accent-bg)' : 'transparent', color: active ? 'var(--accent)' : 'var(--text-secondary)', fontSize: 12, transition: 'var(--transition-fast)' }}
+                          onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = 'var(--bg-surface)'; }}
                           onMouseLeave={(e) => { if (!active) e.currentTarget.style.background = 'transparent'; }}
                         >{m.label}</button>
                       );
@@ -1302,31 +1302,31 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
                 )}
                 {availableProviders.has('ollama') && ollamaModels.length > 0 && (
                   <>
-                    {(availableProviders.has('claude') || availableProviders.has('openai')) && <div style={{ height: 1, background: 'rgba(255,255,255,0.08)', margin: '4px 0' }} />}
-                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', padding: '6px 14px 2px', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600 }}>Ollama</div>
+                    {(availableProviders.has('claude') || availableProviders.has('openai')) && <div style={{ height: 1, background: 'var(--border-default)', margin: '4px 0' }} />}
+                    <div style={{ fontSize: 10, color: 'var(--text-disabled)', padding: '6px 14px 2px', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>Ollama</div>
                     {ollamaModels.map((m) => {
                       const active = currentProvider === 'ollama' && currentModel === m.name;
                       return (
-                        <button key={`ollama-${m.name}`} onClick={() => handleModelChange('ollama', m.name)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '7px 14px', border: 'none', cursor: 'pointer', background: active ? 'rgba(207,122,92,0.15)' : 'transparent', color: active ? '#CF7A5C' : 'rgba(255,255,255,0.7)', fontSize: 12, transition: 'background 0.1s' }}
-                          onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; }}
+                        <button key={`ollama-${m.name}`} onClick={() => handleModelChange('ollama', m.name)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '7px 14px', border: 'none', cursor: 'pointer', background: active ? 'var(--accent-bg)' : 'transparent', color: active ? 'var(--accent)' : 'var(--text-secondary)', fontSize: 12, transition: 'var(--transition-fast)' }}
+                          onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = 'var(--bg-surface)'; }}
                           onMouseLeave={(e) => { if (!active) e.currentTarget.style.background = 'transparent'; }}
-                        >{m.name.split(':')[0]} <span style={{ color: 'rgba(255,255,255,0.3)' }}>{m.parameterSize}</span></button>
+                        >{m.name.split(':')[0]} <span style={{ color: 'var(--text-disabled)' }}>{m.parameterSize}</span></button>
                       );
                     })}
                   </>
                 )}
                 {availableProviders.has('openrouter') && (
                   <>
-                    {(availableProviders.has('claude') || availableProviders.has('openai') || availableProviders.has('ollama')) && <div style={{ height: 1, background: 'rgba(255,255,255,0.08)', margin: '4px 0' }} />}
-                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', padding: '6px 14px 2px', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600 }}>OpenRouter</div>
-                    <button onClick={() => handleModelChange('openrouter', openrouterModelName)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '7px 14px', border: 'none', cursor: 'pointer', background: currentProvider === 'openrouter' ? 'rgba(207,122,92,0.15)' : 'transparent', color: currentProvider === 'openrouter' ? '#CF7A5C' : 'rgba(255,255,255,0.7)', fontSize: 12, transition: 'background 0.1s' }}
-                      onMouseEnter={(e) => { if (currentProvider !== 'openrouter') e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; }}
+                    {(availableProviders.has('claude') || availableProviders.has('openai') || availableProviders.has('ollama')) && <div style={{ height: 1, background: 'var(--border-default)', margin: '4px 0' }} />}
+                    <div style={{ fontSize: 10, color: 'var(--text-disabled)', padding: '6px 14px 2px', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>OpenRouter</div>
+                    <button onClick={() => handleModelChange('openrouter', openrouterModelName)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '7px 14px', border: 'none', cursor: 'pointer', background: currentProvider === 'openrouter' ? 'var(--accent-bg)' : 'transparent', color: currentProvider === 'openrouter' ? 'var(--accent)' : 'var(--text-secondary)', fontSize: 12, transition: 'var(--transition-fast)' }}
+                      onMouseEnter={(e) => { if (currentProvider !== 'openrouter') e.currentTarget.style.background = 'var(--bg-surface)'; }}
                       onMouseLeave={(e) => { if (currentProvider !== 'openrouter') e.currentTarget.style.background = 'transparent'; }}
                     >{openrouterModelName || 'Configure in Settings'}</button>
                   </>
                 )}
                 {availableProviders.size === 0 && (
-                  <div style={{ padding: '10px 14px', color: 'rgba(255,255,255,0.4)', fontSize: 12 }}>
+                  <div style={{ padding: '10px 14px', color: 'var(--text-subtle)', fontSize: 12 }}>
                     No providers configured. Add an API key in Settings.
                   </div>
                 )}

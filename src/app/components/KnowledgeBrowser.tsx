@@ -28,14 +28,14 @@ function FolderItem({ entry, depth, onSelect, selectedPath, isTeam }: {
         style={{
           width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center',
           gap: 6, padding: '5px 8px', paddingLeft: 8 + depth * 16,
-          borderRadius: 6, border: 'none',
-          background: isActive ? 'rgba(207,122,92,0.15)' : 'transparent',
-          color: isActive ? '#CF7A5C' : 'rgba(255,255,255,0.6)',
-          fontSize: 13, cursor: 'pointer', transition: 'all 0.12s',
+          borderRadius: 'var(--radius-md)', border: 'none',
+          background: isActive ? 'var(--accent-bg)' : 'transparent',
+          color: isActive ? 'var(--accent)' : 'var(--text-tertiary)',
+          fontSize: 13, cursor: 'pointer', transition: 'var(--transition-fast)',
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
         }}
         onMouseEnter={(e) => {
-          if (!isActive) e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
+          if (!isActive) e.currentTarget.style.background = 'var(--bg-surface)';
         }}
         onMouseLeave={(e) => {
           if (!isActive) e.currentTarget.style.background = 'transparent';
@@ -54,11 +54,11 @@ function FolderItem({ entry, depth, onSelect, selectedPath, isTeam }: {
         style={{
           width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center',
           gap: 6, padding: '5px 8px', paddingLeft: 8 + depth * 16,
-          borderRadius: 6, border: 'none', background: 'transparent',
-          color: 'rgba(255,255,255,0.7)', fontSize: 13, cursor: 'pointer',
-          fontWeight: 500, transition: 'all 0.12s',
+          borderRadius: 'var(--radius-md)', border: 'none', background: 'transparent',
+          color: 'var(--text-secondary)', fontSize: 13, cursor: 'pointer',
+          fontWeight: 500, transition: 'var(--transition-fast)',
         }}
-        onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; }}
+        onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-surface)'; }}
         onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
       >
         <span style={{ fontSize: 10, opacity: 0.4, transition: 'transform 0.15s', transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)' }}>▶</span>
@@ -172,7 +172,7 @@ export default function KnowledgeBrowser({ onBack }: Props) {
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
       {/* Header */}
       <div style={{
-        padding: '16px 24px', borderBottom: '1px solid var(--border-default)',
+        padding: '18px 24px', borderBottom: '1px solid var(--border-subtle)',
         display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0,
       }}>
         <button
@@ -211,16 +211,16 @@ export default function KnowledgeBrowser({ onBack }: Props) {
             />
           ))}
           {rootEntries.length === 0 && (
-            <div style={{ padding: 16, color: 'rgba(255,255,255,0.3)', fontSize: 12, textAlign: 'center' }}>
+            <div style={{ padding: 16, color: 'var(--text-ghost)', fontSize: 12, textAlign: 'center' }}>
               No files found
             </div>
           )}
           {teamEntries.length > 0 && (
             <>
               <div style={{
-                padding: '12px 8px 4px', fontSize: 10, fontWeight: 700,
-                color: 'rgba(207,122,92,0.7)', textTransform: 'uppercase',
-                letterSpacing: '0.08em', borderTop: '1px solid var(--border-subtle)',
+                padding: '14px 8px 4px', fontSize: 10, fontWeight: 600,
+                color: 'var(--accent)', opacity: 0.7, textTransform: 'uppercase',
+                letterSpacing: '0.06em', borderTop: '1px solid var(--border-subtle)',
                 marginTop: 8,
               }}>
                 Team Brain
@@ -243,8 +243,8 @@ export default function KnowledgeBrowser({ onBack }: Props) {
         <div style={{ flex: 1, display: isMobile && !mobileShowEditor ? 'none' : 'flex', flexDirection: 'column', minWidth: 0 }}>
           {!selectedPath ? (
             <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <div style={{ textAlign: 'center', color: 'rgba(255,255,255,0.3)' }}>
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: 12 }}>
+              <div style={{ textAlign: 'center', color: 'var(--text-ghost)' }}>
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: 12, opacity: 0.5 }}>
                   <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
                 </svg>
                 <div style={{ fontSize: 14 }}>Select a file to edit</div>
@@ -262,16 +262,16 @@ export default function KnowledgeBrowser({ onBack }: Props) {
                   {isMobile && (
                     <button
                       onClick={() => setMobileShowEditor(false)}
-                      style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.6)', cursor: 'pointer', fontSize: 16, padding: '0 4px' }}
+                      style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 16, padding: '0 4px' }}
                     >
                       ←
                     </button>
                   )}
-                  {isTeamFile && <span style={{ color: '#CF7A5C', marginRight: 6, fontSize: 10, fontWeight: 700, letterSpacing: '0.04em' }}>TEAM</span>}
+                  {isTeamFile && <span style={{ color: 'var(--accent)', marginRight: 6, fontSize: 10, fontWeight: 600, letterSpacing: '0.04em' }}>TEAM</span>}
                   {selectedPath}
                 </span>
                 <span style={{
-                  fontSize: 11, color: saveStatus === 'saved' ? '#4ade80' : 'rgba(255,255,255,0.25)',
+                  fontSize: 11, color: saveStatus === 'saved' ? '#6fcf97' : 'var(--text-ghost)',
                   transition: 'color 0.3s',
                 }}>
                   {saveStatus === 'saving' ? 'Saving...' : saveStatus === 'saved' ? 'Saved' : ''}
@@ -294,7 +294,7 @@ export default function KnowledgeBrowser({ onBack }: Props) {
                           <div key={i} style={{
                             fontSize: level === 1 ? 18 : level === 2 ? 15 : 13,
                             fontWeight: 600,
-                            color: 'rgba(255,255,255,0.85)',
+                            color: 'var(--text-primary)',
                             marginTop: level === 1 ? 8 : 16,
                             marginBottom: 8,
                           }}>
@@ -310,9 +310,9 @@ export default function KnowledgeBrowser({ onBack }: Props) {
                           <label key={i} style={{
                             display: 'flex', alignItems: 'flex-start', gap: 10,
                             padding: '6px 4px', cursor: 'pointer',
-                            borderRadius: 6, transition: 'background 0.1s',
+                            borderRadius: 'var(--radius-md)', transition: 'var(--transition-fast)',
                           }}
-                            onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; }}
+                            onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-surface)'; }}
                             onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
                           >
                             <input
@@ -320,13 +320,13 @@ export default function KnowledgeBrowser({ onBack }: Props) {
                               checked={isChecked}
                               onChange={() => toggleCheckbox(i)}
                               style={{
-                                accentColor: '#CF7A5C', width: 16, height: 16,
+                                accentColor: 'var(--accent)', width: 16, height: 16,
                                 marginTop: 2, cursor: 'pointer', flexShrink: 0,
                               }}
                             />
                             <span style={{
                               fontSize: 14, lineHeight: 1.5,
-                              color: isChecked ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.85)',
+                              color: isChecked ? 'var(--text-disabled)' : 'var(--text-primary)',
                               textDecoration: isChecked ? 'line-through' : 'none',
                             }}>
                               {text}
@@ -338,7 +338,7 @@ export default function KnowledgeBrowser({ onBack }: Props) {
                       if (!line.trim()) return <div key={i} style={{ height: 8 }} />;
 
                       return (
-                        <div key={i} style={{ fontSize: 14, color: 'rgba(255,255,255,0.6)', padding: '2px 4px', lineHeight: 1.5 }}>
+                        <div key={i} style={{ fontSize: 14, color: 'var(--text-tertiary)', padding: '2px 4px', lineHeight: 1.5 }}>
                           {line}
                         </div>
                       );
