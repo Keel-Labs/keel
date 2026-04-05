@@ -129,9 +129,9 @@ export default function Sidebar({ currentSessionId, onSelectSession, onNewChat, 
               onClick={() => onSelectSession(s.id)}
               style={{
                 width: '100%', textAlign: 'left', display: 'block',
-                padding: '8px 12px', borderRadius: 'var(--radius-base)', border: 'none',
-                background: isActive ? '#2a2a2a' : 'transparent',
-                color: isActive ? '#f5f5f5' : 'var(--text-subtle)',
+                padding: '8px 10px', borderRadius: 8, border: 'none',
+                background: isActive ? '#222222' : 'transparent',
+                color: isActive ? '#e8e8e8' : '#888',
                 fontSize: 'var(--text-sm)', cursor: 'pointer', transition: 'var(--transition-fast)',
                 overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                 marginBottom: 1, lineHeight: 1.4, fontFamily: 'inherit',
