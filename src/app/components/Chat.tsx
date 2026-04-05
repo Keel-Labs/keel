@@ -1115,7 +1115,7 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
 
         {/* Unified input container — matches Claude's rounded box */}
         <div style={{
-          background: '#303030',
+          background: '#3d3d3d',
           border: '1px solid rgba(255,255,255,0.08)',
           borderRadius: 20,
           overflow: 'hidden',
