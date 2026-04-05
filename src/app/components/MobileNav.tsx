@@ -89,7 +89,7 @@ export default function MobileNav({ activeView, onNavigate, onNewChat }: Props) 
               transition: 'var(--transition-base)',
             }}
           >
-            {item.icon(isActive ? '#CF7A5C' : 'rgba(255,255,255,0.4)')}
+            {item.icon(isActive ? 'var(--accent-link)' : 'var(--text-subtle)')}
             <span>{item.label}</span>
           </button>
         );

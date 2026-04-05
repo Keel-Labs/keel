@@ -1,7 +1,6 @@
 import React, { useMemo } from 'react';
 import { marked } from 'marked';
 import type { Message as MessageType } from '../../shared/types';
-import { KeelIcon } from './KeelIcon';
 
 const renderer = new marked.Renderer();
 renderer.link = ({ href, text }) => {
@@ -24,12 +23,15 @@ export default function Message({ message }: Props) {
 
   if (isUser) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16, paddingLeft: 64 }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 18, paddingLeft: 72 }}>
         <div style={{
-          background: 'var(--accent)', color: 'white',
-          borderRadius: 'var(--radius-2xl) var(--radius-2xl) var(--radius-sm) var(--radius-2xl)',
-          padding: '10px 16px', fontSize: 'var(--text-base)', lineHeight: 1.6,
+          background: 'var(--user-message-bg)', color: 'var(--user-message-color)',
+          border: '1px solid var(--user-message-border)',
+          borderRadius: '18px 18px 8px 18px',
+          padding: '11px 16px', fontSize: 'var(--text-base)', lineHeight: 1.65,
           whiteSpace: 'pre-wrap',
+          maxWidth: 'min(680px, 82%)',
+          boxShadow: '0 10px 24px rgba(0,0,0,0.08)',
         }}>
           {message.images && message.images.length > 0 && (
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
@@ -40,7 +42,7 @@ export default function Message({ message }: Props) {
                   alt=""
                   style={{
                     maxWidth: 200, maxHeight: 200, borderRadius: 'var(--radius-base)',
-                    objectFit: 'cover', border: '2px solid rgba(255,255,255,0.2)',
+                    objectFit: 'cover', border: '1px solid var(--panel-border-strong)',
                   }}
                 />
               ))}
@@ -53,14 +55,19 @@ export default function Message({ message }: Props) {
   }
 
   return (
-    <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 16, paddingRight: 48 }}>
+    <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 26, paddingRight: 88 }}>
       <div
         className="markdown-body"
         style={{
-          background: 'var(--bg-surface)', border: '1px solid var(--border-default)',
-          borderRadius: 'var(--radius-2xl) var(--radius-2xl) var(--radius-2xl) var(--radius-sm)',
-          padding: '12px 16px', fontSize: 'var(--text-base)', lineHeight: 1.6,
-          color: 'var(--text-primary)', minWidth: 0,
+          background: 'var(--assistant-message-bg)',
+          border: '1px solid var(--assistant-message-border)',
+          borderRadius: 0,
+          padding: 0,
+          fontSize: 'var(--text-base)',
+          lineHeight: 1.78,
+          color: 'var(--text-primary)',
+          minWidth: 0,
+          maxWidth: 'min(760px, 100%)',
         }}
         dangerouslySetInnerHTML={{ __html: renderedContent || '' }}
       />

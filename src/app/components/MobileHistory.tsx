@@ -62,7 +62,7 @@ export default function MobileHistory({ onSelectSession, refreshSignal }: Props)
               transition: 'var(--transition-fast)',
               fontFamily: 'inherit',
             }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--surface-muted)'; }}
             onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
           >
             <div>{s.title}</div>

@@ -66,11 +66,11 @@ let teamFileManager: TeamFileManager | null = settings.teamBrainPath
 const isDev = process.env.NODE_ENV === 'development';
 
 function createWindow() {
-  mainWindow = new BrowserWindow({
-    width: 900,
-    height: 700,
-    minWidth: 900,
-    minHeight: 700,
+  const windowOptions: Electron.BrowserWindowConstructorOptions = {
+    width: 1220,
+    height: 830,
+    minWidth: 1080,
+    minHeight: 760,
     title: 'Keel',
     backgroundColor: '#1a1a1a',
     webPreferences: {
@@ -78,7 +78,15 @@ function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
     },
-  });
+  };
+
+  if (process.platform === 'darwin') {
+    windowOptions.titleBarStyle = 'hidden';
+    windowOptions.titleBarOverlay = true;
+    windowOptions.trafficLightPosition = { x: 14, y: 14 };
+  }
+
+  mainWindow = new BrowserWindow(windowOptions);
 
   if (isDev) {
     mainWindow.loadURL('http://localhost:5173');
