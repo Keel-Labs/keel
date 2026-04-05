@@ -84,7 +84,7 @@ export default function App() {
   // Loading state
   if (needsAuth === null || (needsAuth === false && showOnboarding === null)) {
     return (
-      <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#1a1a1a' }} />
+      <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-base)' }} />
     );
   }
 
@@ -111,7 +111,7 @@ export default function App() {
         height: '100vh',
         display: 'flex',
         flexDirection: 'column',
-        background: '#1a1a1a',
+        background: 'var(--bg-base)',
       }}>
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
           {activeView === 'chat' && (
@@ -148,7 +148,7 @@ export default function App() {
 
   // Desktop layout: sidebar + main content
   return (
-    <div style={{ height: '100vh', display: 'flex', flexDirection: 'row', background: '#1a1a1a' }}>
+    <div style={{ height: '100vh', display: 'flex', flexDirection: 'row', background: 'var(--bg-base)' }}>
       <Sidebar
         currentSessionId={currentSessionId}
         onSelectSession={handleSelectSession}
