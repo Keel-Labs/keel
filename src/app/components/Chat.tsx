@@ -1034,8 +1034,8 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
               <div style={{ margin: '0 auto 24px', width: 52 }}>
                 <KeelIcon size={52} />
               </div>
-              <h2 style={{ fontSize: 'var(--text-xl)', fontWeight: 500, color: 'var(--text-primary)', marginBottom: 6, letterSpacing: '-0.02em' }}>Good to see you</h2>
-              <p style={{ fontSize: 'var(--text-base)', color: 'var(--text-muted)', marginBottom: 28, lineHeight: 1.6 }}>
+              <h2 style={{ fontSize: 26, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 10, letterSpacing: '-0.01em', fontFamily: "'Playfair Display', Georgia, serif" }}>Good to see you</h2>
+              <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)', marginBottom: 28, lineHeight: 1.7 }}>
                 I'm Keel, your AI chief of staff. I know your projects, priorities, and people.
               </p>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
