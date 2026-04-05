@@ -39,8 +39,9 @@ export default function Onboarding({ initialSettings, onComplete }: Props) {
   };
 
   const finish = async () => {
+    const completedSettings = { ...settings, hasCompletedOnboarding: true };
     try {
-      await window.keel.saveSettings(settings);
+      await window.keel.saveSettings(completedSettings);
       await window.keel.ensureBrain();
 
       // Write initial profile if user provided info
@@ -58,7 +59,7 @@ export default function Onboarding({ initialSettings, onComplete }: Props) {
     } catch {
       // Settings save failed — still proceed
     }
-    onComplete(settings);
+    onComplete(completedSettings);
   };
 
   const selectedProvider = PROVIDERS.find((p) => p.value === settings.provider);
