@@ -77,7 +77,7 @@ export default function Onboarding({ initialSettings, onComplete }: Props) {
   const containerStyle: React.CSSProperties = {
     height: '100vh', display: 'flex', flexDirection: 'column',
     alignItems: 'center', justifyContent: 'center',
-    background: '#1a1a1a', padding: 32,
+    background: 'var(--bg-base)', padding: 'var(--space-6xl)',
   };
 
   const cardStyle: React.CSSProperties = {
@@ -85,32 +85,33 @@ export default function Onboarding({ initialSettings, onComplete }: Props) {
   };
 
   const inputStyle: React.CSSProperties = {
-    width: '100%', padding: '12px 14px', borderRadius: 10,
-    background: '#252525', border: '1px solid rgba(255,255,255,0.1)',
-    color: 'rgba(255,255,255,0.9)', fontSize: 14, outline: 'none',
-    fontFamily: 'inherit',
+    width: '100%', padding: '12px 14px', borderRadius: 'var(--radius-lg)',
+    background: 'var(--bg-surface)', border: '1px solid var(--border-input)',
+    color: 'var(--text-primary)', fontSize: 'var(--text-base)', outline: 'none',
+    fontFamily: 'inherit', transition: 'var(--transition-base)',
   };
 
   const primaryBtn: React.CSSProperties = {
-    padding: '12px 32px', borderRadius: 10, border: 'none',
-    background: '#CF7A5C', color: 'white', fontSize: 14,
-    fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s',
+    padding: '12px 32px', borderRadius: 'var(--radius-lg)', border: 'none',
+    background: 'var(--accent)', color: 'white', fontSize: 'var(--text-base)',
+    fontWeight: 600, cursor: 'pointer', transition: 'var(--transition-base)',
+    fontFamily: 'inherit',
   };
 
   const secondaryBtn: React.CSSProperties = {
-    padding: '12px 24px', borderRadius: 10, border: 'none',
-    background: 'transparent', color: 'rgba(255,255,255,0.5)',
-    fontSize: 14, cursor: 'pointer',
+    padding: '12px 24px', borderRadius: 'var(--radius-lg)', border: 'none',
+    background: 'transparent', color: 'var(--text-muted)',
+    fontSize: 'var(--text-base)', cursor: 'pointer', fontFamily: 'inherit',
   };
 
   const headingStyle: React.CSSProperties = {
-    fontSize: 20, fontWeight: 600, color: 'rgba(255,255,255,0.9)',
+    fontSize: 'var(--text-2xl)', fontWeight: 600, color: 'var(--text-primary)',
     marginBottom: 8,
   };
 
   const subtextStyle: React.CSSProperties = {
-    fontSize: 14, color: 'rgba(255,255,255,0.4)', lineHeight: 1.6,
-    marginBottom: 28,
+    fontSize: 'var(--text-base)', color: 'var(--text-subtle)', lineHeight: 1.6,
+    marginBottom: 'var(--space-5xl)',
   };
 
   return (
@@ -123,7 +124,7 @@ export default function Onboarding({ initialSettings, onComplete }: Props) {
         }}>
           <div style={{
             height: '100%', width: `${progress}%`,
-            background: '#CF7A5C', transition: 'width 0.3s ease',
+            background: 'var(--accent)', transition: 'width 0.3s ease',
           }} />
         </div>
       )}
@@ -197,10 +198,10 @@ export default function Onboarding({ initialSettings, onComplete }: Props) {
                   key={p.value}
                   style={{
                     display: 'flex', alignItems: 'center', gap: 12,
-                    padding: '12px 14px', borderRadius: 10,
-                    background: settings.provider === p.value ? 'rgba(207,122,92,0.12)' : '#252525',
-                    border: `1px solid ${settings.provider === p.value ? 'rgba(207,122,92,0.4)' : 'rgba(255,255,255,0.08)'}`,
-                    cursor: 'pointer', transition: 'all 0.15s',
+                    padding: '12px 14px', borderRadius: 'var(--radius-lg)',
+                    background: settings.provider === p.value ? 'var(--accent-bg)' : 'var(--bg-surface)',
+                    border: `1px solid ${settings.provider === p.value ? 'var(--accent-border)' : 'var(--border-default)'}`,
+                    cursor: 'pointer', transition: 'var(--transition-base)',
                   }}
                 >
                   <input
@@ -208,17 +209,17 @@ export default function Onboarding({ initialSettings, onComplete }: Props) {
                     name="provider"
                     checked={settings.provider === p.value}
                     onChange={() => setSettings({ ...settings, provider: p.value })}
-                    style={{ accentColor: '#CF7A5C' }}
+                    style={{ accentColor: 'var(--accent)' }}
                   />
                   <div>
-                    <div style={{ fontSize: 14, fontWeight: 500, color: 'rgba(255,255,255,0.9)' }}>{p.label}</div>
-                    <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>
+                    <div style={{ fontSize: 'var(--text-base)', fontWeight: 500, color: 'var(--text-primary)' }}>{p.label}</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-subtle)', marginTop: 2 }}>
                       {p.description}
                       {p.value === 'ollama' && (
                         <>
                           {' '}
                           <a href="https://ollama.com/download" target="_blank" rel="noopener noreferrer"
-                            style={{ color: '#CF7A5C' }}>
+                            style={{ color: 'var(--accent)' }}>
                             Download Ollama
                           </a>
                         </>
@@ -298,7 +299,7 @@ export default function Onboarding({ initialSettings, onComplete }: Props) {
             </p>
             <div style={{ textAlign: 'left', marginBottom: 24 }}>
               <label style={{
-                fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.5)',
+                fontSize: 12, fontWeight: 600, color: 'var(--text-muted)',
                 marginBottom: 6, display: 'block', textTransform: 'uppercase',
                 letterSpacing: '0.04em',
               }}>Your Name</label>
@@ -310,7 +311,7 @@ export default function Onboarding({ initialSettings, onComplete }: Props) {
                 style={{ ...inputStyle, marginBottom: 16 }}
               />
               <label style={{
-                fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.5)',
+                fontSize: 12, fontWeight: 600, color: 'var(--text-muted)',
                 marginBottom: 6, display: 'block', textTransform: 'uppercase',
                 letterSpacing: '0.04em',
               }}>Your Role</label>
@@ -349,11 +350,11 @@ export default function Onboarding({ initialSettings, onComplete }: Props) {
               Start by telling Keel about your projects and priorities. The more context you share, the more helpful Keel becomes.
             </p>
             <div style={{
-              textAlign: 'left', background: '#252525', borderRadius: 12,
+              textAlign: 'left', background: 'var(--bg-surface)', borderRadius: 'var(--radius-xl)',
               padding: '16px 18px', marginBottom: 24,
-              border: '1px solid rgba(255,255,255,0.08)',
+              border: '1px solid var(--border-default)',
             }}>
-              <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', lineHeight: 1.6 }}>
+              <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-tertiary)', lineHeight: 1.6 }}>
                 <strong style={{ color: 'rgba(255,255,255,0.85)' }}>Quick tips:</strong>
                 <br />
                 - Tell me about your projects and I'll remember them

@@ -35,15 +35,16 @@ export default function AuthScreen({ onAuthenticated }: Props) {
 
   const inputStyle: React.CSSProperties = {
     width: '100%',
-    background: '#252525',
-    border: '1px solid rgba(255,255,255,0.1)',
-    color: 'rgba(255,255,255,0.9)',
-    fontSize: 14,
-    borderRadius: 10,
+    background: 'var(--bg-surface)',
+    border: '1px solid var(--border-input)',
+    color: 'var(--text-primary)',
+    fontSize: 'var(--text-base)',
+    borderRadius: 'var(--radius-lg)',
     padding: '10px 14px',
     outline: 'none',
     boxSizing: 'border-box',
     fontFamily: 'inherit',
+    transition: 'var(--transition-base)',
   };
 
   return (
@@ -52,35 +53,35 @@ export default function AuthScreen({ onAuthenticated }: Props) {
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      background: '#1a1a1a',
+      background: 'var(--bg-base)',
     }}>
       <div style={{
         width: 360,
-        padding: 32,
-        background: '#1e1e1e',
-        border: '1px solid rgba(255,255,255,0.08)',
-        borderRadius: 16,
+        padding: 'var(--space-6xl)',
+        background: 'var(--bg-elevated)',
+        border: '1px solid var(--border-default)',
+        borderRadius: 'var(--radius-2xl)',
       }}>
         {/* Logo */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: 24 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: 'var(--space-4xl)' }}>
           <KeelIcon size={36} />
           <KeelWordmark height={20} />
         </div>
 
         <h2 style={{
           textAlign: 'center',
-          fontSize: 18,
+          fontSize: 'var(--text-xl)',
           fontWeight: 600,
-          color: 'rgba(255,255,255,0.9)',
+          color: 'var(--text-primary)',
           marginBottom: 4,
         }}>
           {mode === 'login' ? 'Welcome back' : 'Create your account'}
         </h2>
         <p style={{
           textAlign: 'center',
-          fontSize: 13,
-          color: 'rgba(255,255,255,0.4)',
-          marginBottom: 24,
+          fontSize: 'var(--text-sm)',
+          color: 'var(--text-subtle)',
+          marginBottom: 'var(--space-4xl)',
         }}>
           {mode === 'login'
             ? 'Sign in to your Keel account'
@@ -132,17 +133,18 @@ export default function AuthScreen({ onAuthenticated }: Props) {
             disabled={loading}
             style={{
               width: '100%',
-              background: '#CF7A5C',
+              background: 'var(--accent)',
               border: 'none',
               color: 'white',
-              fontSize: 14,
+              fontSize: 'var(--text-base)',
               fontWeight: 600,
-              borderRadius: 10,
+              borderRadius: 'var(--radius-lg)',
               padding: '11px 16px',
               cursor: loading ? 'default' : 'pointer',
               opacity: loading ? 0.6 : 1,
-              transition: 'opacity 0.15s',
+              transition: 'var(--transition-base)',
               marginTop: 4,
+              fontFamily: 'inherit',
             }}
           >
             {loading
@@ -167,7 +169,7 @@ export default function AuthScreen({ onAuthenticated }: Props) {
                 style={{
                   background: 'none',
                   border: 'none',
-                  color: '#CF7A5C',
+                  color: 'var(--accent)',
                   cursor: 'pointer',
                   fontSize: 13,
                   padding: 0,
@@ -184,7 +186,7 @@ export default function AuthScreen({ onAuthenticated }: Props) {
                 style={{
                   background: 'none',
                   border: 'none',
-                  color: '#CF7A5C',
+                  color: 'var(--accent)',
                   cursor: 'pointer',
                   fontSize: 13,
                   padding: 0,
