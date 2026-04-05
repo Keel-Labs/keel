@@ -26,9 +26,9 @@ export function KeelWordmark({ height = 20 }: { height?: number }) {
         y="40"
         fontFamily="'Playfair Display', Georgia, 'Times New Roman', serif"
         fontSize="44"
-        fontWeight="400"
+        fontWeight="700"
         fill="var(--text-primary)"
-        letterSpacing="2"
+        letterSpacing="1"
       >Keel</text>
     </svg>
   );
