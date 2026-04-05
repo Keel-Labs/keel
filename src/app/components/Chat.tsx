@@ -613,27 +613,6 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
     }
   }, [loadSessionId]);
 
-  // Load the last session on mount (only if no specific session was requested)
-  useEffect(() => {
-    if (loadSessionId) return; // A specific session was requested — skip auto-load
-    (async () => {
-      try {
-        const latestId = await window.keel.getLatestSession();
-        if (latestId) {
-          const saved = await window.keel.loadChat(latestId);
-          if (saved && saved.length > 0) {
-            justLoadedRef.current = true;
-            setSessionId(latestId);
-            setMessages(saved);
-            onSessionChange(latestId);
-          }
-        }
-      } catch {
-        // First launch, no sessions yet
-      }
-    })();
-  }, []);
-
   // Listen for scheduled notifications (daily brief / EOD)
   useEffect(() => {
     window.keel.onScheduledNotification((notification) => {
@@ -695,6 +674,7 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
   const startNewChat = () => {
     setMessages([]);
     setSessionId(generateSessionId());
+    onSessionChange('');
   };
 
   const handleModelChange = async (provider: string, model: string) => {
