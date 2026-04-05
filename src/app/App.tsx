@@ -14,6 +14,11 @@ import type { Settings as SettingsType } from '../shared/types';
 import { getKeelAPI, loadTokens, isAuthenticated, setOnAuthExpired } from '../lib/api-client';
 import { useIsMobile } from '../lib/useIsMobile';
 import { applyTheme } from './theme';
+import {
+  consumeForceOnboardingFlag,
+  FORCE_ONBOARDING_ONCE_KEY,
+  shouldShowOnboarding,
+} from './onboarding';
 
 type MobileView = 'chat' | 'settings' | 'knowledge' | 'history';
 type DesktopMode = 'chat' | 'team-brain';
@@ -154,6 +159,17 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (typeof window === 'undefined' || !import.meta.env.DEV) return;
+
+    (window as any).keelDebug = {
+      forceOnboardingOnce: () => {
+        window.localStorage.setItem(FORCE_ONBOARDING_ONCE_KEY, '1');
+        window.location.reload();
+      },
+    };
+  }, []);
+
+  useEffect(() => {
     if (isElectron) {
       setNeedsAuth(false);
       window.keel.getSettings().then((settings) => {
@@ -173,9 +189,10 @@ export default function App() {
     window.keel.getSettings().then((settings) => {
       applyTheme(settings.theme);
       setInitialSettings(settings);
-      const hasKey = settings.anthropicApiKey || settings.openaiApiKey || settings.openrouterApiKey;
-      const isOllama = settings.provider === 'ollama';
-      setShowOnboarding(!hasKey && !isOllama);
+      const forceOnboarding = import.meta.env.DEV
+        ? consumeForceOnboardingFlag(window.localStorage)
+        : false;
+      setShowOnboarding(shouldShowOnboarding(settings, { forceOnboarding }));
     }).catch(() => {
       setShowOnboarding(true);
     });
@@ -220,12 +237,14 @@ export default function App() {
     }
   }, []);
 
-  const handleOnboardingComplete = () => {
+  const handleOnboardingComplete = (settings: SettingsType) => {
+    setInitialSettings(settings);
     setShowOnboarding(false);
   };
 
   const handleNewChat = () => {
     setLoadSessionId(null);
+    setCurrentSessionId('');
     setNewChatSignal((value) => value + 1);
     setMobileView('chat');
     navigateDesktop('chat', { mode: 'chat' });
