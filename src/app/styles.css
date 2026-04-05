@@ -1,5 +1,83 @@
 @import "tailwindcss";
 
+/* ── Design Tokens (from UI_STYLE_GUIDE.md) ── */
+:root {
+  /* Backgrounds */
+  --bg-base: #1a1a1a;
+  --bg-sidebar: #151515;
+  --bg-surface: #252525;
+  --bg-surface-hover: #2a2a2a;
+  --bg-input-focus: #282828;
+  --bg-elevated: #1e1e1e;
+  --bg-raw-editor: #161616;
+  --bg-btn-secondary: #303030;
+
+  /* Accent */
+  --accent: #CF7A5C;
+  --accent-hover: #d98b6f;
+  --accent-bg: rgba(207, 122, 92, 0.12);
+  --accent-bg-subtle: rgba(207, 122, 92, 0.06);
+  --accent-border: rgba(207, 122, 92, 0.4);
+  --accent-border-subtle: rgba(207, 122, 92, 0.15);
+  --accent-border-faint: rgba(207, 122, 92, 0.2);
+  --accent-link: #E09A80;
+
+  /* Text */
+  --text-primary: rgba(255, 255, 255, 0.9);
+  --text-secondary: rgba(255, 255, 255, 0.7);
+  --text-tertiary: rgba(255, 255, 255, 0.6);
+  --text-muted: rgba(255, 255, 255, 0.5);
+  --text-subtle: rgba(255, 255, 255, 0.4);
+  --text-disabled: rgba(255, 255, 255, 0.3);
+  --text-ghost: rgba(255, 255, 255, 0.2);
+
+  /* Borders */
+  --border-default: rgba(255, 255, 255, 0.08);
+  --border-subtle: rgba(255, 255, 255, 0.06);
+  --border-input: rgba(255, 255, 255, 0.1);
+  --border-emphasis: rgba(255, 255, 255, 0.12);
+  --border-btn: rgba(255, 255, 255, 0.15);
+
+  /* Radius */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-base: 8px;
+  --radius-lg: 10px;
+  --radius-xl: 12px;
+  --radius-2xl: 16px;
+
+  /* Spacing */
+  --space-xs: 2px;
+  --space-sm: 4px;
+  --space-md: 6px;
+  --space-base: 8px;
+  --space-lg: 10px;
+  --space-xl: 12px;
+  --space-2xl: 16px;
+  --space-3xl: 20px;
+  --space-4xl: 24px;
+  --space-5xl: 28px;
+  --space-6xl: 32px;
+
+  /* Typography */
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  --text-xs: 11px;
+  --text-sm: 13px;
+  --text-base: 14px;
+  --text-lg: 16px;
+  --text-xl: 18px;
+  --text-2xl: 20px;
+
+  /* Transitions */
+  --transition-fast: all 0.12s ease;
+  --transition-base: all 0.15s ease;
+  --transition-slow: all 0.2s ease;
+
+  /* Sidebar */
+  --sidebar-width: 260px;
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -7,11 +85,12 @@
 }
 
 body {
-  background-color: #1a1a1a;
+  background-color: var(--bg-base);
   color: #e5e5e5;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: var(--font-sans);
   height: 100vh;
   overflow: hidden;
+  line-height: 1.5;
 }
 
 #root {
@@ -34,6 +113,12 @@ body {
 
 ::-webkit-scrollbar-thumb:hover {
   background: #555;
+}
+
+/* Focus ring for accessibility */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 /* (nautical loader is inline SVG — no CSS animation needed) */
@@ -108,15 +193,15 @@ body {
 .markdown-body code {
   background: rgba(255, 255, 255, 0.1);
   padding: 0.1em 0.35em;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   font-size: 0.88em;
-  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-family: var(--font-mono);
 }
 
 .markdown-body pre {
   background: rgba(0, 0, 0, 0.4);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 6px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
   padding: 0.6em 0.8em;
   margin: 0 0 0.5em 0;
   overflow-x: auto;
@@ -130,10 +215,10 @@ body {
 }
 
 .markdown-body blockquote {
-  border-left: 3px solid rgba(207, 122, 92, 0.4);
+  border-left: 3px solid var(--accent-border);
   padding-left: 0.8em;
   margin: 0 0 0.5em 0;
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--text-tertiary);
 }
 
 .markdown-body table {
@@ -145,7 +230,7 @@ body {
 
 .markdown-body th,
 .markdown-body td {
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--border-input);
   padding: 0.3em 0.6em;
   text-align: left;
 }
@@ -156,7 +241,7 @@ body {
 }
 
 .markdown-body a {
-  color: #E09A80;
+  color: var(--accent-link);
   text-decoration: none;
 }
 
@@ -170,6 +255,6 @@ body {
 
 .markdown-body hr {
   border: none;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  border-top: 1px solid var(--border-input);
   margin: 0.6em 0;
 }
