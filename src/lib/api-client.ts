@@ -456,17 +456,26 @@ export const apiClient: KeelAPI = {
     return { models: [], error: 'Ollama is only available in desktop mode.' };
   },
 
-  // Team brain (mapped to brain files with team/ prefix in cloud mode)
+  // Team brain (shared across all users on the cloud server)
   async listTeamFiles(dirPath: string): Promise<FileEntry[]> {
-    return apiClient.listFiles(`team/${dirPath}`);
+    const entries = await apiGet<Array<{ name: string; isDir: boolean; path: string }>>(
+      `/api/team/files?dir=${encodeURIComponent(dirPath)}`
+    );
+    return entries.map((e) => ({
+      name: e.name,
+      path: e.path,
+      isDirectory: e.isDir,
+      updatedAt: 0,
+    }));
   },
 
   async readTeamFile(filePath: string): Promise<string> {
-    return apiClient.readFile(`team/${filePath}`);
+    const data = await apiGet<{ content: string }>(`/api/team/file?path=${encodeURIComponent(filePath)}`);
+    return data.content;
   },
 
   async writeTeamFile(filePath: string, content: string): Promise<void> {
-    return apiClient.writeFile(`team/${filePath}`, content);
+    await apiPut('/api/team/file', { path: filePath, content });
   },
 };
 
