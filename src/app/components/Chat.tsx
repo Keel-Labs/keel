@@ -1099,245 +1099,249 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
 
       {/* Input area */}
       <div style={{
-        borderTop: isStreaming ? 'none' : '1px solid var(--border-subtle)',
-        padding: '14px 32px',
+        padding: '12px 32px 16px',
         background: 'var(--bg-chat)',
       }}>
       <div style={{ maxWidth: 720, margin: '0 auto' }}>
-        {/* Image thumbnails */}
-        {attachedImages.length > 0 && (
-          <div style={{ display: 'flex', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
-            {attachedImages.map((img, i) => (
-              <div key={i} style={{ position: 'relative' }}>
-                <img
-                  src={`data:${img.mediaType};base64,${img.data}`}
-                  alt=""
-                  style={{
-                    width: 56, height: 56, borderRadius: 'var(--radius-base)', objectFit: 'cover',
-                    border: '1px solid var(--border-emphasis)',
-                  }}
-                />
-                <button
-                  onClick={() => removeImage(i)}
-                  style={{
-                    position: 'absolute', top: -6, right: -6,
-                    width: 18, height: 18, borderRadius: '50%',
-                    background: 'var(--accent)', border: 'none', color: 'white',
-                    fontSize: 11, cursor: 'pointer', display: 'flex',
-                    alignItems: 'center', justifyContent: 'center',
-                    lineHeight: 1, padding: 0,
-                  }}
-                >
-                  ×
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
+        {/* Hidden file input */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/gif,image/webp"
+          multiple
+          onChange={handleFileChange}
+          style={{ display: 'none' }}
+        />
 
-        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10, position: 'relative' }}>
-          {/* Hidden file input */}
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/jpeg,image/png,image/gif,image/webp"
-            multiple
-            onChange={handleFileChange}
-            style={{ display: 'none' }}
+        {/* Unified input container — matches Claude's rounded box */}
+        <div style={{
+          background: '#303030',
+          border: '1px solid rgba(255,255,255,0.08)',
+          borderRadius: 20,
+          overflow: 'hidden',
+          opacity: isStreaming ? 0.5 : 1,
+          transition: 'var(--transition-base)',
+        }}>
+          {/* Image thumbnails inside the container */}
+          {attachedImages.length > 0 && (
+            <div style={{ display: 'flex', gap: 8, padding: '12px 16px 0', flexWrap: 'wrap' }}>
+              {attachedImages.map((img, i) => (
+                <div key={i} style={{ position: 'relative' }}>
+                  <img
+                    src={`data:${img.mediaType};base64,${img.data}`}
+                    alt=""
+                    style={{
+                      width: 56, height: 56, borderRadius: 8, objectFit: 'cover',
+                    }}
+                  />
+                  <button
+                    onClick={() => removeImage(i)}
+                    style={{
+                      position: 'absolute', top: -6, right: -6,
+                      width: 18, height: 18, borderRadius: '50%',
+                      background: '#666', border: 'none', color: 'white',
+                      fontSize: 11, cursor: 'pointer', display: 'flex',
+                      alignItems: 'center', justifyContent: 'center',
+                      lineHeight: 1, padding: 0,
+                    }}
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Command indicator */}
+          {input.startsWith('/') && (
+            <div style={{
+              padding: '8px 16px 0',
+              fontSize: 'var(--text-xs)', fontWeight: 600, color: 'var(--accent)',
+              letterSpacing: '0.03em', opacity: 0.8,
+            }}>
+              / COMMAND
+            </div>
+          )}
+
+          {/* Textarea */}
+          <textarea
+            ref={textareaRef}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Message Keel..."
+            disabled={isStreaming}
+            rows={1}
+            style={{
+              width: '100%', background: 'transparent',
+              border: 'none',
+              color: '#ececec', fontSize: 'var(--text-base)',
+              padding: '14px 16px 8px', resize: 'none', outline: 'none',
+              fontFamily: 'inherit',
+              overflow: 'hidden',
+              boxSizing: 'border-box',
+              lineHeight: 1.5,
+            }}
           />
 
-          <div style={{ flex: 1, position: 'relative' }}>
-            {input.startsWith('/') && (
-              <div style={{
-                position: 'absolute', top: -24, left: 4,
-                fontSize: 'var(--text-xs)', fontWeight: 600, color: 'var(--accent)',
-                letterSpacing: '0.03em', opacity: 0.8,
-              }}>
-                / COMMAND
-              </div>
-            )}
-            <textarea
-              ref={textareaRef}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="Message Keel..."
-              disabled={isStreaming}
-              rows={1}
-              style={{
-                width: '100%', background: input.startsWith('/') ? 'var(--accent-bg-subtle)' : 'var(--bg-surface)',
-                border: `1px solid ${input.startsWith('/') ? 'var(--accent-border)' : 'var(--border-subtle)'}`,
-                color: 'var(--text-primary)', fontSize: 'var(--text-base)', borderRadius: 'var(--radius-xl)',
-                padding: '11px 18px', resize: 'none', outline: 'none',
-                fontFamily: 'inherit', transition: 'var(--transition-base)',
-                overflow: 'hidden',
-                opacity: isStreaming ? 0.4 : 1,
-                boxSizing: 'border-box',
-              }}
-              onFocus={(e) => {
-                if (!input.startsWith('/')) {
-                  e.currentTarget.style.borderColor = 'var(--accent-border)';
-                  e.currentTarget.style.background = 'var(--bg-input-focus)';
-                }
-              }}
-              onBlur={(e) => {
-                if (!input.startsWith('/')) {
-                  e.currentTarget.style.borderColor = 'var(--border-subtle)';
-                  e.currentTarget.style.background = 'var(--bg-surface)';
-                }
-              }}
-            />
-          </div>
+          {/* Bottom toolbar — buttons left, model+send right */}
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            padding: '4px 10px 10px',
+          }}>
+            {/* Left: action buttons */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <button
+                onClick={handleImageAttach}
+                disabled={isStreaming}
+                title="Attach image"
+                style={{
+                  background: 'transparent', border: 'none',
+                  color: '#888', fontSize: 'var(--text-xl)',
+                  padding: '6px 8px', cursor: isStreaming ? 'default' : 'pointer',
+                  transition: 'var(--transition-fast)', lineHeight: 1,
+                  borderRadius: 8, display: 'flex', alignItems: 'center',
+                }}
+                onMouseEnter={(e) => {
+                  if (!isStreaming) {
+                    e.currentTarget.style.color = '#ccc';
+                    e.currentTarget.style.background = 'rgba(255,255,255,0.06)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.color = '#888';
+                  e.currentTarget.style.background = 'transparent';
+                }}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                  <circle cx="8.5" cy="8.5" r="1.5"/>
+                  <polyline points="21 15 16 10 5 21"/>
+                </svg>
+              </button>
+            </div>
 
-          {/* Image attach button */}
-          <button
-            onClick={handleImageAttach}
-            disabled={isStreaming}
-            title="Attach image"
-            style={{
-              background: 'transparent', border: '1px solid var(--border-subtle)',
-              color: 'var(--text-disabled)', fontSize: 'var(--text-xl)', borderRadius: 'var(--radius-xl)',
-              padding: '9px 11px', cursor: isStreaming ? 'default' : 'pointer',
-              transition: 'var(--transition-base)', flexShrink: 0, lineHeight: 1,
-              opacity: isStreaming ? 0.4 : 1,
-            }}
-            onMouseEnter={(e) => {
-              if (!isStreaming) {
-                e.currentTarget.style.borderColor = 'var(--accent-border)';
-                e.currentTarget.style.color = 'var(--text-secondary)';
-              }
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.borderColor = 'var(--border-subtle)';
-              e.currentTarget.style.color = 'var(--text-disabled)';
-            }}
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-              <circle cx="8.5" cy="8.5" r="1.5"/>
-              <polyline points="21 15 16 10 5 21"/>
-            </svg>
-          </button>
+            {/* Right: model selector + send button */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, position: 'relative' }}>
+              {/* Model selector */}
+              <button
+                onClick={() => setShowModelDropdown(!showModelDropdown)}
+                style={{
+                  background: 'none', border: 'none', padding: '4px 8px',
+                  color: '#888', fontSize: 12,
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4,
+                  borderRadius: 6, transition: 'var(--transition-fast)',
+                  fontFamily: 'inherit',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.color = '#ccc';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.color = '#888';
+                }}
+              >
+                {getModelLabel()}
+                <span style={{ fontSize: 8 }}>▼</span>
+              </button>
 
-          <button
-            onClick={() => sendMessage()}
-            disabled={isStreaming || (!input.trim() && attachedImages.length === 0)}
-            style={{
-              background: isStreaming || (!input.trim() && attachedImages.length === 0) ? 'var(--bg-surface)' : 'var(--accent)',
-              border: isStreaming || (!input.trim() && attachedImages.length === 0) ? '1px solid var(--border-subtle)' : '1px solid transparent',
-              color: isStreaming || (!input.trim() && attachedImages.length === 0) ? 'var(--text-ghost)' : 'white',
-              fontSize: 'var(--text-sm)', fontWeight: 500, borderRadius: 'var(--radius-xl)',
-              padding: '10px 18px', cursor: isStreaming || (!input.trim() && attachedImages.length === 0) ? 'default' : 'pointer',
-              transition: 'var(--transition-base)', flexShrink: 0, fontFamily: 'inherit',
-            }}
-          >
-            Send
-          </button>
-        </div>
-
-        {/* Model selector bar */}
-        <div style={{
-          display: 'flex', justifyContent: 'flex-end', alignItems: 'center',
-          marginTop: 6, paddingRight: 2, position: 'relative',
-        }}>
-          <button
-            onClick={() => setShowModelDropdown(!showModelDropdown)}
-            style={{
-              background: 'none', border: 'none', padding: '2px 6px',
-              color: 'var(--text-disabled)', fontSize: 11,
-              cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4,
-              borderRadius: 'var(--radius-sm)', transition: 'var(--transition-fast)',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.color = 'var(--text-muted)';
-              e.currentTarget.style.background = 'var(--bg-surface)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.color = 'var(--text-disabled)';
-              e.currentTarget.style.background = 'none';
-            }}
-          >
-            {getModelLabel()}
-            <span style={{ fontSize: 8 }}>▼</span>
-          </button>
-
-          {showModelDropdown && (
-            <>
-              {/* Backdrop to close */}
-              <div
-                onClick={() => setShowModelDropdown(false)}
-                style={{ position: 'fixed', inset: 0, zIndex: 99 }}
-              />
-              <div style={{
-                position: 'absolute', bottom: '100%', right: 0, marginBottom: 4,
-                background: 'var(--bg-elevated)', border: '1px solid var(--border-emphasis)',
-                borderRadius: 'var(--radius-lg)', padding: '6px 0', minWidth: 180,
-                boxShadow: '0 8px 32px rgba(0,0,0,0.5)', zIndex: 100,
-                maxHeight: 320, overflowY: 'auto',
-              }}>
-                {availableProviders.has('claude') && (
-                  <>
-                    <div style={{ fontSize: 10, color: 'var(--text-disabled)', padding: '6px 14px 2px', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>Claude</div>
-                    {CLAUDE_MODELS.map((m) => {
-                      const active = currentProvider === 'claude' && currentModel === m.value;
-                      return (
-                        <button key={`claude-${m.value}`} onClick={() => handleModelChange('claude', m.value)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '7px 14px', border: 'none', cursor: 'pointer', background: active ? 'var(--accent-bg)' : 'transparent', color: active ? 'var(--accent)' : 'var(--text-secondary)', fontSize: 12, transition: 'var(--transition-fast)' }}
-                          onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = 'var(--bg-surface)'; }}
-                          onMouseLeave={(e) => { if (!active) e.currentTarget.style.background = 'transparent'; }}
-                        >{m.label}</button>
-                      );
-                    })}
-                  </>
-                )}
-                {availableProviders.has('openai') && (
-                  <>
-                    {availableProviders.has('claude') && <div style={{ height: 1, background: 'var(--border-default)', margin: '4px 0' }} />}
-                    <div style={{ fontSize: 10, color: 'var(--text-disabled)', padding: '6px 14px 2px', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>OpenAI</div>
-                    {OPENAI_MODELS.map((m) => {
-                      const active = currentProvider === 'openai' && currentModel === m.value;
-                      return (
-                        <button key={`openai-${m.value}`} onClick={() => handleModelChange('openai', m.value)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '7px 14px', border: 'none', cursor: 'pointer', background: active ? 'var(--accent-bg)' : 'transparent', color: active ? 'var(--accent)' : 'var(--text-secondary)', fontSize: 12, transition: 'var(--transition-fast)' }}
-                          onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = 'var(--bg-surface)'; }}
-                          onMouseLeave={(e) => { if (!active) e.currentTarget.style.background = 'transparent'; }}
-                        >{m.label}</button>
-                      );
-                    })}
-                  </>
-                )}
-                {availableProviders.has('ollama') && ollamaModels.length > 0 && (
-                  <>
-                    {(availableProviders.has('claude') || availableProviders.has('openai')) && <div style={{ height: 1, background: 'var(--border-default)', margin: '4px 0' }} />}
-                    <div style={{ fontSize: 10, color: 'var(--text-disabled)', padding: '6px 14px 2px', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>Ollama</div>
-                    {ollamaModels.map((m) => {
-                      const active = currentProvider === 'ollama' && currentModel === m.name;
-                      return (
-                        <button key={`ollama-${m.name}`} onClick={() => handleModelChange('ollama', m.name)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '7px 14px', border: 'none', cursor: 'pointer', background: active ? 'var(--accent-bg)' : 'transparent', color: active ? 'var(--accent)' : 'var(--text-secondary)', fontSize: 12, transition: 'var(--transition-fast)' }}
-                          onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = 'var(--bg-surface)'; }}
-                          onMouseLeave={(e) => { if (!active) e.currentTarget.style.background = 'transparent'; }}
-                        >{m.name.split(':')[0]} <span style={{ color: 'var(--text-disabled)' }}>{m.parameterSize}</span></button>
-                      );
-                    })}
-                  </>
-                )}
-                {availableProviders.has('openrouter') && (
-                  <>
-                    {(availableProviders.has('claude') || availableProviders.has('openai') || availableProviders.has('ollama')) && <div style={{ height: 1, background: 'var(--border-default)', margin: '4px 0' }} />}
-                    <div style={{ fontSize: 10, color: 'var(--text-disabled)', padding: '6px 14px 2px', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>OpenRouter</div>
-                    <button onClick={() => handleModelChange('openrouter', openrouterModelName)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '7px 14px', border: 'none', cursor: 'pointer', background: currentProvider === 'openrouter' ? 'var(--accent-bg)' : 'transparent', color: currentProvider === 'openrouter' ? 'var(--accent)' : 'var(--text-secondary)', fontSize: 12, transition: 'var(--transition-fast)' }}
-                      onMouseEnter={(e) => { if (currentProvider !== 'openrouter') e.currentTarget.style.background = 'var(--bg-surface)'; }}
-                      onMouseLeave={(e) => { if (currentProvider !== 'openrouter') e.currentTarget.style.background = 'transparent'; }}
-                    >{openrouterModelName || 'Configure in Settings'}</button>
-                  </>
-                )}
-                {availableProviders.size === 0 && (
-                  <div style={{ padding: '10px 14px', color: 'var(--text-subtle)', fontSize: 12 }}>
-                    No providers configured. Add an API key in Settings.
+              {showModelDropdown && (
+                <>
+                  <div
+                    onClick={() => setShowModelDropdown(false)}
+                    style={{ position: 'fixed', inset: 0, zIndex: 99 }}
+                  />
+                  <div style={{
+                    position: 'absolute', bottom: '100%', right: 0, marginBottom: 4,
+                    background: '#242424', border: '1px solid rgba(255,255,255,0.12)',
+                    borderRadius: 12, padding: '6px 0', minWidth: 180,
+                    boxShadow: '0 8px 32px rgba(0,0,0,0.5)', zIndex: 100,
+                    maxHeight: 320, overflowY: 'auto',
+                  }}>
+                    {availableProviders.has('claude') && (
+                      <>
+                        <div style={{ fontSize: 10, color: '#666', padding: '6px 14px 2px', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>Claude</div>
+                        {CLAUDE_MODELS.map((m) => {
+                          const active = currentProvider === 'claude' && currentModel === m.value;
+                          return (
+                            <button key={`claude-${m.value}`} onClick={() => handleModelChange('claude', m.value)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '7px 14px', border: 'none', cursor: 'pointer', background: active ? 'var(--accent-bg)' : 'transparent', color: active ? 'var(--accent)' : '#ccc', fontSize: 12, transition: 'var(--transition-fast)', fontFamily: 'inherit' }}
+                              onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = '#2a2a2a'; }}
+                              onMouseLeave={(e) => { if (!active) e.currentTarget.style.background = 'transparent'; }}
+                            >{m.label}</button>
+                          );
+                        })}
+                      </>
+                    )}
+                    {availableProviders.has('openai') && (
+                      <>
+                        {availableProviders.has('claude') && <div style={{ height: 1, background: 'rgba(255,255,255,0.08)', margin: '4px 0' }} />}
+                        <div style={{ fontSize: 10, color: '#666', padding: '6px 14px 2px', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>OpenAI</div>
+                        {OPENAI_MODELS.map((m) => {
+                          const active = currentProvider === 'openai' && currentModel === m.value;
+                          return (
+                            <button key={`openai-${m.value}`} onClick={() => handleModelChange('openai', m.value)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '7px 14px', border: 'none', cursor: 'pointer', background: active ? 'var(--accent-bg)' : 'transparent', color: active ? 'var(--accent)' : '#ccc', fontSize: 12, transition: 'var(--transition-fast)', fontFamily: 'inherit' }}
+                              onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = '#2a2a2a'; }}
+                              onMouseLeave={(e) => { if (!active) e.currentTarget.style.background = 'transparent'; }}
+                            >{m.label}</button>
+                          );
+                        })}
+                      </>
+                    )}
+                    {availableProviders.has('ollama') && ollamaModels.length > 0 && (
+                      <>
+                        {(availableProviders.has('claude') || availableProviders.has('openai')) && <div style={{ height: 1, background: 'rgba(255,255,255,0.08)', margin: '4px 0' }} />}
+                        <div style={{ fontSize: 10, color: '#666', padding: '6px 14px 2px', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>Ollama</div>
+                        {ollamaModels.map((m) => {
+                          const active = currentProvider === 'ollama' && currentModel === m.name;
+                          return (
+                            <button key={`ollama-${m.name}`} onClick={() => handleModelChange('ollama', m.name)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '7px 14px', border: 'none', cursor: 'pointer', background: active ? 'var(--accent-bg)' : 'transparent', color: active ? 'var(--accent)' : '#ccc', fontSize: 12, transition: 'var(--transition-fast)', fontFamily: 'inherit' }}
+                              onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = '#2a2a2a'; }}
+                              onMouseLeave={(e) => { if (!active) e.currentTarget.style.background = 'transparent'; }}
+                            >{m.name.split(':')[0]} <span style={{ color: '#555' }}>{m.parameterSize}</span></button>
+                          );
+                        })}
+                      </>
+                    )}
+                    {availableProviders.has('openrouter') && (
+                      <>
+                        {(availableProviders.has('claude') || availableProviders.has('openai') || availableProviders.has('ollama')) && <div style={{ height: 1, background: 'rgba(255,255,255,0.08)', margin: '4px 0' }} />}
+                        <div style={{ fontSize: 10, color: '#666', padding: '6px 14px 2px', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>OpenRouter</div>
+                        <button onClick={() => handleModelChange('openrouter', openrouterModelName)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '7px 14px', border: 'none', cursor: 'pointer', background: currentProvider === 'openrouter' ? 'var(--accent-bg)' : 'transparent', color: currentProvider === 'openrouter' ? 'var(--accent)' : '#ccc', fontSize: 12, transition: 'var(--transition-fast)', fontFamily: 'inherit' }}
+                          onMouseEnter={(e) => { if (currentProvider !== 'openrouter') e.currentTarget.style.background = '#2a2a2a'; }}
+                          onMouseLeave={(e) => { if (currentProvider !== 'openrouter') e.currentTarget.style.background = 'transparent'; }}
+                        >{openrouterModelName || 'Configure in Settings'}</button>
+                      </>
+                    )}
+                    {availableProviders.size === 0 && (
+                      <div style={{ padding: '10px 14px', color: '#888', fontSize: 12 }}>
+                        No providers configured. Add an API key in Settings.
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-            </>
-          )}
-        </div>
+                </>
+              )}
+
+              {/* Send button */}
+              <button
+                onClick={() => sendMessage()}
+                disabled={isStreaming || (!input.trim() && attachedImages.length === 0)}
+                style={{
+                  background: isStreaming || (!input.trim() && attachedImages.length === 0) ? '#3a3a3a' : 'var(--accent)',
+                  border: 'none',
+                  color: isStreaming || (!input.trim() && attachedImages.length === 0) ? '#555' : 'white',
+                  borderRadius: 10, width: 32, height: 32,
+                  cursor: isStreaming || (!input.trim() && attachedImages.length === 0) ? 'default' : 'pointer',
+                  transition: 'var(--transition-base)', flexShrink: 0,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="12" y1="19" x2="12" y2="5"/>
+                  <polyline points="5 12 12 5 19 12"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>{/* end unified input container */}
       </div>{/* end centering wrapper */}
       </div>
     </div>
