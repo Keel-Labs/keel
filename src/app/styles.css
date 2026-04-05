@@ -3,8 +3,8 @@
 
 /* ── Design Tokens — Warm Minimalist Dark ── */
 :root {
-  /* Backgrounds — warm charcoal tones (TEMP: red bg for testing) */
-  --bg-base: #ff0000;
+  /* Backgrounds — warm charcoal tones */
+  --bg-base: #1f1d1b;
   --bg-sidebar: #171513;
   --bg-surface: #2a2724;
   --bg-surface-hover: #332f2b;
