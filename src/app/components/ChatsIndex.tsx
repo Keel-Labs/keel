@@ -1,4 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import type { SessionIndicatorState } from '../sessionState';
+import SessionStatusIndicator from './SessionStatusIndicator';
 
 interface Session {
   id: string;
@@ -10,9 +12,15 @@ interface Props {
   currentSessionId: string;
   refreshSignal: number;
   onOpenSession: (id: string) => void;
+  sessionIndicators?: Record<string, SessionIndicatorState>;
 }
 
-export default function ChatsIndex({ currentSessionId, refreshSignal, onOpenSession }: Props) {
+export default function ChatsIndex({
+  currentSessionId,
+  refreshSignal,
+  onOpenSession,
+  sessionIndicators,
+}: Props) {
   const [query, setQuery] = useState('');
   const [sessions, setSessions] = useState<Session[]>([]);
 
@@ -54,6 +62,7 @@ export default function ChatsIndex({ currentSessionId, refreshSignal, onOpenSess
         <div className="session-grid">
           {filteredSessions.map((session) => {
             const active = session.id === currentSessionId;
+            const indicator = sessionIndicators?.[session.id];
             return (
               <button
                 key={session.id}
@@ -61,8 +70,16 @@ export default function ChatsIndex({ currentSessionId, refreshSignal, onOpenSess
                 className={active ? 'session-card is-active' : 'session-card'}
               >
                 <div className="session-card__meta">
-                  <span>{new Date(session.updatedAt).toLocaleDateString()}</span>
-                  {active && <span className="session-card__badge">Open</span>}
+                  <div className="session-card__meta-leading">
+                    <SessionStatusIndicator indicator={indicator} />
+                    <span>{new Date(session.updatedAt).toLocaleDateString()}</span>
+                  </div>
+                  <div className="session-card__meta-trailing">
+                    {indicator?.unread && !indicator.isStreaming && (
+                      <span className="session-card__badge">Unread</span>
+                    )}
+                    {active && <span className="session-card__badge">Open</span>}
+                  </div>
                 </div>
                 <div className="session-card__title">{session.title}</div>
                 <div className="session-card__description">

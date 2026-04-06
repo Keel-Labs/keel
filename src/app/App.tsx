@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Chat from './components/Chat';
 import Sidebar, { type DesktopView, type WikiNavId, type WikiSidebarState } from './components/Sidebar';
 import Settings from './components/Settings';
@@ -14,6 +14,13 @@ import type { Settings as SettingsType } from '../shared/types';
 import { getKeelAPI, loadTokens, isAuthenticated, setOnAuthExpired } from '../lib/api-client';
 import { useIsMobile } from '../lib/useIsMobile';
 import { applyTheme } from './theme';
+import {
+  CHAT_UNREAD_STORAGE_KEY,
+  addUnreadSessionId,
+  loadUnreadSessionIds,
+  removeUnreadSessionId,
+  type SessionIndicatorState,
+} from './sessionState';
 import {
   consumeForceOnboardingFlag,
   FORCE_ONBOARDING_ONCE_KEY,
@@ -132,11 +139,19 @@ export default function App() {
     entries: ['chat'],
     index: 0,
   });
+  const [unreadSessionIds, setUnreadSessionIds] = useState<string[]>(() => {
+    if (typeof window === 'undefined') return [];
+    return loadUnreadSessionIds(window.localStorage);
+  });
+  const [streamingSessionIds, setStreamingSessionIds] = useState<Record<string, boolean>>({});
   const sidebarWidthRef = useRef(sidebarWidth);
   const expandedSidebarWidthRef = useRef(sidebarWidth);
   const desktopHistoryRef = useRef(desktopHistory);
+  const currentSessionIdRef = useRef(currentSessionId);
+  const streamingSessionIdsRef = useRef(streamingSessionIds);
   const isMobile = useIsMobile();
   const effectiveSidebarCollapsed = sidebarCollapsed || autoSidebarCollapsed;
+  const chatVisible = isMobile ? mobileView === 'chat' : desktopView === 'chat';
 
   useEffect(() => {
     sidebarWidthRef.current = sidebarWidth;
@@ -150,6 +165,14 @@ export default function App() {
   }, [desktopHistory]);
 
   useEffect(() => {
+    currentSessionIdRef.current = currentSessionId;
+  }, [currentSessionId]);
+
+  useEffect(() => {
+    streamingSessionIdsRef.current = streamingSessionIds;
+  }, [streamingSessionIds]);
+
+  useEffect(() => {
     if (typeof window === 'undefined') return;
     window.localStorage.setItem('keel.sidebar.collapsed', sidebarCollapsed ? '1' : '0');
   }, [sidebarCollapsed]);
@@ -158,6 +181,11 @@ export default function App() {
     if (typeof window === 'undefined' || effectiveSidebarCollapsed) return;
     window.localStorage.setItem('keel.sidebar.width', String(sidebarWidth));
   }, [effectiveSidebarCollapsed, sidebarWidth]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(CHAT_UNREAD_STORAGE_KEY, JSON.stringify(unreadSessionIds));
+  }, [unreadSessionIds]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -228,12 +256,86 @@ export default function App() {
     setDesktopHistory(nextHistory);
   }, []);
 
+  const handleOnboardingComplete = (settings: SettingsType) => {
+    setInitialSettings(settings);
+    setShowOnboarding(false);
+  };
+
+  const markSessionUnread = useCallback((sessionId: string) => {
+    setUnreadSessionIds((ids) => addUnreadSessionId(ids, sessionId));
+  }, []);
+
+  const markSessionRead = useCallback((sessionId: string) => {
+    setUnreadSessionIds((ids) => removeUnreadSessionId(ids, sessionId));
+  }, []);
+
+  const markCurrentSessionUnreadIfStreaming = useCallback((nextSessionId?: string) => {
+    const activeSessionId = currentSessionIdRef.current;
+    if (!activeSessionId || activeSessionId === nextSessionId) return;
+    if (!streamingSessionIdsRef.current[activeSessionId]) return;
+    markSessionUnread(activeSessionId);
+  }, [markSessionUnread]);
+
+  const handleSessionStreamStateChange = useCallback((sessionId: string, isStreaming: boolean) => {
+    if (isStreaming) {
+      streamingSessionIdsRef.current = { ...streamingSessionIdsRef.current, [sessionId]: true };
+    } else if (streamingSessionIdsRef.current[sessionId]) {
+      const next = { ...streamingSessionIdsRef.current };
+      delete next[sessionId];
+      streamingSessionIdsRef.current = next;
+    }
+
+    setStreamingSessionIds((previous) => {
+      if (isStreaming) {
+        if (previous[sessionId]) return previous;
+        return { ...previous, [sessionId]: true };
+      }
+
+      if (!previous[sessionId]) return previous;
+      const next = { ...previous };
+      delete next[sessionId];
+      return next;
+    });
+    setRefreshSidebar((value) => value + 1);
+  }, []);
+
+  useEffect(() => {
+    if (!chatVisible || !currentSessionId) return;
+    markSessionRead(currentSessionId);
+  }, [chatVisible, currentSessionId, markSessionRead]);
+
+  const handleNewChat = () => {
+    markCurrentSessionUnreadIfStreaming();
+    setLoadSessionId(null);
+    setCurrentSessionId('');
+    currentSessionIdRef.current = '';
+    setNewChatSignal((value) => value + 1);
+    setMobileView('chat');
+    navigateDesktop('chat', { mode: 'chat' });
+  };
+
+  const handleSelectSession = (id: string) => {
+    markCurrentSessionUnreadIfStreaming(id);
+    setLoadSessionId(id);
+    setMobileView('chat');
+    navigateDesktop('chat', { mode: 'chat' });
+  };
+
+  const handleSessionChange = (id: string) => {
+    currentSessionIdRef.current = id;
+    setCurrentSessionId(id);
+    setRefreshSidebar((value) => value + 1);
+  };
+
   const stepDesktopHistory = useCallback((direction: -1 | 1) => {
     const currentHistory = desktopHistoryRef.current;
     const nextIndex = currentHistory.index + direction;
     if (nextIndex < 0 || nextIndex >= currentHistory.entries.length) return;
 
     const nextView = currentHistory.entries[nextIndex];
+    if (nextView !== 'chat') {
+      markCurrentSessionUnreadIfStreaming();
+    }
     const nextHistory = { ...currentHistory, index: nextIndex };
     desktopHistoryRef.current = nextHistory;
     setDesktopHistory(nextHistory);
@@ -244,31 +346,7 @@ export default function App() {
     } else if (nextView === 'wiki') {
       setDesktopMode('wiki');
     }
-  }, []);
-
-  const handleOnboardingComplete = (settings: SettingsType) => {
-    setInitialSettings(settings);
-    setShowOnboarding(false);
-  };
-
-  const handleNewChat = () => {
-    setLoadSessionId(null);
-    setCurrentSessionId('');
-    setNewChatSignal((value) => value + 1);
-    setMobileView('chat');
-    navigateDesktop('chat', { mode: 'chat' });
-  };
-
-  const handleSelectSession = (id: string) => {
-    setLoadSessionId(id);
-    setMobileView('chat');
-    navigateDesktop('chat', { mode: 'chat' });
-  };
-
-  const handleSessionChange = (id: string) => {
-    setCurrentSessionId(id);
-    setRefreshSidebar((value) => value + 1);
-  };
+  }, [markCurrentSessionUnreadIfStreaming]);
 
   const openWikiLanding = useCallback(() => {
     setWikiCommand({ type: 'nav', target: 'synthesis', nonce: Date.now() });
@@ -279,6 +357,7 @@ export default function App() {
       navigateDesktop('chat', { mode: 'chat' });
       return;
     }
+    markCurrentSessionUnreadIfStreaming();
     openWikiLanding();
     navigateDesktop('wiki', { mode: 'wiki' });
   };
@@ -287,6 +366,10 @@ export default function App() {
     if (view === 'settings') {
       window.keel.openUtilityWindow('settings').catch(() => {});
       return;
+    }
+
+    if (view !== 'chat') {
+      markCurrentSessionUnreadIfStreaming();
     }
 
     const mode = view === 'wiki'
@@ -339,16 +422,30 @@ export default function App() {
     window.addEventListener('mouseup', onMouseUp);
   }, [effectiveSidebarCollapsed]);
 
+  const handleMobileNavigation = useCallback((view: MobileView) => {
+    if (view !== 'chat') {
+      markCurrentSessionUnreadIfStreaming();
+    }
+    setMobileView(view);
+  }, [markCurrentSessionUnreadIfStreaming]);
+
+  const sessionIndicators = useMemo<Record<string, SessionIndicatorState>>(() => {
+    const unread = new Set(unreadSessionIds);
+    const ids = new Set([...Object.keys(streamingSessionIds), ...unread]);
+
+    return Array.from(ids).reduce<Record<string, SessionIndicatorState>>((accumulator, id) => {
+      accumulator[id] = {
+        isStreaming: Boolean(streamingSessionIds[id]),
+        unread: unread.has(id),
+      };
+      return accumulator;
+    }, {});
+  }, [streamingSessionIds, unreadSessionIds]);
+
   const renderDesktopView = () => {
     switch (desktopView) {
       case 'chat':
-        return (
-          <Chat
-            newChatSignal={newChatSignal}
-            loadSessionId={loadSessionId}
-            onSessionChange={handleSessionChange}
-          />
-        );
+        return null;
       case 'search':
         return <SearchStub />;
       case 'chats':
@@ -357,6 +454,7 @@ export default function App() {
             currentSessionId={currentSessionId}
             refreshSignal={refreshSidebar}
             onOpenSession={handleSelectSession}
+            sessionIndicators={sessionIndicators}
           />
         );
       case 'wiki':
@@ -416,13 +514,14 @@ export default function App() {
         background: 'var(--bg-base)',
       }}>
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-          {mobileView === 'chat' && (
+          <div className={mobileView === 'chat' ? 'app-view' : 'app-view is-hidden'}>
             <Chat
               newChatSignal={newChatSignal}
               loadSessionId={loadSessionId}
               onSessionChange={handleSessionChange}
+              onSessionStreamStateChange={handleSessionStreamStateChange}
             />
-          )}
+          </div>
           {mobileView === 'history' && (
             <MobileHistory
               onSelectSession={(id) => {
@@ -430,6 +529,7 @@ export default function App() {
                 setMobileView('chat');
               }}
               refreshSignal={refreshSidebar}
+              sessionIndicators={sessionIndicators}
             />
           )}
           {mobileView === 'settings' && (
@@ -441,7 +541,7 @@ export default function App() {
         </div>
         <MobileNav
           activeView={mobileView}
-          onNavigate={setMobileView}
+          onNavigate={handleMobileNavigation}
           onNewChat={handleNewChat}
         />
       </div>
@@ -477,6 +577,7 @@ export default function App() {
             onNewChat={handleNewChat}
             onSelectSession={handleSelectSession}
             refreshSignal={refreshSidebar}
+            sessionIndicators={sessionIndicators}
             wikiState={wikiSidebarState}
             onWikiNavigate={handleWikiNavigate}
             onWikiOpenPage={handleWikiOpenPage}
@@ -490,7 +591,15 @@ export default function App() {
         </div>
 
         <div className="desktop-shell__content">
-          {renderDesktopView()}
+          <div className={desktopView === 'chat' ? 'app-view' : 'app-view is-hidden'}>
+            <Chat
+              newChatSignal={newChatSignal}
+              loadSessionId={loadSessionId}
+              onSessionChange={handleSessionChange}
+              onSessionStreamStateChange={handleSessionStreamStateChange}
+            />
+          </div>
+          {desktopView !== 'chat' && renderDesktopView()}
         </div>
       </div>
     </div>

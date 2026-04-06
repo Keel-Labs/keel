@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from 'react';
+import type { SessionIndicatorState } from '../sessionState';
+import SessionStatusIndicator from './SessionStatusIndicator';
 
 interface Session {
   id: string;
@@ -9,9 +11,10 @@ interface Session {
 interface Props {
   onSelectSession: (id: string) => void;
   refreshSignal: number;
+  sessionIndicators?: Record<string, SessionIndicatorState>;
 }
 
-export default function MobileHistory({ onSelectSession, refreshSignal }: Props) {
+export default function MobileHistory({ onSelectSession, refreshSignal, sessionIndicators }: Props) {
   const [sessions, setSessions] = useState<Session[]>([]);
 
   useEffect(() => {
@@ -47,7 +50,9 @@ export default function MobileHistory({ onSelectSession, refreshSignal }: Props)
             style={{
               width: '100%',
               textAlign: 'left',
-              display: 'block',
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: 10,
               padding: '12px 14px',
               borderRadius: 'var(--radius-lg)',
               border: 'none',
@@ -55,9 +60,6 @@ export default function MobileHistory({ onSelectSession, refreshSignal }: Props)
               color: 'var(--text-secondary)',
               fontSize: 'var(--text-base)',
               cursor: 'pointer',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
               marginBottom: 2,
               transition: 'var(--transition-fast)',
               fontFamily: 'inherit',
@@ -65,9 +67,12 @@ export default function MobileHistory({ onSelectSession, refreshSignal }: Props)
             onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--surface-muted)'; }}
             onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
           >
-            <div>{s.title}</div>
-            <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-disabled)', marginTop: 2 }}>
-              {new Date(s.updatedAt).toLocaleDateString()}
+            <SessionStatusIndicator indicator={sessionIndicators?.[s.id]} />
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.title}</div>
+              <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-disabled)', marginTop: 2 }}>
+                {new Date(s.updatedAt).toLocaleDateString()}
+              </div>
             </div>
           </button>
         ))}

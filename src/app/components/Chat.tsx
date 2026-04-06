@@ -674,9 +674,15 @@ interface ChatProps {
   newChatSignal: number;
   loadSessionId: string | null;
   onSessionChange: (id: string) => void;
+  onSessionStreamStateChange?: (sessionId: string, isStreaming: boolean) => void;
 }
 
-export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: ChatProps) {
+export default function Chat({
+  newChatSignal,
+  loadSessionId,
+  onSessionChange,
+  onSessionStreamStateChange,
+}: ChatProps) {
   const [messages, setMessages] = useState<MessageType[]>([]);
   const [input, setInput] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
@@ -954,6 +960,7 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
         sessionMessagesCacheRef.current.set(targetSessionId, finalMessages);
         sessionStreamsRef.current.delete(targetSessionId);
         requestSessionMapRef.current.delete(requestId);
+        onSessionStreamStateChange?.(targetSessionId, false);
         window.keel.saveChat(targetSessionId, finalMessages).catch(() => {});
 
         if (targetSessionId === currentSessionIdRef.current) {
@@ -975,6 +982,7 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
         sessionMessagesCacheRef.current.set(targetSessionId, finalMessages);
         sessionStreamsRef.current.delete(targetSessionId);
         requestSessionMapRef.current.delete(requestId);
+        onSessionStreamStateChange?.(targetSessionId, false);
         window.keel.saveChat(targetSessionId, finalMessages).catch(() => {});
 
         if (targetSessionId === currentSessionIdRef.current) {
@@ -988,7 +996,7 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
     return () => {
       clearStreamSubscriptions();
     };
-  }, [clearStreamSubscriptions, resetStreamingUi]);
+  }, [clearStreamSubscriptions, onSessionStreamStateChange, resetStreamingUi]);
 
   const getLastAssistantMessage = (): string | null => {
     for (let i = messages.length - 1; i >= 0; i--) {
@@ -1078,6 +1086,8 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
   const sendMessage = async (overrideText?: string) => {
     const trimmed = (overrideText || input).trim();
     if ((!trimmed && attachedImages.length === 0) || isStreaming) return;
+
+    onSessionChange(sessionId);
 
     const userMessage: MessageType = {
       role: 'user',
@@ -1297,6 +1307,7 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
       steps: [],
     });
     sessionMessagesCacheRef.current.set(targetSessionId, updatedMessages);
+    onSessionStreamStateChange?.(targetSessionId, true);
 
     try {
       await window.keel.chatStream(updatedMessages, requestId);
@@ -1307,6 +1318,7 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
           : 'AI provider unavailable. Check Settings to configure your AI engine.';
       requestSessionMapRef.current.delete(requestId);
       sessionStreamsRef.current.delete(targetSessionId);
+      onSessionStreamStateChange?.(targetSessionId, false);
       const finalMessages = [
         ...updatedMessages,
         { role: 'assistant' as const, content: msg, timestamp: Date.now() },
