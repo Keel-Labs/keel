@@ -1,4 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import type { SessionIndicatorState } from '../sessionState';
+import SessionStatusIndicator from './SessionStatusIndicator';
 
 interface Session {
   id: string;
@@ -30,6 +32,7 @@ interface Props {
   onNewChat: () => void;
   onSelectSession: (id: string) => void;
   refreshSignal: number;
+  sessionIndicators?: Record<string, SessionIndicatorState>;
   wikiState?: WikiSidebarState | null;
   onWikiNavigate?: (nav: WikiNavId) => void;
   onWikiOpenPage?: (path: string) => void;
@@ -218,6 +221,7 @@ export default function Sidebar({
   onNewChat,
   onSelectSession,
   refreshSignal,
+  sessionIndicators,
   wikiState,
   onWikiNavigate,
   onWikiOpenPage,
@@ -296,12 +300,17 @@ export default function Sidebar({
             <>
               {recentSessions.map((session) => {
                 const active = activeView === 'chat' && session.id === currentSessionId;
+                const indicator = sessionIndicators?.[session.id];
                 return (
                   <button
                     key={session.id}
                     onClick={() => onSelectSession(session.id)}
                     className={active ? 'desktop-sidebar__session is-active' : 'desktop-sidebar__session'}
                   >
+                    <SessionStatusIndicator
+                      indicator={indicator}
+                      className="desktop-sidebar__session-indicator"
+                    />
                     <span className="desktop-sidebar__session-title">{session.title}</span>
                   </button>
                 );
