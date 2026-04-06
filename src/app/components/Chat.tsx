@@ -874,6 +874,17 @@ export default function Chat({
     };
   }, []);
 
+  // Listen for auto-capture confirmations
+  useEffect(() => {
+    const cleanup = window.keel.onAutoCaptureDone((event) => {
+      setMessages((prev) => [
+        ...prev,
+        { role: 'assistant', content: `*${event.summary}*`, timestamp: Date.now() },
+      ]);
+    });
+    return cleanup;
+  }, []);
+
   // Auto-save messages whenever they change (skip if just loaded from DB)
   useEffect(() => {
     if (messages.length > 0) {
