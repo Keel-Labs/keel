@@ -131,7 +131,8 @@ export class LLMClient {
   async chatStream(
     messages: Message[],
     systemPrompt: string,
-    onChunk: (chunk: string) => void
+    onChunk: (chunk: string) => void,
+    signal?: AbortSignal
   ): Promise<void> {
     const attempts: Provider[] = [this.provider];
     for (const p of ['claude', 'openai', 'openrouter', 'ollama'] as Provider[]) {
@@ -141,10 +142,10 @@ export class LLMClient {
     for (const provider of attempts) {
       try {
         switch (provider) {
-          case 'claude': return await this.streamClaude(messages, systemPrompt, onChunk);
-          case 'openai': return await this.streamOpenAI(this.openai, this.openaiModel, messages, systemPrompt, onChunk);
-          case 'openrouter': return await this.streamOpenAI(this.openrouter, this.openrouterModel, messages, systemPrompt, onChunk);
-          case 'ollama': return await this.streamOllama(messages, systemPrompt, onChunk);
+          case 'claude': return await this.streamClaude(messages, systemPrompt, onChunk, signal);
+          case 'openai': return await this.streamOpenAI(this.openai, this.openaiModel, messages, systemPrompt, onChunk, signal);
+          case 'openrouter': return await this.streamOpenAI(this.openrouter, this.openrouterModel, messages, systemPrompt, onChunk, signal);
+          case 'ollama': return await this.streamOllama(messages, systemPrompt, onChunk, signal);
         }
       } catch {
         continue;
@@ -203,7 +204,8 @@ export class LLMClient {
   private async streamClaude(
     messages: Message[],
     systemPrompt: string,
-    onChunk: (chunk: string) => void
+    onChunk: (chunk: string) => void,
+    signal?: AbortSignal
   ): Promise<void> {
     if (!this.anthropic) throw new Error('Anthropic API key not configured');
 
@@ -215,6 +217,7 @@ export class LLMClient {
     });
 
     for await (const event of stream) {
+      if (signal?.aborted) { stream.abort(); break; }
       if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
         onChunk(event.delta.text);
       }
@@ -244,7 +247,8 @@ export class LLMClient {
     model: string,
     messages: Message[],
     systemPrompt: string,
-    onChunk: (chunk: string) => void
+    onChunk: (chunk: string) => void,
+    signal?: AbortSignal
   ): Promise<void> {
     if (!client || !model) throw new Error('OpenAI client not configured');
 
@@ -255,6 +259,7 @@ export class LLMClient {
     });
 
     for await (const chunk of stream) {
+      if (signal?.aborted) break;
       const content = chunk.choices[0]?.delta?.content;
       if (content) onChunk(content);
     }
@@ -286,7 +291,8 @@ export class LLMClient {
   private async streamOllama(
     messages: Message[],
     systemPrompt: string,
-    onChunk: (chunk: string) => void
+    onChunk: (chunk: string) => void,
+    signal?: AbortSignal
   ): Promise<void> {
     const response = await this.ollama.chat({
       model: this.ollamaModel,
@@ -295,6 +301,7 @@ export class LLMClient {
     });
 
     for await (const chunk of response) {
+      if (signal?.aborted) break;
       if (chunk.message?.content) {
         onChunk(chunk.message.content);
       }

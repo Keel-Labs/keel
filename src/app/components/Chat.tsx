@@ -499,10 +499,28 @@ function isPdfCommand(text: string): boolean {
   return false;
 }
 
-function isGoogleDocCommand(text: string): boolean {
+function isGoogleDocCommand(text: string): 'export-only' | 'write-and-export' | false {
   const t = text.trim().toLowerCase();
-  if (/google\s*doc/i.test(t) && /(make|create|save|export|want|need|give|get|generate|send|turn)/i.test(t)) return true;
-  if (/^(export|save|send)\s.*google\s*doc/i.test(t)) return true;
+  if (!/google\s*doc/i.test(t)) return false;
+
+  // "export-only" — commands that reference existing content to export
+  // e.g., "put that in a google doc", "make a google doc with this info", "ok make a google doc"
+  if (/^(export|save|send|put)\s.*google\s*doc/i.test(t)) return 'export-only';
+  if (/^(create|make)\s+(a\s+)?google\s*doc/i.test(t)) return 'export-only';
+  // References to existing content at the START: "put this in a google doc", "make a google doc with this"
+  // But NOT "write X and put it in a google doc" (where "it" refers to something being written)
+  if (/^(put|save|send|export)\s+(this|that|it|the above)/i.test(t)) return 'export-only';
+  if (/google\s*docs?\s+(with|from|of|for)\s+(this|that|the above|this info)/i.test(t)) return 'export-only';
+  // Starts with filler words then immediately an export verb: "ok make a google doc", "yeah put it in a google doc"
+  // Must be short (< 60 chars) to avoid matching "can you write X and put it in a google doc"
+  if (t.length < 60 && /^(ok|okay|yes|yeah|sure|please)\s*,?\s*(make|create|put|save|export|send)/i.test(t)) return 'export-only';
+  // Short commands (just the google doc request, not much else)
+  if (t.replace(/google\s*docs?/i, '').replace(/[^a-z]/g, '').length < 20) return 'export-only';
+
+  // "write-and-export" — user wants something NEW written AND exported
+  // e.g., "write a recommendation on X and put it in a google doc"
+  if (/(make|create|save|export|want|need|give|get|generate|send|turn|put|write|add|place)/i.test(t)) return 'write-and-export';
+
   return false;
 }
 
@@ -568,7 +586,7 @@ function parseReminderCommand(text: string, timezone?: string): { dueAt: number;
   const match = t.match(/^\/remind\s+(.+)/i);
   if (!match) return null;
 
-  const rest = match[1];
+  const rest = match[1].replace(/^me\s+/i, '');
   const now = new Date();
 
   // "every day/weekly/monthly at HH:MM message"
@@ -581,13 +599,23 @@ function parseReminderCommand(text: string, timezone?: string): { dueAt: number;
     return { dueAt: due.getTime(), message: recurMatch[5], recurring };
   }
 
-  // "in X seconds/minutes/hours"
+  // "in X seconds/minutes/hours [message]"
   const inMatch = rest.match(/^in\s+(\d+)\s*(sec(?:onds?)?|min(?:utes?)?|hrs?|hours?)\s+(.+)/i);
   if (inMatch) {
     const amount = parseInt(inMatch[1]);
     const unit = inMatch[2].toLowerCase();
     const ms = unit.startsWith('sec') ? amount * 1_000 : unit.startsWith('min') ? amount * 60_000 : amount * 3_600_000;
     return { dueAt: Date.now() + ms, message: inMatch[3] };
+  }
+
+  // "[message] in X seconds/minutes/hours" (time at end)
+  const inEndMatch = rest.match(/^(.+?)\s+in\s+(\d+)\s*(sec(?:onds?)?|min(?:utes?)?|hrs?|hours?)s?\s*$/i);
+  if (inEndMatch) {
+    const amount = parseInt(inEndMatch[2]);
+    const unit = inEndMatch[3].toLowerCase();
+    const ms = unit.startsWith('sec') ? amount * 1_000 : unit.startsWith('min') ? amount * 60_000 : amount * 3_600_000;
+    const message = inEndMatch[1].replace(/^to\s+/i, '');
+    return { dueAt: Date.now() + ms, message };
   }
 
   // "tomorrow at HH:MM message"
@@ -711,6 +739,7 @@ export default function Chat({
   const sessionStreamsRef = useRef(new Map<string, SessionStreamState>());
   const requestSessionMapRef = useRef(new Map<string, string>());
   const streamCleanupRef = useRef<Array<() => void>>([]);
+  const pendingGoogleExportRef = useRef(false);
   const [availableProviders, setAvailableProviders] = useState<Set<string>>(new Set());
   const [openrouterModelName, setOpenrouterModelName] = useState<string>('');
   const openaiModelOptionIds = Array.from(new Set([
@@ -975,14 +1004,72 @@ export default function Chat({
         const stream = sessionStreamsRef.current.get(targetSessionId);
         if (!stream || stream.requestId !== requestId) return;
 
+        sessionStreamsRef.current.delete(targetSessionId);
+        requestSessionMapRef.current.delete(requestId);
+        onSessionStreamStateChange?.(targetSessionId, false);
+
+        // Auto-export to Google Doc if flagged — skip showing full content
+        if (pendingGoogleExportRef.current && stream.accumulated) {
+          pendingGoogleExportRef.current = false;
+          const fullContent = stream.accumulated;
+          const titleMatch = fullContent.match(/^#*\s*(.{1,60})/m);
+          const title = titleMatch ? titleMatch[1].replace(/[*#]/g, '').trim() : 'Keel Export';
+
+          if (targetSessionId === currentSessionIdRef.current) {
+            justLoadedRef.current = true;
+            resetStreamingUi();
+            setMessages([
+              ...stream.baseMessages,
+              { role: 'assistant' as const, content: 'Exporting to Google Doc...', timestamp: Date.now() },
+            ]);
+          }
+
+          window.keel.googleExportDoc(fullContent, title).then((url: string) => {
+            // Extract first real paragraph sentence (skip title, headings, short lines)
+            const lines = fullContent.split('\n');
+            let summary = '';
+            for (const line of lines) {
+              const stripped = line.replace(/^#+\s*/, '').replace(/\*\*/g, '').trim();
+              // Skip empty lines, headings, title-like lines (< 40 chars without a period)
+              if (!stripped) continue;
+              if (line.match(/^#{1,3}\s/)) continue;
+              if (stripped.length < 40 && !stripped.includes('.')) continue;
+              // Found a real paragraph line — grab first sentence
+              const sentenceMatch = stripped.match(/^(.+?[.!?])\s/);
+              summary = sentenceMatch ? sentenceMatch[1] : stripped.slice(0, 140);
+              break;
+            }
+            if (!summary) summary = title;
+
+            const doneMessages = [
+              ...stream.baseMessages,
+              { role: 'assistant' as const, content: `**${title}**\n\n${summary}\n\n${url}`, timestamp: Date.now() },
+            ];
+            sessionMessagesCacheRef.current.set(targetSessionId, doneMessages);
+            window.keel.saveChat(targetSessionId, doneMessages).catch(() => {});
+            if (targetSessionId === currentSessionIdRef.current) {
+              setMessages(doneMessages);
+            }
+          }).catch((err: unknown) => {
+            const errMsg = err instanceof Error ? err.message : 'Google Doc export failed';
+            const errorMessages = [
+              ...stream.baseMessages,
+              { role: 'assistant' as const, content: errMsg, timestamp: Date.now() },
+            ];
+            sessionMessagesCacheRef.current.set(targetSessionId, errorMessages);
+            window.keel.saveChat(targetSessionId, errorMessages).catch(() => {});
+            if (targetSessionId === currentSessionIdRef.current) {
+              setMessages(errorMessages);
+            }
+          });
+          return;
+        }
+
         const finalMessages = [
           ...stream.baseMessages,
           { role: 'assistant' as const, content: stream.accumulated, timestamp: Date.now() },
         ];
         sessionMessagesCacheRef.current.set(targetSessionId, finalMessages);
-        sessionStreamsRef.current.delete(targetSessionId);
-        requestSessionMapRef.current.delete(requestId);
-        onSessionStreamStateChange?.(targetSessionId, false);
         window.keel.saveChat(targetSessionId, finalMessages).catch(() => {});
 
         if (targetSessionId === currentSessionIdRef.current) {
@@ -1022,7 +1109,13 @@ export default function Chat({
 
   const getLastAssistantMessage = (): string | null => {
     for (let i = messages.length - 1; i >= 0; i--) {
-      if (messages[i].role === 'assistant') return messages[i].content;
+      if (messages[i].role === 'assistant') {
+        const content = messages[i].content;
+        // Skip export confirmations and short system messages
+        if (/Exported to Google Doc|docs\.google\.com\/document|Exporting to Google Doc/i.test(content)) continue;
+        if (content.length < 20) continue;
+        return content;
+      }
     }
     return null;
   };
@@ -1079,6 +1172,23 @@ export default function Chat({
   const showHeader = messages.length > 0 || isStreaming;
   const emptyStateGreeting = getTimeOfDayGreeting(userName, userTimezone || undefined);
 
+  const COMMANDS = [
+    { command: '/daily-brief', description: 'Morning briefing' },
+    { command: '/eod', description: 'End-of-day summary' },
+    { command: '/capture', description: 'Save text or URL to brain' },
+    { command: '/remind', description: 'Set a reminder' },
+    { command: '/reminders', description: 'List upcoming reminders' },
+    { command: '/schedule', description: 'Create a calendar event' },
+    { command: '/reset', description: 'Reset your profile' },
+  ];
+
+  const commandSuggestions = isCommandMode && !input.includes(' ')
+    ? COMMANDS.filter((c) => c.command.startsWith(input.toLowerCase()) && c.command !== input.toLowerCase())
+    : [];
+
+  const [commandIndex, setCommandIndex] = useState(0);
+  useEffect(() => { setCommandIndex(0); }, [input]);
+
   const handleImageAttach = () => {
     fileInputRef.current?.click();
   };
@@ -1118,7 +1228,7 @@ export default function Chat({
       timestamp: Date.now(),
     };
 
-    const updatedMessages = [...messages, userMessage];
+    let updatedMessages = [...messages, userMessage];
     setMessages(updatedMessages);
     setInput('');
     setAttachedImages([]);
@@ -1126,7 +1236,8 @@ export default function Chat({
     setStreamingContent('');
 
     // Google Doc export command
-    if (isGoogleDocCommand(trimmed)) {
+    const googleDocMode = isGoogleDocCommand(trimmed);
+    if (googleDocMode === 'export-only') {
       const lastContent = getLastAssistantMessage();
       if (!lastContent) {
         setMessages((prev) => [
@@ -1135,10 +1246,13 @@ export default function Chat({
         ]);
       } else {
         try {
-          const url = await window.keel.googleExportDoc(lastContent, 'Keel Export');
+          // Derive title from first line of content
+          const titleMatch = lastContent.match(/^#*\s*(.{1,60})/m);
+          const title = titleMatch ? titleMatch[1].replace(/[*#]/g, '').trim() : 'Keel Export';
+          const url = await window.keel.googleExportDoc(lastContent, title);
           setMessages((prev) => [
             ...prev,
-            { role: 'assistant', content: `Exported to Google Doc: [Open document](${url})`, timestamp: Date.now() },
+            { role: 'assistant', content: `Exported to Google Doc: ${url}`, timestamp: Date.now() },
           ]);
         } catch (error) {
           const msg = error instanceof Error ? error.message : 'Google Doc export failed';
@@ -1150,6 +1264,22 @@ export default function Chat({
       }
       setIsStreaming(false);
       return;
+    }
+    if (googleDocMode === 'write-and-export') {
+      // Flag for auto-export after the LLM responds
+      pendingGoogleExportRef.current = true;
+      // Strip the "google doc" request from the message so the LLM only writes the content
+      const lastMsg = updatedMessages[updatedMessages.length - 1];
+      if (lastMsg) {
+        const stripped = lastMsg.content
+          .replace(/\b(and\s+)?(put|place|save|export|send|add)\s+(it\s+)?(in|into|to|as)\s+(a\s+)?google\s*docs?\b/gi, '')
+          .replace(/\b(and\s+)?create\s+(a\s+)?google\s*docs?\s*(for|from|with)?\s*(it|this|that)?\b/gi, '')
+          .replace(/\s{2,}/g, ' ')
+          .trim();
+        updatedMessages = updatedMessages.map((m, i) =>
+          i === updatedMessages.length - 1 ? { ...m, content: stripped || m.content } : m
+        );
+      }
     }
 
     // PDF export command
@@ -1331,8 +1461,16 @@ export default function Chat({
     sessionMessagesCacheRef.current.set(targetSessionId, updatedMessages);
     onSessionStreamStateChange?.(targetSessionId, true);
 
+    // Filter out export confirmation messages so the LLM doesn't mimic them
+    const llmMessages = updatedMessages.map((m) => {
+      if (m.role === 'assistant' && /docs\.google\.com\/document\/d\/|Exported to Google Doc|Open Google Doc|\[Open document\]/.test(m.content)) {
+        return { ...m, content: '(Document was exported to Google Doc successfully.)' };
+      }
+      return m;
+    });
+
     try {
-      await window.keel.chatStream(updatedMessages, requestId);
+      await window.keel.chatStream(llmMessages, requestId);
     } catch (error) {
       const msg =
         error instanceof Error
@@ -1352,11 +1490,45 @@ export default function Chat({
         justLoadedRef.current = true;
         setMessages(finalMessages);
         resetStreamingUi();
+
+        // Clear pending Google Doc export on error
+        pendingGoogleExportRef.current = false;
       }
     }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    // Command autocomplete navigation
+    if (commandSuggestions.length > 0) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setCommandIndex((i) => (i + 1) % commandSuggestions.length);
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setCommandIndex((i) => (i - 1 + commandSuggestions.length) % commandSuggestions.length);
+        return;
+      }
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        const selected = commandSuggestions[commandIndex];
+        if (selected) {
+          const needsArg = ['/capture', '/remind', '/schedule'].includes(selected.command);
+          setInput(selected.command + (needsArg ? ' ' : ''));
+        }
+        return;
+      }
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        const selected = commandSuggestions[commandIndex];
+        if (selected) {
+          const needsArg = ['/capture', '/remind', '/schedule'].includes(selected.command);
+          setInput(selected.command + (needsArg ? ' ' : ''));
+        }
+        return;
+      }
+    }
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       sendMessage();
@@ -1401,7 +1573,7 @@ export default function Chat({
 
           {isStreaming && !streamingContent && <ThinkingIndicator />}
 
-          {isStreaming && !!streamingContent && (
+          {isStreaming && !!streamingContent && !pendingGoogleExportRef.current && (
             <ActivityPanel
               steps={activitySteps}
               answerStarted={!!streamingContent}
@@ -1413,11 +1585,21 @@ export default function Chat({
             />
           )}
 
-          {isStreaming && streamingContent && (
+          {isStreaming && streamingContent && !pendingGoogleExportRef.current && (
             <Message
               message={{
                 role: 'assistant',
                 content: streamingContent,
+                timestamp: Date.now(),
+              }}
+            />
+          )}
+
+          {isStreaming && streamingContent && pendingGoogleExportRef.current && (
+            <Message
+              message={{
+                role: 'assistant',
+                content: 'Writing your document...',
                 timestamp: Date.now(),
               }}
             />
@@ -1480,7 +1662,29 @@ export default function Chat({
           )}
 
           {isCommandMode && (
-            <div className="chat-composer__command-label">Command mode</div>
+            <div className="chat-composer__command-label">
+              Command mode
+              {commandSuggestions.length > 0 && (
+                <div className="chat-composer__command-suggestions">
+                  {commandSuggestions.map((cmd, i) => (
+                    <button
+                      key={cmd.command}
+                      className={`chat-composer__command-option${i === commandIndex ? ' is-active' : ''}`}
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        const needsArg = ['/capture', '/remind', '/schedule'].includes(cmd.command);
+                        setInput(cmd.command + (needsArg ? ' ' : ''));
+                        textareaRef.current?.focus();
+                      }}
+                      onMouseEnter={() => setCommandIndex(i)}
+                    >
+                      <span className="chat-composer__command-name">{cmd.command}</span>
+                      <span className="chat-composer__command-desc">{cmd.description}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           )}
 
           <textarea
@@ -1607,13 +1811,27 @@ export default function Chat({
                 )}
               </div>
 
-              <button
-                onClick={() => sendMessage()}
-                disabled={isStreaming || (!input.trim() && attachedImages.length === 0)}
-                className="chat-composer__send"
-              >
-                Send
-              </button>
+              {isStreaming ? (
+                <button
+                  onClick={() => {
+                    if (activeRequestIdRef.current) {
+                      window.keel.cancelStream(activeRequestIdRef.current);
+                    }
+                    resetStreamingUi();
+                  }}
+                  className="chat-composer__send chat-composer__stop"
+                >
+                  Stop
+                </button>
+              ) : (
+                <button
+                  onClick={() => sendMessage()}
+                  disabled={!input.trim() && attachedImages.length === 0}
+                  className="chat-composer__send"
+                >
+                  Send
+                </button>
+              )}
             </div>
           </div>
         </div>

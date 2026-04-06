@@ -270,6 +270,7 @@ select {
   background: var(--bg-sidebar);
   flex-shrink: 0;
   min-width: var(--sidebar-collapsed-width);
+  overflow: hidden;
 }
 
 .desktop-shell__content {
@@ -282,11 +283,15 @@ select {
 }
 
 .desktop-sidebar {
-  height: 100%;
   display: flex;
   flex-direction: column;
   overflow: hidden;
   padding-top: 8px;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
 }
 
 .desktop-sidebar.is-collapsed {
@@ -491,6 +496,7 @@ select {
 .desktop-sidebar__footer {
   padding: 8px;
   border-top: 1px solid var(--border-subtle);
+  flex-shrink: 0;
 }
 
 .desktop-sidebar__resize-handle {
@@ -1654,6 +1660,44 @@ select {
   color: var(--accent-link);
 }
 
+.chat-composer__command-suggestions {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 6px;
+}
+
+.chat-composer__command-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  text-align: left;
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.chat-composer__command-option.is-active {
+  background: var(--surface-muted);
+}
+
+.chat-composer__command-name {
+  font-weight: 600;
+  font-family: var(--font-mono, monospace);
+  font-size: 12.5px;
+  color: var(--accent-link);
+}
+
+.chat-composer__command-desc {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
 .chat-composer__textarea {
   width: 100%;
   min-height: 24px;
@@ -1744,6 +1788,17 @@ select {
   border-color: var(--panel-border);
   color: var(--text-disabled);
   cursor: default;
+}
+
+.chat-composer__stop {
+  background: var(--bg-btn-secondary);
+  border-color: var(--panel-border);
+  color: var(--text-primary);
+}
+
+.chat-composer__stop:hover {
+  background: var(--bg-surface-hover);
+  border-color: var(--text-muted);
 }
 
 @media (max-width: 980px) {

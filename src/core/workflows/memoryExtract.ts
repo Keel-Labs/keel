@@ -17,6 +17,7 @@ Categories to extract:
 - People: names and roles (only if stated)
 - Priorities: only if explicitly listed
 - Tasks/To-Dos: specific action items, things the user needs to do, wants to work on, or is tracking. Include which project they belong to if mentioned.
+- Completed Tasks: tasks the user explicitly says are done, finished, or completed. Match by the task description.
 
 If there IS new info, respond with JSON:
 {
@@ -25,10 +26,12 @@ If there IS new info, respond with JSON:
   "projects": [{ "name": "...", "status": "", "summary": "", "deadline": "" }],
   "people": [{ "name": "...", "role": "", "notes": "" }],
   "priorities": ["..."],
-  "tasks": [{ "task": "...", "project": "..." }]
+  "tasks": [{ "task": "...", "project": "..." }],
+  "completedTasks": ["task description that was marked done"]
 }
 
 For tasks: "task" is the to-do description, "project" is the project name it belongs to (empty string if not associated with a project).
+For completedTasks: list the task descriptions the user said are done. Use the exact or closest matching description.
 
 Only include fields with new info. Use empty strings for unknown fields — NEVER guess.
 
@@ -76,6 +79,7 @@ interface MemoryUpdate {
   priorities?: string[];
   conventions?: string[];
   tasks?: Array<{ task: string; project?: string }>;
+  completedTasks?: string[];
 }
 
 export async function extractAndSaveMemory(
@@ -212,8 +216,36 @@ export async function extractAndSaveMemory(
 
     // Save tasks to project task files
     if (update.tasks && update.tasks.length > 0) {
+      // Collect all existing tasks across all files to prevent duplicates
+      const allExistingTasks = new Set<string>();
+      try {
+        const existingTaskFiles = await fileManager.listFiles('projects/*/tasks.md');
+        for (const f of existingTaskFiles) {
+          try {
+            const c = await fileManager.readFile(f);
+            for (const line of c.split('\n')) {
+              const trimmed = line.trim();
+              if (trimmed.startsWith('- [ ]') || trimmed.startsWith('- [x]')) {
+                allExistingTasks.add(trimmed.replace(/^- \[.\]\s*/, '').toLowerCase());
+              }
+            }
+          } catch { /* skip */ }
+        }
+      } catch { /* no project tasks */ }
+      try {
+        const generalContent = await fileManager.readFile('tasks.md');
+        for (const line of generalContent.split('\n')) {
+          const trimmed = line.trim();
+          if (trimmed.startsWith('- [ ]') || trimmed.startsWith('- [x]')) {
+            allExistingTasks.add(trimmed.replace(/^- \[.\]\s*/, '').toLowerCase());
+          }
+        }
+      } catch { /* no general tasks */ }
+
       const tasksByProject = new Map<string, string[]>();
       for (const t of update.tasks) {
+        // Skip if task already exists anywhere
+        if (allExistingTasks.has(t.task.toLowerCase())) continue;
         const projectKey = t.project?.trim() || '';
         if (!tasksByProject.has(projectKey)) {
           tasksByProject.set(projectKey, []);
@@ -278,6 +310,50 @@ export async function extractAndSaveMemory(
       logActivity(brainPath, 'memory-update', `Saved ${update.tasks.length} task(s) from conversation`);
     }
 
+    // Mark completed tasks
+    if (update.completedTasks && update.completedTasks.length > 0) {
+      const allTaskFiles: string[] = [];
+      try {
+        const projectTaskFiles = await fileManager.listFiles('projects/*/tasks.md');
+        allTaskFiles.push(...projectTaskFiles);
+      } catch { /* no project tasks */ }
+      try {
+        await fileManager.readFile('tasks.md');
+        allTaskFiles.push('tasks.md');
+      } catch { /* no general tasks */ }
+
+      let completedCount = 0;
+      for (const completedTask of update.completedTasks) {
+        const lowerCompleted = completedTask.toLowerCase().trim();
+        for (const filePath of allTaskFiles) {
+          try {
+            const content = await fileManager.readFile(filePath);
+            const lines = content.split('\n');
+            let modified = false;
+            for (let i = 0; i < lines.length; i++) {
+              const line = lines[i];
+              if (line.trim().startsWith('- [ ]')) {
+                const taskText = line.trim().replace(/^- \[ \]\s*/, '').toLowerCase();
+                if (taskText.includes(lowerCompleted) || lowerCompleted.includes(taskText)) {
+                  lines[i] = line.replace('- [ ]', '- [x]');
+                  modified = true;
+                  completedCount++;
+                }
+              }
+            }
+            if (modified) {
+              await fileManager.writeFile(filePath, lines.join('\n'));
+              console.log(`[memory-extract] Marked task(s) done in ${filePath}`);
+            }
+          } catch { /* skip unreadable */ }
+        }
+      }
+      if (completedCount > 0) {
+        const brainPath = fileManager.getBrainPath();
+        logActivity(brainPath, 'memory-update', `Marked ${completedCount} task(s) as done`);
+      }
+    }
+
     // Build summary of what was saved
     const summaryParts: string[] = [];
     if (update.profile?.name || update.profile?.role) summaryParts.push('Updated profile');
@@ -285,6 +361,7 @@ export async function extractAndSaveMemory(
     if (update.priorities && update.priorities.length > 0) summaryParts.push('Updated priorities');
     if (update.tasks && update.tasks.length > 0) summaryParts.push(`Saved ${update.tasks.length} task(s)`);
     if (update.people && update.people.length > 0) summaryParts.push(`Noted ${update.people.length} contact(s)`);
+    if (update.completedTasks && update.completedTasks.length > 0) summaryParts.push(`Completed ${update.completedTasks.length} task(s)`);
 
     if (summaryParts.length > 0) {
       return { updated: true, summary: summaryParts.join(', ') };
