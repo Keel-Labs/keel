@@ -381,7 +381,7 @@ export default function WikiWorkspace({
   }, [currentBasePath]);
 
   const loadCurrentBase = useCallback(async () => {
-    if (!currentBasePath) return;
+    if (!currentBasePath) return [] as WikiPage[];
     const files = await listMarkdownFiles(currentBasePath);
     const visibleFiles = files.filter((file) => !file.path.endsWith('/AGENTS.md') && !file.path.includes('/raw/'));
 
@@ -403,13 +403,15 @@ export default function WikiWorkspace({
     }));
 
     const filtered = nextPages.filter(Boolean) as WikiPage[];
-      setPages(filtered);
+    setPages(filtered);
 
-      if (selectedPagePath && !filtered.some((page) => page.path === selectedPagePath)) {
-        setSelectedPagePath(null);
-        setActiveNav('synthesis');
-        setActiveCollectionPrefix(null);
-      }
+    if (selectedPagePath && !filtered.some((page) => page.path === selectedPagePath)) {
+      setSelectedPagePath(null);
+      setActiveNav('synthesis');
+      setActiveCollectionPrefix(null);
+    }
+
+    return filtered;
   }, [currentBasePath, selectedPagePath]);
 
   useEffect(() => {
@@ -613,6 +615,16 @@ export default function WikiWorkspace({
     return () => window.removeEventListener('mousedown', handleClick);
   }, [baseMenuOpen]);
 
+  useEffect(() => {
+    const handleFocus = () => {
+      loadBaseSummaries().catch(() => undefined);
+      loadCurrentBase().catch(() => undefined);
+    };
+
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [loadBaseSummaries, loadCurrentBase]);
+
   const handleRenderedPageClick = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
     const target = event.target as HTMLElement;
     const linkTarget = target.closest('[data-wiki-path]') as HTMLElement | null;
@@ -799,10 +811,31 @@ export default function WikiWorkspace({
                       </button>
                     );
                   })}
+                  <button
+                    type="button"
+                    className="wiki-base-menu__option"
+                    onClick={() => {
+                      setBaseMenuOpen(false);
+                      window.keel.openUtilityWindow('settings', { section: 'knowledge-sources' }).catch(() => undefined);
+                    }}
+                  >
+                    <span className="wiki-base-menu__option-title">Create New Base</span>
+                    <span className="wiki-base-menu__option-text">Open Sources settings and initialize a new wiki base.</span>
+                  </button>
                 </div>
               )}
             </div>
-            <button type="button" className="wiki-shell__action" onClick={() => openNav('sources')}>Add Source</button>
+            <button
+              type="button"
+              className="wiki-shell__action"
+              onClick={() => {
+                const query: Record<string, string> = { section: 'knowledge-sources' };
+                if (currentBasePath) query.basePath = currentBasePath;
+                window.keel.openUtilityWindow('settings', query).catch(() => undefined);
+              }}
+            >
+              Sources
+            </button>
             <button
               type="button"
               className="wiki-shell__action"
@@ -899,6 +932,7 @@ export default function WikiWorkspace({
           </aside>
         )}
       </div>
+
     </div>
   );
 }

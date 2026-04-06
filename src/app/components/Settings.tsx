@@ -1,5 +1,11 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import type { Settings as SettingsType, OllamaModelInfo } from '../../shared/types';
+import type {
+  Settings as SettingsType,
+  OllamaModelInfo,
+  WikiFileImport,
+  WikiSourceInput,
+  WikiSourceType,
+} from '../../shared/types';
 import { applyTheme } from '../theme';
 
 const isElectron = typeof window !== 'undefined' && !!(window as any).keelMigrate;
@@ -16,6 +22,19 @@ const OPENAI_MODELS = [
   { value: 'gpt-4.1-mini', label: 'GPT-4.1 Mini' },
 ];
 
+function formatOpenAIModelLabel(modelId: string): string {
+  const known = OPENAI_MODELS.find((model) => model.value === modelId);
+  if (known) return known.label;
+
+  return modelId
+    .split('-')
+    .map((part) => {
+      if (/^\d/.test(part)) return part;
+      return part.charAt(0).toUpperCase() + part.slice(1);
+    })
+    .join(' ');
+}
+
 const PROVIDERS = [
   { value: 'claude', label: 'Claude', description: 'Anthropic reasoning and writing.' },
   { value: 'openai', label: 'OpenAI', description: 'General-purpose GPT models.' },
@@ -31,10 +50,26 @@ type SettingsSectionId =
   | 'ai-models'
   | 'ai-local'
   | 'knowledge-storage'
+  | 'knowledge-sources'
   | 'knowledge-team'
   | 'integrations-google'
   | 'cloud-sync'
   | 'advanced-developer';
+
+const SETTINGS_SECTION_IDS: SettingsSectionId[] = [
+  'general-personal',
+  'general-workspace',
+  'general-notifications',
+  'ai-provider',
+  'ai-models',
+  'ai-local',
+  'knowledge-storage',
+  'knowledge-sources',
+  'knowledge-team',
+  'integrations-google',
+  'cloud-sync',
+  'advanced-developer',
+];
 
 const SECTION_META: Record<SettingsSectionId, { title: string; description: string }> = {
   'general-personal': {
@@ -64,6 +99,10 @@ const SECTION_META: Record<SettingsSectionId, { title: string; description: stri
   'knowledge-storage': {
     title: 'Data Storage',
     description: 'Control where Keel stores local knowledge and context.',
+  },
+  'knowledge-sources': {
+    title: 'Sources',
+    description: 'Ingest source material into a wiki base and inspect the current source library.',
   },
   'knowledge-team': {
     title: 'Team Brain',
@@ -107,6 +146,7 @@ const NAV_GROUPS: Array<{
     label: 'Knowledge',
     items: [
       { id: 'knowledge-storage', label: 'Data Storage' },
+      { id: 'knowledge-sources', label: 'Sources' },
       { id: 'knowledge-team', label: 'Team Brain' },
     ],
   },
@@ -151,6 +191,24 @@ function providerLabel(provider: SettingsType['provider']): string {
   return PROVIDERS.find((item) => item.value === provider)?.label || provider;
 }
 
+function isSettingsSectionId(value: string | null): value is SettingsSectionId {
+  return !!value && SETTINGS_SECTION_IDS.includes(value as SettingsSectionId);
+}
+
+function getUtilityWindowSearchParam(name: string): string | null {
+  if (typeof window === 'undefined') return null;
+  return new URLSearchParams(window.location.search).get(name);
+}
+
+function getInitialSettingsSection(): SettingsSectionId {
+  const section = getUtilityWindowSearchParam('section');
+  return isSettingsSectionId(section) ? section : 'general-personal';
+}
+
+function getInitialSourcesBasePath(): string {
+  return getUtilityWindowSearchParam('basePath') || '';
+}
+
 function statusTone(
   tone: 'neutral' | 'success' | 'warning' | 'danger' | 'accent'
 ): React.CSSProperties {
@@ -174,7 +232,7 @@ interface Props {
 
 export default function Settings({ onBack }: Props) {
   const [settings, setSettings] = useState<SettingsType | null>(null);
-  const [selectedSection, setSelectedSection] = useState<SettingsSectionId>('general-personal');
+  const [selectedSection, setSelectedSection] = useState<SettingsSectionId>(getInitialSettingsSection);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [showApiKey, setShowApiKey] = useState<Record<string, boolean>>({});
@@ -183,6 +241,9 @@ export default function Settings({ onBack }: Props) {
   const [googleSyncing, setGoogleSyncing] = useState(false);
   const [googleMessage, setGoogleMessage] = useState('');
   const [ollamaModels, setOllamaModels] = useState<OllamaModelInfo[]>([]);
+  const [openaiModels, setOpenaiModels] = useState<string[]>([]);
+  const [openaiModelsLoading, setOpenaiModelsLoading] = useState(false);
+  const [openaiModelError, setOpenaiModelError] = useState<string | null>(null);
   const [ollamaError, setOllamaError] = useState<string | null>(null);
   const [ollamaLoading, setOllamaLoading] = useState(false);
   const [ollamaManualEntry, setOllamaManualEntry] = useState(false);
@@ -190,6 +251,21 @@ export default function Settings({ onBack }: Props) {
     () => typeof window !== 'undefined' && window.innerWidth < 980
   );
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const fetchOpenAIModels = useCallback(async () => {
+    setOpenaiModelsLoading(true);
+    setOpenaiModelError(null);
+    try {
+      const result = await window.keel.openaiListModels();
+      setOpenaiModels(result.models);
+      setOpenaiModelError(result.error);
+    } catch {
+      setOpenaiModels([]);
+      setOpenaiModelError('Failed to fetch OpenAI models');
+    } finally {
+      setOpenaiModelsLoading(false);
+    }
+  }, []);
 
   const fetchOllamaModels = useCallback(async () => {
     setOllamaLoading(true);
@@ -213,12 +289,28 @@ export default function Settings({ onBack }: Props) {
     window.keel.getSettings().then((s) => {
       setSettings(s);
       if (s.provider === 'ollama') fetchOllamaModels();
+      if (s.openaiApiKey) fetchOpenAIModels();
     }).catch(() => {});
     window.keel.googleStatus().then((s) => {
       setGoogleConnected(s.connected);
       setGoogleConfigured(s.configured ?? false);
     }).catch(() => {});
-  }, [fetchOllamaModels]);
+  }, [fetchOllamaModels, fetchOpenAIModels]);
+
+  useEffect(() => {
+    if (!settings?.openaiApiKey) {
+      setOpenaiModels([]);
+      setOpenaiModelsLoading(false);
+      setOpenaiModelError(null);
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      fetchOpenAIModels();
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [fetchOpenAIModels, settings?.openaiApiKey]);
 
   useEffect(() => {
     const onResize = () => setIsCompactLayout(window.innerWidth < 980);
@@ -308,6 +400,13 @@ export default function Settings({ onBack }: Props) {
     { label: 'Google', value: googleConnected ? 'Connected' : googleConfigured ? 'Ready to connect' : 'Unavailable' },
     { label: 'Team Brain', value: settings.teamBrainPath ? 'Enabled' : 'Off' },
   ];
+
+  const openaiModelOptionIds = Array.from(new Set([
+    ...(settings.openaiApiKey ? openaiModels : OPENAI_MODELS.map((model) => model.value)),
+    settings.openaiModel,
+  ].filter(Boolean)));
+  const openaiModelOptions = openaiModelOptionIds
+    .map((modelId) => ({ value: modelId, label: formatOpenAIModelLabel(modelId) }));
 
   const renderApiKeyInput = (
     label: string,
@@ -417,7 +516,7 @@ export default function Settings({ onBack }: Props) {
       return (
         <SectionCard
           title="Model Selection"
-          description="Choose the default OpenAI model for your conversations."
+          description="Choose the default OpenAI model for your conversations. Keel now uses the live model list available to the configured API key."
         >
           <FieldRow label="OpenAI Model">
             <select
@@ -425,10 +524,21 @@ export default function Settings({ onBack }: Props) {
               onChange={(e) => update({ openaiModel: e.target.value })}
               style={selectStyle}
             >
-              {OPENAI_MODELS.map((model) => (
+              {openaiModelOptions.map((model) => (
                 <option key={model.value} value={model.value}>{model.label}</option>
               ))}
             </select>
+            {settings.openaiApiKey && openaiModelsLoading && (
+              <InlineNote>Loading the live OpenAI model list for this API key…</InlineNote>
+            )}
+            {openaiModelError && (
+              <InlineNote>
+                Could not load the live OpenAI model list: {openaiModelError}
+              </InlineNote>
+            )}
+            {settings.openaiApiKey && !openaiModelsLoading && !openaiModelError && (
+              <InlineNote>Loaded {openaiModels.length} OpenAI models from the configured API key.</InlineNote>
+            )}
           </FieldRow>
         </SectionCard>
       );
@@ -784,6 +894,14 @@ export default function Settings({ onBack }: Props) {
               </div>
             </FieldRow>
           </SectionCard>
+        );
+
+      case 'knowledge-sources':
+        return (
+          <WikiSourcesSection
+            initialBasePath={getInitialSourcesBasePath()}
+            isCompactLayout={isCompactLayout}
+          />
         );
 
       case 'knowledge-team':
@@ -1394,6 +1512,550 @@ const inlineCodeStyle: React.CSSProperties = {
   borderRadius: 6,
   fontSize: 12,
 };
+
+interface SettingsWikiBaseSummary {
+  path: string;
+  title: string;
+  description: string;
+}
+
+interface SettingsWikiSourceSummary {
+  path: string;
+  title: string;
+  summary: string;
+  updatedAt: number;
+}
+
+function WikiSourcesSection({
+  initialBasePath,
+  isCompactLayout,
+}: {
+  initialBasePath: string;
+  isCompactLayout: boolean;
+}) {
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [bases, setBases] = useState<SettingsWikiBaseSummary[]>([]);
+  const [currentBasePath, setCurrentBasePath] = useState(initialBasePath);
+  const [sourcePages, setSourcePages] = useState<SettingsWikiSourceSummary[]>([]);
+  const [newBaseTitle, setNewBaseTitle] = useState('');
+  const [newBaseDescription, setNewBaseDescription] = useState('');
+  const [newBaseError, setNewBaseError] = useState('');
+  const [newBaseNotice, setNewBaseNotice] = useState('');
+  const [isCreatingBase, setIsCreatingBase] = useState(false);
+  const [ingestMode, setIngestMode] = useState<WikiSourceType>('url');
+  const [ingestTitle, setIngestTitle] = useState('');
+  const [ingestUrl, setIngestUrl] = useState('');
+  const [ingestText, setIngestText] = useState('');
+  const [ingestFile, setIngestFile] = useState<WikiFileImport | null>(null);
+  const [ingestError, setIngestError] = useState('');
+  const [ingestNotice, setIngestNotice] = useState('');
+  const [isIngesting, setIsIngesting] = useState(false);
+
+  const inputStyle: React.CSSProperties = {
+    width: '100%',
+    padding: '12px 14px',
+    borderRadius: 'var(--radius-lg)',
+    background: 'var(--control-bg)',
+    border: '1px solid var(--control-border)',
+    color: 'var(--text-primary)',
+    fontSize: 'var(--text-base)',
+    outline: 'none',
+    fontFamily: 'inherit',
+  };
+
+  const selectStyle: React.CSSProperties = {
+    ...inputStyle,
+    appearance: 'none',
+    backgroundImage: `url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23888' stroke-width='1.5' fill='none'/%3E%3C/svg%3E")`,
+    backgroundRepeat: 'no-repeat',
+    backgroundPosition: 'right 14px center',
+    paddingRight: 36,
+    cursor: 'pointer',
+  };
+
+  const loadBaseSummaries = useCallback(async () => {
+    await window.keel.ensureBrain();
+    const baseEntries = await window.keel.listFiles('knowledge-bases');
+    const baseDirs = baseEntries.filter((entry) => entry.isDirectory);
+
+    const summaries = await Promise.all(baseDirs.map(async (entry) => {
+      const overviewPath = `${entry.path}/overview.md`;
+      let title = formatSettingsWikiTitle(entry.name);
+      let description = 'LLM-maintained wiki workspace.';
+
+      try {
+        const content = await window.keel.readFile(overviewPath);
+        title = extractSettingsWikiTitle(content, title);
+        description = extractSettingsWikiSummary(content) || description;
+      } catch {
+        // Keep fallback labels when overview is unavailable.
+      }
+
+      return {
+        path: entry.path,
+        title,
+        description,
+      };
+    }));
+
+    setBases(summaries);
+    setCurrentBasePath((previousPath) => {
+      if (previousPath && summaries.some((base) => base.path === previousPath)) return previousPath;
+      if (initialBasePath && summaries.some((base) => base.path === initialBasePath)) return initialBasePath;
+      return summaries[0]?.path || '';
+    });
+  }, [initialBasePath]);
+
+  const loadSourcePages = useCallback(async (basePath: string) => {
+    if (!basePath) {
+      setSourcePages([]);
+      return;
+    }
+
+    try {
+      const files = await listSettingsMarkdownFiles(`${basePath}/wiki/sources`);
+      const pages = await Promise.all(files.map(async (file) => {
+        const content = await window.keel.readFile(file.path);
+        return {
+          path: file.path,
+          title: extractSettingsWikiTitle(content, formatSettingsWikiTitle(file.path.split('/').pop() || 'Source')),
+          summary: extractSettingsWikiSummary(content),
+          updatedAt: file.updatedAt,
+        } satisfies SettingsWikiSourceSummary;
+      }));
+
+      setSourcePages(pages.sort((left, right) => right.updatedAt - left.updatedAt));
+    } catch {
+      setSourcePages([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      try {
+        setLoading(true);
+        setError('');
+        await loadBaseSummaries();
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : 'Failed to load wiki sources.');
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [loadBaseSummaries]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      try {
+        await loadSourcePages(currentBasePath);
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : 'Failed to load source pages.');
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentBasePath, loadSourcePages]);
+
+  const currentBase = bases.find((base) => base.path === currentBasePath) || null;
+
+  const handleCreateBase = useCallback(async () => {
+    setIsCreatingBase(true);
+    setNewBaseError('');
+    setNewBaseNotice('');
+
+    try {
+      const result = await window.keel.createWikiBase(newBaseTitle, newBaseDescription.trim() || undefined);
+      await loadBaseSummaries();
+      setCurrentBasePath(result.basePath);
+      setNewBaseTitle('');
+      setNewBaseDescription('');
+      setNewBaseNotice(result.message);
+    } catch (err) {
+      setNewBaseError(err instanceof Error ? err.message : 'Failed to create wiki base.');
+    } finally {
+      setIsCreatingBase(false);
+    }
+  }, [loadBaseSummaries, newBaseDescription, newBaseTitle]);
+
+  const resetForm = useCallback(() => {
+    setIngestMode('url');
+    setIngestTitle('');
+    setIngestUrl('');
+    setIngestText('');
+    setIngestFile(null);
+    setIngestError('');
+  }, []);
+
+  const pickIngestFile = useCallback(async () => {
+    setIngestError('');
+    const files = await window.keel.pickWikiFiles();
+    setIngestFile(files[0] || null);
+  }, []);
+
+  const handleIngestSubmit = useCallback(async () => {
+    if (!currentBasePath) {
+      setIngestError('Choose a wiki base before adding a source.');
+      return;
+    }
+
+    const payload: WikiSourceInput = {
+      sourceType: ingestMode,
+      title: ingestTitle.trim() || undefined,
+    };
+
+    if (ingestMode === 'url') {
+      payload.url = ingestUrl.trim();
+    } else if (ingestMode === 'text') {
+      payload.text = ingestText.trim();
+    } else if (ingestFile) {
+      payload.filePath = ingestFile.path;
+      payload.fileName = ingestFile.name;
+    }
+
+    setIsIngesting(true);
+    setIngestError('');
+    setIngestNotice('');
+
+    try {
+      const result = await window.keel.ingestWikiSource(currentBasePath, payload);
+      await loadSourcePages(currentBasePath);
+      resetForm();
+      setIngestNotice(result.warning || result.message);
+    } catch (err) {
+      setIngestError(err instanceof Error ? err.message : 'Failed to ingest source.');
+    } finally {
+      setIsIngesting(false);
+    }
+  }, [
+    currentBasePath,
+    ingestFile,
+    ingestMode,
+    ingestText,
+    ingestTitle,
+    ingestUrl,
+    loadSourcePages,
+    resetForm,
+  ]);
+
+  const ingestCanSubmit =
+    !!currentBasePath &&
+    (
+      (ingestMode === 'url' && ingestUrl.trim()) ||
+      (ingestMode === 'text' && ingestText.trim()) ||
+      (ingestMode === 'file' && ingestFile)
+    );
+
+  if (loading && bases.length === 0) {
+    return <PlaceholderPanel title="Loading sources" description="Inspecting wiki bases and source pages." />;
+  }
+
+  return (
+    <>
+      <StatusPanel
+        title="Sources Workspace"
+        badge={{ label: currentBase ? 'Ready' : 'No base selected', tone: currentBase ? 'success' : 'warning' }}
+        description={
+          currentBase
+            ? `Add source material to ${currentBase.title} and keep its source pages in one place.`
+            : 'Choose a wiki base to begin ingesting sources.'
+        }
+      />
+
+      <SectionCard
+        title="Wiki Base"
+        description="Pick the target wiki base. New source packages will be written into its raw and wiki/source folders."
+      >
+        <FieldRow
+          label="Create New Base"
+          description="Create a new wiki base with the default Keel structure: overview, index, log, health, and raw/wiki folders."
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <input
+              type="text"
+              value={newBaseTitle}
+              onChange={(event) => {
+                setNewBaseTitle(event.target.value);
+                setNewBaseError('');
+              }}
+              placeholder="e.g. Competitive Landscape"
+              style={inputStyle}
+            />
+            <textarea
+              value={newBaseDescription}
+              onChange={(event) => setNewBaseDescription(event.target.value)}
+              placeholder="Optional description for the wiki home page."
+              style={{ ...inputStyle, minHeight: 96, resize: 'vertical' }}
+            />
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+              <InlineNote>
+                Keel will create a new folder under <code style={inlineCodeStyle}>knowledge-bases/</code> and initialize a valid wiki skeleton.
+              </InlineNote>
+              <button
+                type="button"
+                onClick={handleCreateBase}
+                disabled={!newBaseTitle.trim() || isCreatingBase}
+                style={primaryButtonStyle(!newBaseTitle.trim() || isCreatingBase)}
+              >
+                {isCreatingBase ? 'Creating...' : 'Create Base'}
+              </button>
+            </div>
+            {newBaseError && <InlineMessage tone="danger">{newBaseError}</InlineMessage>}
+            {newBaseNotice && <InlineMessage tone="success">{newBaseNotice}</InlineMessage>}
+          </div>
+        </FieldRow>
+
+        <FieldRow label="Target Base">
+          <select
+            value={currentBasePath}
+            onChange={(event) => {
+              setCurrentBasePath(event.target.value);
+              setIngestNotice('');
+              setIngestError('');
+            }}
+            style={selectStyle}
+          >
+            {bases.map((base) => (
+              <option key={base.path} value={base.path}>{base.title}</option>
+            ))}
+          </select>
+        </FieldRow>
+
+        {currentBase && (
+          <div
+            style={{
+              padding: '14px 16px',
+              borderRadius: 16,
+              background: 'var(--surface-elevated)',
+              border: '1px solid var(--panel-border)',
+            }}
+          >
+            <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-primary)' }}>{currentBase.title}</div>
+            <div style={{ marginTop: 6, fontSize: 13, lineHeight: 1.6, color: 'var(--text-muted)' }}>
+              {currentBase.description}
+            </div>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 12 }}>
+              <StatusBadge label={`${sourcePages.length} Sources`} tone="accent" />
+              <StatusBadge label="URL / Text / File" tone="neutral" />
+            </div>
+          </div>
+        )}
+
+        {error && <InlineMessage tone="danger">{error}</InlineMessage>}
+      </SectionCard>
+
+      <SectionCard
+        title="Add Source"
+        description="Ingest an article, pasted notes, or a document file. Supported files: Markdown, text, PDF, DOCX, and PPTX."
+      >
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {(['url', 'text', 'file'] as WikiSourceType[]).map((mode) => {
+            const active = ingestMode === mode;
+            const label = mode === 'url'
+              ? 'URL Article'
+              : mode === 'text'
+                ? 'Pasted Text'
+                : 'Document File';
+
+            return (
+              <button
+                key={mode}
+                type="button"
+                onClick={() => {
+                  setIngestMode(mode);
+                  setIngestError('');
+                }}
+                style={{
+                  padding: '9px 12px',
+                  borderRadius: 999,
+                  border: `1px solid ${active ? 'var(--accent-border)' : 'var(--panel-border)'}`,
+                  background: active ? 'var(--accent-bg)' : 'var(--surface-muted)',
+                  color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+
+        <FieldRow label="Title Override" description="Optional. Keel will derive a title from the source when left blank.">
+          <input
+            type="text"
+            value={ingestTitle}
+            onChange={(event) => setIngestTitle(event.target.value)}
+            placeholder="Optional title override"
+            style={inputStyle}
+          />
+        </FieldRow>
+
+        {ingestMode === 'url' && (
+          <FieldRow label="Article URL">
+            <input
+              type="text"
+              value={ingestUrl}
+              onChange={(event) => setIngestUrl(event.target.value)}
+              placeholder="https://example.com/article"
+              style={inputStyle}
+            />
+          </FieldRow>
+        )}
+
+        {ingestMode === 'text' && (
+          <FieldRow label="Source Text">
+            <textarea
+              value={ingestText}
+              onChange={(event) => setIngestText(event.target.value)}
+              placeholder="Paste notes, article text, or raw source material."
+              style={{ ...inputStyle, minHeight: 220, resize: 'vertical' }}
+            />
+          </FieldRow>
+        )}
+
+        {ingestMode === 'file' && (
+          <FieldRow label="Document File" description="Markdown, TXT, PDF, DOCX, and PPTX are supported in this build.">
+            <div style={{ display: 'flex', gap: 12, flexDirection: isCompactLayout ? 'column' : 'row', alignItems: isCompactLayout ? 'stretch' : 'center' }}>
+              <button type="button" onClick={pickIngestFile} style={secondaryButtonStyle(false)}>
+                Choose File
+              </button>
+              <div style={{ fontSize: 13, color: ingestFile ? 'var(--text-primary)' : 'var(--text-muted)' }}>
+                {ingestFile?.name || 'No file selected'}
+              </div>
+            </div>
+          </FieldRow>
+        )}
+
+        {ingestError && <InlineMessage tone="danger">{ingestError}</InlineMessage>}
+        {ingestNotice && <InlineMessage tone="success">{ingestNotice}</InlineMessage>}
+
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+          <InlineNote>
+            Source packages are normalized into <code style={inlineCodeStyle}>raw/</code> and visible pages are created in <code style={inlineCodeStyle}>wiki/sources/</code>.
+          </InlineNote>
+          <button
+            type="button"
+            onClick={handleIngestSubmit}
+            disabled={!ingestCanSubmit || isIngesting}
+            style={primaryButtonStyle(!ingestCanSubmit || isIngesting)}
+          >
+            {isIngesting ? 'Ingesting...' : 'Add Source'}
+          </button>
+        </div>
+      </SectionCard>
+
+      <SectionCard
+        title="Source Pages"
+        description="The wiki-visible source pages for the selected base. These are the pages the compiler and reader surfaces use today."
+      >
+        {sourcePages.length === 0 ? (
+          <InlineNote>No source pages have been created for this base yet.</InlineNote>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {sourcePages.map((page) => (
+              <div
+                key={page.path}
+                style={{
+                  padding: '14px 16px',
+                  borderRadius: 16,
+                  background: 'var(--surface-elevated)',
+                  border: '1px solid var(--panel-border)',
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'baseline', flexWrap: 'wrap' }}>
+                  <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-primary)' }}>{page.title}</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-subtle)' }}>
+                    Updated {formatSettingsRelativeTime(page.updatedAt)}
+                  </div>
+                </div>
+                {page.summary && (
+                  <div style={{ marginTop: 6, fontSize: 13, lineHeight: 1.6, color: 'var(--text-muted)' }}>
+                    {page.summary}
+                  </div>
+                )}
+                <div style={{ marginTop: 8, fontSize: 12, color: 'var(--text-subtle)' }}>{page.path}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </SectionCard>
+    </>
+  );
+}
+
+function formatSettingsWikiTitle(input: string): string {
+  return input
+    .replace(/[-_]+/g, ' ')
+    .replace(/\.md$/i, '')
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function extractSettingsWikiTitle(content: string, fallback: string): string {
+  const heading = content.match(/^#\s+(.+)$/m);
+  return heading?.[1]?.trim() || fallback;
+}
+
+function extractSettingsWikiSummary(content: string): string {
+  const lines = content
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  for (const line of lines) {
+    if (!line.startsWith('#') && !line.startsWith('- ') && !line.startsWith('##')) {
+      return line;
+    }
+  }
+
+  return '';
+}
+
+function formatSettingsRelativeTime(timestamp: number): string {
+  if (!timestamp) return 'Unknown';
+  const deltaMs = Date.now() - timestamp;
+  const minutes = Math.round(deltaMs / 60000);
+
+  if (minutes < 1) return 'Just now';
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.round(hours / 24);
+  return `${days}d ago`;
+}
+
+async function listSettingsMarkdownFiles(dirPath: string): Promise<Array<{ path: string; updatedAt: number }>> {
+  const entries = await window.keel.listFiles(dirPath);
+  const files: Array<{ path: string; updatedAt: number }> = [];
+
+  for (const entry of entries) {
+    if (entry.isDirectory) {
+      const nested = await listSettingsMarkdownFiles(entry.path);
+      files.push(...nested);
+    } else if (entry.path.endsWith('.md')) {
+      files.push({ path: entry.path, updatedAt: entry.updatedAt });
+    }
+  }
+
+  return files;
+}
 
 function CloudMigrationSection() {
   const [serverUrl, setServerUrl] = useState(

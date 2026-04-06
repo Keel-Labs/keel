@@ -64,6 +64,40 @@ export interface FileEntry {
   updatedAt: number;
 }
 
+export type WikiSourceType = 'url' | 'text' | 'file';
+
+export interface WikiFileImport {
+  name: string;
+  path: string;
+}
+
+export interface WikiSourceInput {
+  sourceType: WikiSourceType;
+  title?: string;
+  url?: string;
+  text?: string;
+  filePath?: string;
+  fileName?: string;
+}
+
+export interface WikiIngestResult {
+  sourceSlug: string;
+  title: string;
+  pagePath: string;
+  relativePagePath: string;
+  message: string;
+  warning?: string;
+}
+
+export interface WikiBaseCreateResult {
+  basePath: string;
+  slug: string;
+  title: string;
+  message: string;
+}
+
+export type UtilityWindowKind = 'settings' | 'wiki-ingest';
+
 export interface ActivityLogEntry {
   id: number;
   action: string;
@@ -81,6 +115,11 @@ export interface OllamaModelInfo {
 
 export interface OllamaListResult {
   models: OllamaModelInfo[];
+  error: string | null;
+}
+
+export interface OpenAIListResult {
+  models: string[];
   error: string | null;
 }
 
@@ -121,6 +160,11 @@ export type IpcChannels =
   | 'keel:read-file'
   | 'keel:write-file'
   | 'keel:pick-folder'
+  | 'keel:pick-wiki-files'
+  | 'keel:create-wiki-base'
+  | 'keel:wiki-ingest-source'
+  | 'keel:open-utility-window'
+  | 'keel:close-window'
   | 'keel:scheduled-notification'
   | 'keel:create-reminder'
   | 'keel:list-reminders'
@@ -130,6 +174,7 @@ export type IpcChannels =
   | 'keel:google-status'
   | 'keel:google-sync-calendar'
   | 'keel:google-export-doc'
+  | 'keel:openai-list-models'
   | 'keel:ollama-list-models'
   | 'keel:list-team-files'
   | 'keel:read-team-file'
@@ -158,9 +203,14 @@ export interface KeelAPI {
   getLatestSession: () => Promise<string | null>;
   listSessions: () => Promise<Array<{ id: string; title: string; updatedAt: number }>>;
   pickFolder: (defaultPath?: string) => Promise<string | null>;
+  pickWikiFiles: () => Promise<WikiFileImport[]>;
+  createWikiBase: (title: string, description?: string) => Promise<WikiBaseCreateResult>;
+  openUtilityWindow: (kind: UtilityWindowKind, query?: Record<string, string>) => Promise<void>;
+  closeWindow: () => Promise<void>;
   listFiles: (dirPath: string) => Promise<FileEntry[]>;
   readFile: (filePath: string) => Promise<string>;
   writeFile: (filePath: string, content: string) => Promise<void>;
+  ingestWikiSource: (basePath: string, input: WikiSourceInput) => Promise<WikiIngestResult>;
   onScheduledNotification: (callback: (notification: ScheduledNotification) => void) => void;
   removeScheduledNotificationListener: () => void;
   // Reminders
@@ -174,6 +224,7 @@ export interface KeelAPI {
   googleSyncCalendar: () => Promise<{ eventCount: number; filesWritten: number }>;
   googleExportDoc: (markdownContent: string, title?: string) => Promise<string>;
   googleCreateEvent: (event: { summary: string; startTime: string; endTime: string; description?: string; attendees?: string[] }) => Promise<{ id: string; htmlLink: string }>;
+  openaiListModels: () => Promise<OpenAIListResult>;
   // Ollama
   ollamaListModels: () => Promise<OllamaListResult>;
   // Team Brain
