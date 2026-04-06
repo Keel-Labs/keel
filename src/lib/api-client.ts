@@ -182,11 +182,12 @@ export function logout(): void {
 // --- SSE streaming state ---
 
 let streamListeners: {
-  onChunk?: (chunk: string) => void;
-  onDone?: () => void;
-  onError?: (error: string) => void;
-  onThinking?: (step: string) => void;
-  onThinkingDelta?: (text: string) => void;
+  requestId?: string;
+  onChunk?: (event: { requestId: string; chunk: string }) => void;
+  onDone?: (event: { requestId: string }) => void;
+  onError?: (event: { requestId: string; error: string }) => void;
+  onThinking?: (event: { requestId: string; step: string }) => void;
+  onThinkingDelta?: (event: { requestId: string; text: string }) => void;
 } = {};
 let currentAbortController: AbortController | null = null;
 
@@ -205,7 +206,8 @@ export const apiClient: KeelAPI = {
   },
 
   // Chat streaming via SSE
-  async chatStream(messages: Message[]): Promise<void> {
+  async chatStream(messages: Message[], requestId: string): Promise<void> {
+    streamListeners.requestId = requestId;
     currentAbortController = new AbortController();
     const res = await apiFetch('/api/chat/stream', {
       method: 'POST',
@@ -242,19 +244,19 @@ export const apiClient: KeelAPI = {
               const data = JSON.parse(line.slice(6));
               switch (eventType) {
                 case 'chunk':
-                  streamListeners.onChunk?.(data.text);
+                  streamListeners.onChunk?.({ requestId, chunk: data.text });
                   break;
                 case 'thinking':
-                  streamListeners.onThinking?.(data.step);
+                  streamListeners.onThinking?.({ requestId, step: data.step });
                   break;
                 case 'thinking_delta':
-                  streamListeners.onThinkingDelta?.(data.text);
+                  streamListeners.onThinkingDelta?.({ requestId, text: data.text });
                   break;
                 case 'done':
-                  streamListeners.onDone?.();
+                  streamListeners.onDone?.({ requestId });
                   break;
                 case 'error':
-                  streamListeners.onError?.(data.message);
+                  streamListeners.onError?.({ requestId, error: data.message });
                   break;
               }
             } catch { /* bad JSON line */ }
@@ -263,40 +265,57 @@ export const apiClient: KeelAPI = {
         }
       }
       // If stream ends without explicit done event, signal done
-      streamListeners.onDone?.();
+      streamListeners.onDone?.({ requestId });
     } catch (err: any) {
       if (err.name !== 'AbortError') {
-        streamListeners.onError?.(err.message || 'Stream failed');
+        streamListeners.onError?.({ requestId, error: err.message || 'Stream failed' });
       }
     }
   },
 
   onStreamChunk(callback) {
     streamListeners.onChunk = callback;
+    return () => {
+      if (streamListeners.onChunk === callback) {
+        delete streamListeners.onChunk;
+      }
+    };
   },
 
   onStreamDone(callback) {
     streamListeners.onDone = callback;
+    return () => {
+      if (streamListeners.onDone === callback) {
+        delete streamListeners.onDone;
+      }
+    };
   },
 
   onStreamError(callback) {
     streamListeners.onError = callback;
+    return () => {
+      if (streamListeners.onError === callback) {
+        delete streamListeners.onError;
+      }
+    };
   },
 
   onThinkingStep(callback) {
     streamListeners.onThinking = callback;
+    return () => {
+      if (streamListeners.onThinking === callback) {
+        delete streamListeners.onThinking;
+      }
+    };
   },
 
   onThinkingDelta(callback) {
     streamListeners.onThinkingDelta = callback;
-  },
-
-  removeStreamListeners() {
-    streamListeners = {};
-    if (currentAbortController) {
-      currentAbortController.abort();
-      currentAbortController = null;
-    }
+    return () => {
+      if (streamListeners.onThinkingDelta === callback) {
+        delete streamListeners.onThinkingDelta;
+      }
+    };
   },
 
   // Settings

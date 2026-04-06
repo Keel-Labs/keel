@@ -623,15 +623,11 @@ function registerIpcHandlers() {
     }
   });
 
-  // Send a thinking step to the renderer
-  function emitThinking(step: string) {
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('keel:thinking-step', step);
-    }
-  }
-
   // Enrich messages: auto-fetch Google Docs and Calendar events
-  async function enrichMessages(messages: Message[]): Promise<Message[]> {
+  async function enrichMessages(
+    messages: Message[],
+    emitThinking: (step: string) => void = () => {},
+  ): Promise<Message[]> {
     if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) return messages;
     if (!isGoogleConnected(settings.brainPath)) return messages;
 
@@ -649,7 +645,7 @@ function registerIpcHandlers() {
       for (const url of urls) {
         const docId = extractDocId(url);
         if (!docId) continue;
-        emitThinking('Reading Google Doc...');
+        emitThinking('Reading Google Doc');
         try {
           const { title, content } = await readGoogleDoc(settings.brainPath, config, docId);
           emitThinking(`Read "${title}" (${content.length.toLocaleString()} chars)`);
@@ -667,7 +663,7 @@ function registerIpcHandlers() {
     const timeKeywords = /\b(today|tomorrow|this week|next week|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/;
     if (calendarKeywords.test(msg) && (timeKeywords.test(msg) || /\b(what|when|do i have|check|show|any)\b/.test(msg))) {
       const daysAhead = /tomorrow/.test(msg) ? 2 : /this week|next week/.test(msg) ? 7 : 1;
-      emitThinking('Fetching Google Calendar...');
+      emitThinking('Fetching Google Calendar');
       try {
         const events = await getUpcomingEventsFormatted(settings.brainPath, config, daysAhead);
         emitThinking(`Fetched calendar events for next ${daysAhead} day(s)`);
@@ -691,18 +687,23 @@ function registerIpcHandlers() {
   ipcMain.handle('keel:chat', async (_event, messages: Message[]) => {
     const enrichedMessages = await enrichMessages(messages);
     const lastMessage = enrichedMessages[enrichedMessages.length - 1]?.content;
-    const systemPrompt = await contextAssembler.assembleContext(lastMessage, emitThinking);
-    emitThinking('Thinking...');
+    const systemPrompt = await contextAssembler.assembleContext(lastMessage, () => {});
     logActivity(settings.brainPath, 'chat', lastMessage?.slice(0, 200));
     return llmClient.chat(enrichedMessages, systemPrompt);
   });
 
-  ipcMain.handle('keel:chat-stream', async (event, messages: Message[]) => {
-    const enrichedMessages = await enrichMessages(messages);
+  ipcMain.handle('keel:chat-stream', async (event, messages: Message[], requestId: string) => {
+    const sender = event.sender;
+    const streamRequestId = requestId || `request-${Date.now()}`;
+    const emitThinking = (step: string) => {
+      if (!sender.isDestroyed()) {
+        sender.send('keel:thinking-step', { requestId: streamRequestId, step });
+      }
+    };
+    const enrichedMessages = await enrichMessages(messages, emitThinking);
     const lastMessage = enrichedMessages[enrichedMessages.length - 1]?.content;
     const systemPrompt = await contextAssembler.assembleContext(lastMessage, emitThinking);
-    emitThinking('Generating response...');
-    const sender = event.sender;
+    emitThinking('Generating answer');
 
     logActivity(settings.brainPath, 'chat', lastMessage?.slice(0, 200));
 
@@ -713,7 +714,7 @@ function registerIpcHandlers() {
 
       const flush = () => {
         if (buffer && !sender.isDestroyed()) {
-          sender.send('keel:chat-stream-chunk', buffer);
+          sender.send('keel:chat-stream-chunk', { requestId: streamRequestId, chunk: buffer });
           buffer = '';
         }
         flushTimer = null;
@@ -736,7 +737,7 @@ function registerIpcHandlers() {
       flush();
 
       if (!sender.isDestroyed()) {
-        sender.send('keel:chat-stream-done');
+        sender.send('keel:chat-stream-done', { requestId: streamRequestId });
       }
 
       // Extract and save memory in background (don't block the response)
@@ -749,7 +750,7 @@ function registerIpcHandlers() {
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       if (!sender.isDestroyed()) {
-        sender.send('keel:chat-stream-error', message);
+        sender.send('keel:chat-stream-error', { requestId: streamRequestId, error: message });
       }
     }
   });
