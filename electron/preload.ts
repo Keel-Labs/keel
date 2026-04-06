@@ -59,12 +59,17 @@ const api: KeelAPI = {
   listSessions: () => ipcRenderer.invoke('keel:list-sessions'),
 
   pickFolder: (defaultPath?: string) => ipcRenderer.invoke('keel:pick-folder', defaultPath),
+  pickWikiFiles: () => ipcRenderer.invoke('keel:pick-wiki-files'),
+  createWikiBase: (title, description) => ipcRenderer.invoke('keel:create-wiki-base', title, description),
+  openUtilityWindow: (kind, query) => ipcRenderer.invoke('keel:open-utility-window', kind, query),
+  closeWindow: () => ipcRenderer.invoke('keel:close-window'),
 
   listFiles: (dirPath: string) => ipcRenderer.invoke('keel:list-files', dirPath),
 
   readFile: (filePath: string) => ipcRenderer.invoke('keel:read-file', filePath),
 
   writeFile: (filePath: string, content: string) => ipcRenderer.invoke('keel:write-file', filePath, content),
+  ingestWikiSource: (basePath, input) => ipcRenderer.invoke('keel:wiki-ingest-source', basePath, input),
 
   onScheduledNotification: (callback) => {
     ipcRenderer.on('keel:scheduled-notification', (_event, notification) => callback(notification));
@@ -91,6 +96,7 @@ const api: KeelAPI = {
 
   googleExportDoc: (markdownContent: string, title?: string) => ipcRenderer.invoke('keel:google-export-doc', markdownContent, title),
   googleCreateEvent: (event) => ipcRenderer.invoke('keel:google-create-event', event),
+  openaiListModels: () => ipcRenderer.invoke('keel:openai-list-models'),
   ollamaListModels: () => ipcRenderer.invoke('keel:ollama-list-models'),
   listTeamFiles: (dirPath: string) => ipcRenderer.invoke('keel:list-team-files', dirPath),
   readTeamFile: (filePath: string) => ipcRenderer.invoke('keel:read-team-file', filePath),

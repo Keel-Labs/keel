@@ -8,7 +8,9 @@ import {
   nativeImage,
   dialog,
   Notification,
+  net,
 } from 'electron';
+import OpenAI from 'openai';
 import * as path from 'path';
 import * as fs from 'fs';
 // chokidar v5 is ESM-only — loaded via dynamic import in startFileWatcher()
@@ -40,6 +42,8 @@ import { capture } from '../src/core/workflows/capture';
 import { dailyBrief } from '../src/core/workflows/dailyBrief';
 import { eod } from '../src/core/workflows/eod';
 import { extractAndSaveMemory } from '../src/core/workflows/memoryExtract';
+import { ingestWikiSource } from '../src/core/workflows/wikiIngest';
+import { createWikiBase } from '../src/core/workflows/wikiBase';
 import {
   startOAuthFlow,
   saveTokens,
@@ -50,10 +54,11 @@ import {
 import { GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_SCOPES } from '../src/core/connectors/googleConfig';
 import { syncCalendar, getUpcomingEventsFormatted, createCalendarEvent } from '../src/core/connectors/googleCalendar';
 import { exportToGoogleDoc, readGoogleDoc, extractDocId } from '../src/core/connectors/googleDocs';
-import type { Message, Settings } from '../src/shared/types';
+import type { Message, Settings, UtilityWindowKind, WikiSourceInput } from '../src/shared/types';
 
 let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
+const utilityWindows = new Map<UtilityWindowKind, BrowserWindow>();
 
 const settings = loadSettings();
 const fileManager = new FileManager(settings.brainPath);
@@ -64,6 +69,21 @@ let teamFileManager: TeamFileManager | null = settings.teamBrainPath
   : null;
 
 const isDev = process.env.NODE_ENV === 'development';
+
+function loadRendererWindow(targetWindow: BrowserWindow, query?: Record<string, string>) {
+  if (isDev) {
+    const url = new URL('http://localhost:5173');
+    if (query) {
+      Object.entries(query).forEach(([key, value]) => url.searchParams.set(key, value));
+    }
+    targetWindow.loadURL(url.toString());
+    return;
+  }
+
+  targetWindow.loadFile(path.join(__dirname, '../../renderer/index.html'), {
+    query,
+  });
+}
 
 function createWindow() {
   const windowOptions: Electron.BrowserWindowConstructorOptions = {
@@ -88,11 +108,7 @@ function createWindow() {
 
   mainWindow = new BrowserWindow(windowOptions);
 
-  if (isDev) {
-    mainWindow.loadURL('http://localhost:5173');
-  } else {
-    mainWindow.loadFile(path.join(__dirname, '../../renderer/index.html'));
-  }
+  loadRendererWindow(mainWindow);
 
   // Open external links in system browser
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
@@ -112,6 +128,54 @@ function createWindow() {
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
+}
+
+function createUtilityWindow(kind: UtilityWindowKind, query?: Record<string, string>) {
+  const existingWindow = utilityWindows.get(kind);
+  if (existingWindow && !existingWindow.isDestroyed()) {
+    loadRendererWindow(existingWindow, { window: kind, ...(query || {}) });
+    existingWindow.show();
+    existingWindow.focus();
+    return existingWindow;
+  }
+
+  const windowOptions: Electron.BrowserWindowConstructorOptions = {
+    width: kind === 'settings' ? 1120 : 780,
+    height: kind === 'settings' ? 820 : 720,
+    minWidth: kind === 'settings' ? 960 : 680,
+    minHeight: kind === 'settings' ? 720 : 620,
+    title: kind === 'settings' ? 'Settings' : 'Add Source',
+    backgroundColor: '#1a1a1a',
+    parent: mainWindow ?? undefined,
+    modal: false,
+    show: false,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  };
+
+  if (process.platform === 'darwin') {
+    windowOptions.titleBarStyle = 'hidden';
+    windowOptions.titleBarOverlay = true;
+    windowOptions.trafficLightPosition = { x: 14, y: 14 };
+  }
+
+  const utilityWindow = new BrowserWindow(windowOptions);
+  utilityWindows.set(kind, utilityWindow);
+  loadRendererWindow(utilityWindow, { window: kind, ...(query || {}) });
+
+  utilityWindow.once('ready-to-show', () => {
+    utilityWindow.show();
+    utilityWindow.focus();
+  });
+
+  utilityWindow.on('closed', () => {
+    utilityWindows.delete(kind);
+  });
+
+  return utilityWindow;
 }
 
 function createTray() {
@@ -152,6 +216,66 @@ function registerShortcuts() {
       mainWindow.focus();
     }
   });
+}
+
+function filterOpenAIChatModels(modelIds: string[]): string[] {
+  const excludedFragments = [
+    'audio',
+    'realtime',
+    'transcribe',
+    'tts',
+    'whisper',
+    'embedding',
+    'moderation',
+    'omni-moderation',
+    'dall-e',
+    'image',
+    'search',
+    'computer-use',
+  ];
+
+  const preferredOrder = [
+    'gpt-5.4',
+    'gpt-5.4-mini',
+    'gpt-5.4-nano',
+    'gpt-4.1',
+    'gpt-4.1-mini',
+    'gpt-4o',
+    'gpt-4o-mini',
+    'o4-mini',
+    'o3',
+    'o1',
+    'gpt-4-turbo',
+    'gpt-4',
+    'gpt-3.5-turbo',
+  ];
+
+  const preferredRank = new Map(preferredOrder.map((model, index) => [model, index]));
+
+  return [...new Set(modelIds)]
+    .filter((id) => /^(gpt-|o\d|chatgpt-)/.test(id))
+    .filter((id) => !excludedFragments.some((fragment) => id.includes(fragment)))
+    .sort((left, right) => {
+      const leftRank = preferredRank.get(left) ?? Number.MAX_SAFE_INTEGER;
+      const rightRank = preferredRank.get(right) ?? Number.MAX_SAFE_INTEGER;
+      if (leftRank !== rightRank) return leftRank - rightRank;
+      return left.localeCompare(right);
+    });
+}
+
+function getElectronAwareFetch(): typeof fetch {
+  if (net?.fetch) {
+    return ((input: string | URL | Request, init?: RequestInit) => {
+      const url = typeof input === 'string'
+        ? input
+        : input instanceof URL
+          ? input.toString()
+          : input.url;
+      return net.fetch(url, init as any) as unknown as Promise<Response>;
+    }) as typeof fetch;
+  }
+
+  return fetch;
 }
 
 // --- File Watcher & Indexing ---
@@ -705,7 +829,51 @@ function registerIpcHandlers() {
     return result.filePaths[0];
   });
 
+  ipcMain.handle('keel:open-utility-window', async (_event, kind: UtilityWindowKind, query?: Record<string, string>) => {
+    createUtilityWindow(kind, query);
+  });
+
+  ipcMain.handle('keel:close-window', async (event) => {
+    const window = BrowserWindow.fromWebContents(event.sender);
+    if (window && window !== mainWindow) {
+      window.close();
+    }
+  });
+
+  ipcMain.handle('keel:pick-wiki-files', async () => {
+    const result = await dialog.showOpenDialog(mainWindow!, {
+      title: 'Choose Source File',
+      properties: ['openFile'],
+      filters: [
+        { name: 'Supported Source Files', extensions: ['md', 'markdown', 'txt', 'pdf', 'docx', 'pptx'] },
+      ],
+    });
+
+    if (result.canceled || result.filePaths.length === 0) return [];
+
+    return result.filePaths.map((filePath) => ({
+      name: path.basename(filePath),
+      path: filePath,
+    }));
+  });
+
+  ipcMain.handle('keel:create-wiki-base', async (_event, title: string, description?: string) => {
+    const result = await createWikiBase(title, fileManager, { description });
+    logActivity(settings.brainPath, 'wiki-base-create', `${result.title} -> ${result.basePath}`);
+    return result;
+  });
+
   // --- Knowledge Browser file operations ---
+
+  ipcMain.handle('keel:wiki-ingest-source', async (_event, basePath: string, input: WikiSourceInput) => {
+    if (basePath.includes('..') || basePath.startsWith('.config')) {
+      throw new Error('Access denied');
+    }
+
+    const result = await ingestWikiSource(basePath, input, fileManager);
+    logActivity(settings.brainPath, 'wiki-ingest', `${result.title} -> ${result.pagePath}`);
+    return result;
+  });
 
   ipcMain.handle('keel:list-files', async (_event, dirPath: string) => {
     // Security: reject paths that escape brain directory
@@ -870,6 +1038,58 @@ function registerIpcHandlers() {
       ...eventData,
       timeZone: settings.timezone || undefined,
     });
+  });
+
+  ipcMain.handle('keel:openai-list-models', async () => {
+    if (!settings.openaiApiKey) {
+      return { models: [], error: 'OpenAI API key not configured.' };
+    }
+
+    try {
+      const client = new OpenAI({
+        apiKey: settings.openaiApiKey,
+        fetch: getElectronAwareFetch(),
+      });
+      const page = await client.models.list();
+      const models: string[] = [];
+
+      for await (const model of page) {
+        models.push(model.id);
+      }
+
+      return {
+        models: filterOpenAIChatModels(models),
+        error: null,
+      };
+    } catch (err) {
+      console.error('[openai-list-models] SDK fetch failed:', err);
+
+      try {
+        const response = await getElectronAwareFetch()('https://api.openai.com/v1/models', {
+          headers: {
+            Authorization: `Bearer ${settings.openaiApiKey}`,
+          },
+        });
+
+        if (!response.ok) {
+          const body = await response.text();
+          throw new Error(`HTTP ${response.status}: ${body.slice(0, 240)}`);
+        }
+
+        const data = await response.json() as { data?: Array<{ id: string }> };
+        const modelIds = (data.data || []).map((model) => model.id);
+        return {
+          models: filterOpenAIChatModels(modelIds),
+          error: null,
+        };
+      } catch (fallbackErr) {
+        console.error('[openai-list-models] HTTP fallback failed:', fallbackErr);
+        return {
+          models: [],
+          error: fallbackErr instanceof Error ? fallbackErr.message : 'Could not fetch OpenAI models',
+        };
+      }
+    }
   });
 
   ipcMain.handle('keel:ollama-list-models', async () => {

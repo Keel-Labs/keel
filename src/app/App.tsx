@@ -29,6 +29,11 @@ if (!isElectron) {
   (window as any).keel = getKeelAPI();
 }
 
+function getUtilityWindowKind(): string | null {
+  if (typeof window === 'undefined') return null;
+  return new URLSearchParams(window.location.search).get('window');
+}
+
 function clampSidebarWidth(value: number): number {
   return Math.min(360, Math.max(228, value));
 }
@@ -96,6 +101,7 @@ function InboxStub() {
 }
 
 export default function App() {
+  const utilityWindowKind = getUtilityWindowKind();
   const [newChatSignal, setNewChatSignal] = useState(0);
   const [loadSessionId, setLoadSessionId] = useState<string | null>(null);
   const [currentSessionId, setCurrentSessionId] = useState('');
@@ -278,6 +284,11 @@ export default function App() {
   };
 
   const handleDesktopNavigation = (view: DesktopView) => {
+    if (view === 'settings') {
+      window.keel.openUtilityWindow('settings').catch(() => {});
+      return;
+    }
+
     const mode = view === 'wiki'
       ? 'wiki'
       : view === 'chat' || view === 'chats'
@@ -386,6 +397,14 @@ export default function App() {
 
   if (showOnboarding && initialSettings) {
     return <Onboarding initialSettings={initialSettings} onComplete={handleOnboardingComplete} />;
+  }
+
+  if (utilityWindowKind === 'settings') {
+    return (
+      <div style={{ height: '100vh', display: 'flex', background: 'var(--bg-base)' }}>
+        <Settings onBack={() => window.keel.closeWindow()} />
+      </div>
+    );
   }
 
   if (isMobile) {

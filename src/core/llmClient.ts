@@ -6,6 +6,40 @@ import { loadSettings } from './settings';
 
 type Provider = 'claude' | 'openai' | 'openrouter' | 'ollama';
 
+function getDesktopFetch(): typeof fetch {
+  if (!process.versions.electron) {
+    return fetch;
+  }
+
+  try {
+    // Electron's network stack uses the OS trust store, which avoids Node TLS
+    // certificate issues some desktop environments hit with undici/fetch.
+    const { net } = require('electron') as typeof import('electron');
+    if (net?.fetch) {
+      return ((input: string | URL | Request, init?: RequestInit) => {
+        const url = typeof input === 'string'
+          ? input
+          : input instanceof URL
+            ? input.toString()
+            : input.url;
+        return net.fetch(url, init as any) as unknown as Promise<Response>;
+      }) as typeof fetch;
+    }
+  } catch {
+    // Fall back to the default fetch implementation.
+  }
+
+  return fetch;
+}
+
+function createOpenAIClient(apiKey: string, baseURL?: string): OpenAI {
+  return new OpenAI({
+    apiKey,
+    baseURL,
+    fetch: getDesktopFetch(),
+  });
+}
+
 export class LLMClient {
   private provider: Provider;
   private anthropic: Anthropic | null = null;
@@ -30,13 +64,13 @@ export class LLMClient {
       this.anthropic = new Anthropic({ apiKey: settings.anthropicApiKey });
     }
     if (settings.openaiApiKey) {
-      this.openai = new OpenAI({ apiKey: settings.openaiApiKey });
+      this.openai = createOpenAIClient(settings.openaiApiKey);
     }
     if (settings.openrouterApiKey) {
-      this.openrouter = new OpenAI({
-        apiKey: settings.openrouterApiKey,
-        baseURL: settings.openrouterBaseUrl || 'https://openrouter.ai/api/v1',
-      });
+      this.openrouter = createOpenAIClient(
+        settings.openrouterApiKey,
+        settings.openrouterBaseUrl || 'https://openrouter.ai/api/v1'
+      );
     }
   }
 
@@ -58,15 +92,15 @@ export class LLMClient {
       this.anthropic = null;
     }
     if (settings.openaiApiKey) {
-      this.openai = new OpenAI({ apiKey: settings.openaiApiKey });
+      this.openai = createOpenAIClient(settings.openaiApiKey);
     } else {
       this.openai = null;
     }
     if (settings.openrouterApiKey) {
-      this.openrouter = new OpenAI({
-        apiKey: settings.openrouterApiKey,
-        baseURL: settings.openrouterBaseUrl || 'https://openrouter.ai/api/v1',
-      });
+      this.openrouter = createOpenAIClient(
+        settings.openrouterApiKey,
+        settings.openrouterBaseUrl || 'https://openrouter.ai/api/v1'
+      );
     } else {
       this.openrouter = null;
     }
