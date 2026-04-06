@@ -84,6 +84,12 @@ const api: KeelAPI = {
     ipcRenderer.removeAllListeners('keel:scheduled-notification');
   },
 
+  onAutoCaptureDone: (callback) => {
+    const handler = (_event: Electron.IpcRendererEvent, payload: { requestId: string; summary: string }) => callback(payload);
+    ipcRenderer.on('keel:auto-capture-done', handler);
+    return () => ipcRenderer.off('keel:auto-capture-done', handler);
+  },
+
   createReminder: (message: string, dueAt: number, recurring?: string) =>
     ipcRenderer.invoke('keel:create-reminder', message, dueAt, recurring),
 

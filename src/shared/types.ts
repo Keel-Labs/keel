@@ -235,6 +235,7 @@ export interface KeelAPI {
   listWikiJobs: (basePath?: string) => Promise<WikiJob[]>;
   onScheduledNotification: (callback: (notification: ScheduledNotification) => void) => void;
   removeScheduledNotificationListener: () => void;
+  onAutoCaptureDone: (callback: (event: { requestId: string; summary: string }) => void) => () => void;
   // Reminders
   createReminder: (message: string, dueAt: number, recurring?: string) => Promise<number>;
   listReminders: () => Promise<Reminder[]>;

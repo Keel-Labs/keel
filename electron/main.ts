@@ -39,6 +39,7 @@ import {
   deleteReminder,
 } from '../src/core/db';
 import { capture } from '../src/core/workflows/capture';
+import { autoCapture } from '../src/core/workflows/autoCapture';
 import { dailyBrief } from '../src/core/workflows/dailyBrief';
 import { eod } from '../src/core/workflows/eod';
 import { extractAndSaveMemory } from '../src/core/workflows/memoryExtract';
@@ -787,6 +788,21 @@ function registerIpcHandlers() {
         setSelfWriting();
       }).catch((err) => {
         console.error('[main] Memory extraction failed:', err);
+      });
+
+      // Auto-capture substantial context from user messages
+      const googleConfig = (GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET)
+        ? { clientId: GOOGLE_CLIENT_ID, clientSecret: GOOGLE_CLIENT_SECRET, scopes: GOOGLE_SCOPES }
+        : undefined;
+      autoCapture(allMessages, fileManager, llmClient, googleConfig).then((result) => {
+        if (result.captured && result.summary && !sender.isDestroyed()) {
+          sender.send('keel:auto-capture-done', {
+            requestId: streamRequestId,
+            summary: result.summary,
+          });
+        }
+      }).catch((err) => {
+        console.error('[main] Auto-capture failed:', err);
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
