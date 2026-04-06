@@ -183,13 +183,12 @@ export type IpcChannels =
 // Preload API exposed to renderer
 export interface KeelAPI {
   chat: (messages: Message[]) => Promise<string>;
-  chatStream: (messages: Message[]) => Promise<void>;
-  onStreamChunk: (callback: (chunk: string) => void) => void;
-  onStreamDone: (callback: () => void) => void;
-  onStreamError: (callback: (error: string) => void) => void;
-  onThinkingStep: (callback: (step: string) => void) => void;
-  onThinkingDelta: (callback: (text: string) => void) => void;
-  removeStreamListeners: () => void;
+  chatStream: (messages: Message[], requestId: string) => Promise<void>;
+  onStreamChunk: (callback: (event: { requestId: string; chunk: string }) => void) => () => void;
+  onStreamDone: (callback: (event: { requestId: string }) => void) => () => void;
+  onStreamError: (callback: (event: { requestId: string; error: string }) => void) => () => void;
+  onThinkingStep: (callback: (event: { requestId: string; step: string }) => void) => () => void;
+  onThinkingDelta: (callback: (event: { requestId: string; text: string }) => void) => () => void;
   getSettings: () => Promise<Settings>;
   saveSettings: (settings: Settings) => Promise<void>;
   ensureBrain: () => Promise<void>;

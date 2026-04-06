@@ -351,6 +351,103 @@ function ThinkingSteps({ steps, thinkingContent }: { steps: string[]; thinkingCo
   );
 }
 
+function ActivityPanel({
+  steps,
+  answerStarted,
+  expanded,
+  onToggle,
+}: {
+  steps: string[];
+  answerStarted: boolean;
+  expanded: boolean;
+  onToggle: () => void;
+}) {
+  const latestStep = steps[steps.length - 1] || (answerStarted ? 'Generating answer' : 'Working');
+
+  return (
+    <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 12, paddingRight: 48 }}>
+      <div style={{
+        background: 'var(--surface-elevated)',
+        border: '1px solid var(--border-subtle)',
+        borderRadius: 'var(--radius-xl)',
+        padding: answerStarted ? '10px 14px' : '12px 14px',
+        maxWidth: '72%',
+        minWidth: 260,
+      }}>
+        {answerStarted ? (
+          <>
+            <button
+              onClick={onToggle}
+              style={{
+                background: 'none',
+                border: 'none',
+                padding: 0,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                width: '100%',
+                color: 'inherit',
+                textAlign: 'left',
+              }}
+            >
+              <span style={{
+                fontSize: 9,
+                color: 'var(--text-muted)',
+                transition: 'transform 0.15s ease',
+                transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)',
+              }}>▶</span>
+              <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>Activity</span>
+              <span style={{
+                fontSize: 12,
+                color: 'var(--text-subtle)',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+              }}>
+                {latestStep}
+              </span>
+            </button>
+
+            {expanded && (
+              <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {steps.map((step, index) => (
+                  <div key={`${step}-${index}`} style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                    <span style={{
+                      width: 6,
+                      height: 6,
+                      borderRadius: '50%',
+                      background: index === steps.length - 1 ? 'var(--accent)' : 'var(--border-strong)',
+                      marginTop: 6,
+                      flexShrink: 0,
+                    }} />
+                    <span style={{ fontSize: 12, lineHeight: 1.45, color: 'var(--text-subtle)' }}>{step}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{
+                width: 8,
+                height: 8,
+                borderRadius: '50%',
+                background: 'var(--accent)',
+                boxShadow: '0 0 0 4px var(--accent-bg-subtle)',
+                flexShrink: 0,
+              }} />
+              <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>Working</span>
+            </div>
+            <div style={{ fontSize: 13, color: 'var(--text-subtle)', lineHeight: 1.45 }}>{latestStep}</div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function ClipboardIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -562,6 +659,17 @@ function generateSessionId(): string {
   return `session-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+function generateRequestId(): string {
+  return `request-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+type SessionStreamState = {
+  requestId: string;
+  baseMessages: MessageType[];
+  accumulated: string;
+  steps: string[];
+};
+
 interface ChatProps {
   newChatSignal: number;
   loadSessionId: string | null;
@@ -578,8 +686,9 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [userTimezone, setUserTimezone] = useState<string>('');
   const [userName, setUserName] = useState<string>('');
-  const [thinkingSteps, setThinkingSteps] = useState<string[]>([]);
-  const [thinkingContent, setThinkingContent] = useState<string>('');
+  const [activitySteps, setActivitySteps] = useState<string[]>([]);
+  const [activityExpanded, setActivityExpanded] = useState(true);
+  const [activityManuallyToggled, setActivityManuallyToggled] = useState(false);
   const [attachedImages, setAttachedImages] = useState<MessageImage[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [currentProvider, setCurrentProvider] = useState<string>('claude');
@@ -590,6 +699,12 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
   const [showModelDropdown, setShowModelDropdown] = useState(false);
   const [composerExpanded, setComposerExpanded] = useState(false);
   const justLoadedRef = useRef(false);
+  const currentSessionIdRef = useRef(sessionId);
+  const activeRequestIdRef = useRef<string | null>(null);
+  const sessionMessagesCacheRef = useRef(new Map<string, MessageType[]>());
+  const sessionStreamsRef = useRef(new Map<string, SessionStreamState>());
+  const requestSessionMapRef = useRef(new Map<string, string>());
+  const streamCleanupRef = useRef<Array<() => void>>([]);
   const [availableProviders, setAvailableProviders] = useState<Set<string>>(new Set());
   const [openrouterModelName, setOpenrouterModelName] = useState<string>('');
   const openaiModelOptionIds = Array.from(new Set([
@@ -663,6 +778,37 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
     return () => window.removeEventListener('focus', handleFocus);
   }, [syncProviderSettings]);
 
+  const clearStreamSubscriptions = useCallback(() => {
+    for (const unsubscribe of streamCleanupRef.current) {
+      unsubscribe();
+    }
+    streamCleanupRef.current = [];
+  }, []);
+
+  const resetStreamingUi = useCallback(() => {
+    activeRequestIdRef.current = null;
+    setIsStreaming(false);
+    setStreamingContent('');
+    setActivitySteps([]);
+    setActivityExpanded(true);
+    setActivityManuallyToggled(false);
+  }, []);
+
+  const syncVisibleStreamState = useCallback((targetSessionId: string) => {
+    const stream = sessionStreamsRef.current.get(targetSessionId);
+    if (!stream) {
+      resetStreamingUi();
+      return;
+    }
+
+    activeRequestIdRef.current = stream.requestId;
+    setIsStreaming(true);
+    setStreamingContent(stream.accumulated);
+    setActivitySteps(stream.steps);
+    setActivityManuallyToggled(false);
+    setActivityExpanded(stream.accumulated.length === 0);
+  }, [resetStreamingUi]);
+
   const formatTime = (ms: number) => {
     const opts: Intl.DateTimeFormatOptions = { dateStyle: 'medium', timeStyle: 'short' };
     if (userTimezone) opts.timeZone = userTimezone;
@@ -671,6 +817,10 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
 
   // Handle new chat signal from sidebar/header
   const isFirstRender = useRef(true);
+  useEffect(() => {
+    currentSessionIdRef.current = sessionId;
+  }, [sessionId]);
+
   useEffect(() => {
     if (isFirstRender.current) {
       isFirstRender.current = false;
@@ -683,16 +833,19 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
   useEffect(() => {
     if (loadSessionId && loadSessionId !== sessionId) {
       (async () => {
-        const saved = await window.keel.loadChat(loadSessionId);
+        const saved = sessionMessagesCacheRef.current.get(loadSessionId)
+          ?? sessionStreamsRef.current.get(loadSessionId)?.baseMessages
+          ?? await window.keel.loadChat(loadSessionId);
         if (saved) {
           justLoadedRef.current = true;
           setSessionId(loadSessionId);
           setMessages(saved);
           onSessionChange(loadSessionId);
+          syncVisibleStreamState(loadSessionId);
         }
       })();
     }
-  }, [loadSessionId]);
+  }, [loadSessionId, onSessionChange, sessionId, syncVisibleStreamState]);
 
   // Listen for scheduled notifications (daily brief / EOD)
   useEffect(() => {
@@ -718,6 +871,7 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
   // Auto-save messages whenever they change (skip if just loaded from DB)
   useEffect(() => {
     if (messages.length > 0) {
+      sessionMessagesCacheRef.current.set(sessionId, messages);
       if (justLoadedRef.current) {
         justLoadedRef.current = false;
         return;
@@ -745,6 +899,97 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
     }
   }, [input, attachedImages.length]);
 
+  useEffect(() => {
+    if (isStreaming && streamingContent && !activityManuallyToggled) {
+      setActivityExpanded(false);
+    }
+  }, [activityManuallyToggled, isStreaming, streamingContent]);
+
+  useEffect(() => {
+    return () => {
+      clearStreamSubscriptions();
+    };
+  }, [clearStreamSubscriptions]);
+
+  useEffect(() => {
+    streamCleanupRef.current = [
+      window.keel.onThinkingStep(({ requestId, step }) => {
+        const targetSessionId = requestSessionMapRef.current.get(requestId);
+        if (!targetSessionId) return;
+        const stream = sessionStreamsRef.current.get(targetSessionId);
+        if (!stream || stream.requestId !== requestId) return;
+
+        if (stream.steps[stream.steps.length - 1] !== step) {
+          stream.steps = [...stream.steps, step];
+        }
+        sessionStreamsRef.current.set(targetSessionId, stream);
+
+        if (targetSessionId === currentSessionIdRef.current && requestId === activeRequestIdRef.current) {
+          setActivitySteps([...stream.steps]);
+        }
+      }),
+      window.keel.onStreamChunk(({ requestId, chunk }) => {
+        const targetSessionId = requestSessionMapRef.current.get(requestId);
+        if (!targetSessionId) return;
+        const stream = sessionStreamsRef.current.get(targetSessionId);
+        if (!stream || stream.requestId !== requestId) return;
+
+        stream.accumulated += chunk;
+        sessionStreamsRef.current.set(targetSessionId, stream);
+
+        if (targetSessionId === currentSessionIdRef.current && requestId === activeRequestIdRef.current) {
+          setStreamingContent(stream.accumulated);
+        }
+      }),
+      window.keel.onStreamDone(({ requestId }) => {
+        const targetSessionId = requestSessionMapRef.current.get(requestId);
+        if (!targetSessionId) return;
+        const stream = sessionStreamsRef.current.get(targetSessionId);
+        if (!stream || stream.requestId !== requestId) return;
+
+        const finalMessages = [
+          ...stream.baseMessages,
+          { role: 'assistant' as const, content: stream.accumulated, timestamp: Date.now() },
+        ];
+        sessionMessagesCacheRef.current.set(targetSessionId, finalMessages);
+        sessionStreamsRef.current.delete(targetSessionId);
+        requestSessionMapRef.current.delete(requestId);
+        window.keel.saveChat(targetSessionId, finalMessages).catch(() => {});
+
+        if (targetSessionId === currentSessionIdRef.current) {
+          justLoadedRef.current = true;
+          setMessages(finalMessages);
+          resetStreamingUi();
+        }
+      }),
+      window.keel.onStreamError(({ requestId, error }) => {
+        const targetSessionId = requestSessionMapRef.current.get(requestId);
+        if (!targetSessionId) return;
+        const stream = sessionStreamsRef.current.get(targetSessionId);
+        if (!stream || stream.requestId !== requestId) return;
+
+        const finalMessages = [
+          ...stream.baseMessages,
+          { role: 'assistant' as const, content: error, timestamp: Date.now() },
+        ];
+        sessionMessagesCacheRef.current.set(targetSessionId, finalMessages);
+        sessionStreamsRef.current.delete(targetSessionId);
+        requestSessionMapRef.current.delete(requestId);
+        window.keel.saveChat(targetSessionId, finalMessages).catch(() => {});
+
+        if (targetSessionId === currentSessionIdRef.current) {
+          justLoadedRef.current = true;
+          setMessages(finalMessages);
+          resetStreamingUi();
+        }
+      }),
+    ];
+
+    return () => {
+      clearStreamSubscriptions();
+    };
+  }, [clearStreamSubscriptions, resetStreamingUi]);
+
   const getLastAssistantMessage = (): string | null => {
     for (let i = messages.length - 1; i >= 0; i--) {
       if (messages[i].role === 'assistant') return messages[i].content;
@@ -753,8 +998,11 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
   };
 
   const startNewChat = () => {
+    resetStreamingUi();
     setMessages([]);
-    setSessionId(generateSessionId());
+    const nextSessionId = generateSessionId();
+    setSessionId(nextSessionId);
+    currentSessionIdRef.current = nextSessionId;
     onSessionChange('');
   };
 
@@ -1035,59 +1283,42 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
 
     // Regular chat — use streaming
     let accumulated = '';
-    setThinkingSteps([]);
-    setThinkingContent('');
-
-    window.keel.removeStreamListeners();
-
-    window.keel.onThinkingStep((step: string) => {
-      setThinkingSteps((prev) => [...prev, step]);
+    const targetSessionId = sessionId;
+    const requestId = generateRequestId();
+    activeRequestIdRef.current = requestId;
+    setActivitySteps([]);
+    setActivityExpanded(true);
+    setActivityManuallyToggled(false);
+    requestSessionMapRef.current.set(requestId, targetSessionId);
+    sessionStreamsRef.current.set(targetSessionId, {
+      requestId,
+      baseMessages: updatedMessages,
+      accumulated,
+      steps: [],
     });
-
-    // Real chain-of-thought from Claude extended thinking
-    window.keel.onThinkingDelta((text: string) => {
-      setThinkingContent((prev) => prev + text);
-    });
-
-    window.keel.onStreamChunk((chunk: string) => {
-      accumulated += chunk;
-      setStreamingContent(accumulated);
-    });
-
-    window.keel.onStreamDone(() => {
-      window.keel.removeStreamListeners();
-      setMessages((prev) => [
-        ...prev,
-        { role: 'assistant', content: accumulated, timestamp: Date.now() },
-      ]);
-      setStreamingContent('');
-      setIsStreaming(false);
-    });
-
-    window.keel.onStreamError((error: string) => {
-      window.keel.removeStreamListeners();
-      setMessages((prev) => [
-        ...prev,
-        { role: 'assistant', content: error, timestamp: Date.now() },
-      ]);
-      setStreamingContent('');
-      setIsStreaming(false);
-    });
+    sessionMessagesCacheRef.current.set(targetSessionId, updatedMessages);
 
     try {
-      await window.keel.chatStream(updatedMessages);
+      await window.keel.chatStream(updatedMessages, requestId);
     } catch (error) {
-      window.keel.removeStreamListeners();
       const msg =
         error instanceof Error
           ? error.message
           : 'AI provider unavailable. Check Settings to configure your AI engine.';
-      setMessages((prev) => [
-        ...prev,
-        { role: 'assistant', content: msg, timestamp: Date.now() },
-      ]);
-      setStreamingContent('');
-      setIsStreaming(false);
+      requestSessionMapRef.current.delete(requestId);
+      sessionStreamsRef.current.delete(targetSessionId);
+      const finalMessages = [
+        ...updatedMessages,
+        { role: 'assistant' as const, content: msg, timestamp: Date.now() },
+      ];
+      sessionMessagesCacheRef.current.set(targetSessionId, finalMessages);
+      window.keel.saveChat(targetSessionId, finalMessages).catch(() => {});
+
+      if (targetSessionId === currentSessionIdRef.current) {
+        justLoadedRef.current = true;
+        setMessages(finalMessages);
+        resetStreamingUi();
+      }
     }
   };
 
@@ -1136,8 +1367,16 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
 
           {isStreaming && !streamingContent && <ThinkingIndicator />}
 
-          {isStreaming && (thinkingSteps.length > 0 || thinkingContent) && (
-            <ThinkingSteps steps={thinkingSteps} thinkingContent={thinkingContent} />
+          {isStreaming && !!streamingContent && (
+            <ActivityPanel
+              steps={activitySteps}
+              answerStarted={!!streamingContent}
+              expanded={activityExpanded}
+              onToggle={() => {
+                setActivityManuallyToggled(true);
+                setActivityExpanded((prev) => !prev);
+              }}
+            />
           )}
 
           {isStreaming && streamingContent && (

@@ -4,34 +4,36 @@ import type { KeelAPI } from '../src/shared/types';
 const api: KeelAPI = {
   chat: (messages) => ipcRenderer.invoke('keel:chat', messages),
 
-  chatStream: (messages) => ipcRenderer.invoke('keel:chat-stream', messages),
+  chatStream: (messages, requestId) => ipcRenderer.invoke('keel:chat-stream', messages, requestId),
 
   onStreamChunk: (callback) => {
-    ipcRenderer.on('keel:chat-stream-chunk', (_event, chunk) => callback(chunk));
+    const handler = (_event: Electron.IpcRendererEvent, payload: { requestId: string; chunk: string }) => callback(payload);
+    ipcRenderer.on('keel:chat-stream-chunk', handler);
+    return () => ipcRenderer.off('keel:chat-stream-chunk', handler);
   },
 
   onStreamDone: (callback) => {
-    ipcRenderer.on('keel:chat-stream-done', () => callback());
+    const handler = (_event: Electron.IpcRendererEvent, payload: { requestId: string }) => callback(payload);
+    ipcRenderer.on('keel:chat-stream-done', handler);
+    return () => ipcRenderer.off('keel:chat-stream-done', handler);
   },
 
   onStreamError: (callback) => {
-    ipcRenderer.on('keel:chat-stream-error', (_event, error) => callback(error));
+    const handler = (_event: Electron.IpcRendererEvent, payload: { requestId: string; error: string }) => callback(payload);
+    ipcRenderer.on('keel:chat-stream-error', handler);
+    return () => ipcRenderer.off('keel:chat-stream-error', handler);
   },
 
-  onThinkingStep: (callback: (step: string) => void) => {
-    ipcRenderer.on('keel:thinking-step', (_event, step) => callback(step));
+  onThinkingStep: (callback) => {
+    const handler = (_event: Electron.IpcRendererEvent, payload: { requestId: string; step: string }) => callback(payload);
+    ipcRenderer.on('keel:thinking-step', handler);
+    return () => ipcRenderer.off('keel:thinking-step', handler);
   },
 
-  onThinkingDelta: (callback: (text: string) => void) => {
-    ipcRenderer.on('keel:thinking-delta', (_event, text) => callback(text));
-  },
-
-  removeStreamListeners: () => {
-    ipcRenderer.removeAllListeners('keel:chat-stream-chunk');
-    ipcRenderer.removeAllListeners('keel:chat-stream-done');
-    ipcRenderer.removeAllListeners('keel:chat-stream-error');
-    ipcRenderer.removeAllListeners('keel:thinking-step');
-    ipcRenderer.removeAllListeners('keel:thinking-delta');
+  onThinkingDelta: (callback) => {
+    const handler = (_event: Electron.IpcRendererEvent, payload: { requestId: string; text: string }) => callback(payload);
+    ipcRenderer.on('keel:thinking-delta', handler);
+    return () => ipcRenderer.off('keel:thinking-delta', handler);
   },
 
   getSettings: () => ipcRenderer.invoke('keel:get-settings'),
