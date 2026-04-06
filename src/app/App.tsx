@@ -456,6 +456,7 @@ export default function App() {
         canGoForward={desktopHistory.index < desktopHistory.entries.length - 1}
         isSidebarCollapsed={effectiveSidebarCollapsed}
         isContextOpen={wikiContextOpen}
+        sidebarWidth={effectiveSidebarCollapsed ? 72 : sidebarWidth}
         onGoBack={() => stepDesktopHistory(-1)}
         onGoForward={() => stepDesktopHistory(1)}
         onSetMode={handleDesktopModeChange}
