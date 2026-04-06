@@ -197,6 +197,7 @@ select {
 }
 
 .desktop-topbar {
+  --sidebar-offset: 272px;
   height: var(--topbar-height);
   display: grid;
   grid-template-columns: 1fr auto 1fr;
@@ -217,6 +218,7 @@ select {
   background: var(--surface-muted);
   border: 1px solid var(--panel-border);
   -webkit-app-region: no-drag;
+  transform: translateX(calc((var(--sidebar-offset) - 94px + 18px) / 2));
 }
 
 .mode-switcher__button {
@@ -1477,10 +1479,13 @@ select {
   width: min(860px, 100%);
   margin: 0 auto;
   min-width: 0;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 .chat-empty-state {
-  min-height: 100%;
+  flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1555,7 +1560,7 @@ select {
 }
 
 .chat-pane__composer-wrap {
-  padding: 0 24px 20px;
+  padding: 0 28px 20px;
   flex-shrink: 0;
   background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--bg-base) 82%, transparent) 30%, var(--bg-base));
 }
