@@ -30,12 +30,6 @@ Role: [Your Role]
 
 const TASKS_MD_TEMPLATE = `# Tasks
 
-## To Do
-- [ ]
-
-## In Progress
-
-## Done
 `;
 
 const EXAMPLE_PROJECT_CONTEXT = `# Example Project

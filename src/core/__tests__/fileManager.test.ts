@@ -90,7 +90,6 @@ describe('FileManager', () => {
       await fm.ensureDirectoryStructure();
       const content = await fm.readFile('tasks.md');
       expect(content).toContain('# Tasks');
-      expect(content).toContain('- [ ]');
     });
 
     it('creates example project', async () => {
