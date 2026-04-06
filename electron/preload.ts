@@ -6,6 +6,8 @@ const api: KeelAPI = {
 
   chatStream: (messages, requestId) => ipcRenderer.invoke('keel:chat-stream', messages, requestId),
 
+  cancelStream: (requestId) => ipcRenderer.invoke('keel:cancel-stream', requestId),
+
   onStreamChunk: (callback) => {
     const handler = (_event: Electron.IpcRendererEvent, payload: { requestId: string; chunk: string }) => callback(payload);
     ipcRenderer.on('keel:chat-stream-chunk', handler);

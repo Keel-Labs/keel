@@ -8,10 +8,49 @@
 import { getValidAccessToken, type GoogleOAuthConfig } from './googleAuth';
 import { logActivity } from '../db';
 
+interface BoldSpan {
+  start: number; // offset within the text
+  end: number;
+}
+
 interface DocSection {
   type: 'heading' | 'paragraph' | 'list-item' | 'code';
   text: string;
   level?: number; // heading level 1-3
+  boldSpans?: BoldSpan[];
+}
+
+/**
+ * Strip inline markdown and extract bold span positions from text.
+ */
+function extractFormattedText(raw: string): { text: string; boldSpans: BoldSpan[] } {
+  const boldSpans: BoldSpan[] = [];
+  let result = '';
+  let i = 0;
+
+  // First pass: handle **bold** markers and track positions
+  while (i < raw.length) {
+    if (raw[i] === '*' && raw[i + 1] === '*') {
+      const closeIdx = raw.indexOf('**', i + 2);
+      if (closeIdx !== -1) {
+        const boldText = raw.slice(i + 2, closeIdx);
+        boldSpans.push({ start: result.length, end: result.length + boldText.length });
+        result += boldText;
+        i = closeIdx + 2;
+        continue;
+      }
+    }
+    result += raw[i];
+    i++;
+  }
+
+  // Strip remaining inline markdown
+  const cleaned = result
+    .replace(/\*(.+?)\*/g, '$1')       // italic
+    .replace(/`(.+?)`/g, '$1')         // inline code
+    .replace(/\[(.+?)\]\(.+?\)/g, '$1'); // links
+
+  return { text: cleaned, boldSpans };
 }
 
 /**
@@ -21,22 +60,49 @@ function parseMarkdown(markdown: string): DocSection[] {
   const sections: DocSection[] = [];
   const lines = markdown.split('\n');
 
-  for (const line of lines) {
-    // Headings
+  for (let idx = 0; idx < lines.length; idx++) {
+    const line = lines[idx];
+
+    // Headings — demote H1 to H2 since we add our own H1 title
     const headingMatch = line.match(/^(#{1,3})\s+(.+)/);
     if (headingMatch) {
+      const level = Math.min(headingMatch[1].length + 1, 3); // demote: H1→H2, H2→H3
       sections.push({
         type: 'heading',
         text: headingMatch[2],
-        level: headingMatch[1].length,
+        level,
       });
+      continue;
+    }
+
+    // Bold-only lines as H2 headings (e.g., "**Current market pain points:**")
+    const boldLineMatch = line.trim().match(/^\*\*(.+?)\*\*:?\s*$/);
+    if (boldLineMatch) {
+      sections.push({ type: 'heading', text: boldLineMatch[1].replace(/:$/, ''), level: 2 });
+      continue;
+    }
+
+    // Numbered items that are bold section titles (e.g., "1. **About Me**") → H3 heading
+    const numberedBoldMatch = line.match(/^[\s]*\d+\.\s+\*\*(.+?)\*\*(.*)/);
+    if (numberedBoldMatch) {
+      const headingText = numberedBoldMatch[1] + (numberedBoldMatch[2] ? numberedBoldMatch[2].replace(/\*\*/g, '') : '');
+      sections.push({ type: 'heading', text: headingText.trim(), level: 3 });
+      continue;
+    }
+
+    // Regular numbered list items (e.g., "1. Some item")
+    const numberedMatch = line.match(/^[\s]*\d+\.\s+(.+)/);
+    if (numberedMatch) {
+      const { text, boldSpans } = extractFormattedText(numberedMatch[1]);
+      sections.push({ type: 'list-item', text, boldSpans });
       continue;
     }
 
     // List items
     const listMatch = line.match(/^[\s]*[-*]\s+(.+)/);
     if (listMatch) {
-      sections.push({ type: 'list-item', text: listMatch[1] });
+      const { text, boldSpans } = extractFormattedText(listMatch[1]);
+      sections.push({ type: 'list-item', text, boldSpans });
       continue;
     }
 
@@ -46,13 +112,8 @@ function parseMarkdown(markdown: string): DocSection[] {
     // Regular paragraphs
     const trimmed = line.trim();
     if (trimmed) {
-      // Strip inline markdown formatting for clean text
-      const cleaned = trimmed
-        .replace(/\*\*(.+?)\*\*/g, '$1')  // bold
-        .replace(/\*(.+?)\*/g, '$1')       // italic
-        .replace(/`(.+?)`/g, '$1')         // inline code
-        .replace(/\[(.+?)\]\(.+?\)/g, '$1'); // links
-      sections.push({ type: 'paragraph', text: cleaned });
+      const { text, boldSpans } = extractFormattedText(trimmed);
+      sections.push({ type: 'paragraph', text, boldSpans });
     }
   }
 
@@ -101,7 +162,7 @@ async function insertContent(
   let insertIndex = 1; // Google Docs body starts at index 1
 
   // Build the full text and formatting requests
-  const textParts: { text: string; style?: string }[] = [];
+  const textParts: { text: string; style?: string; prefix?: string; boldSpans?: BoldSpan[] }[] = [];
 
   for (const section of sections) {
     switch (section.type) {
@@ -109,10 +170,10 @@ async function insertContent(
         textParts.push({ text: section.text + '\n', style: `HEADING_${section.level || 1}` });
         break;
       case 'list-item':
-        textParts.push({ text: '  \u2022  ' + section.text + '\n' });
+        textParts.push({ text: section.text + '\n', prefix: '  \u2022  ', boldSpans: section.boldSpans });
         break;
       case 'paragraph':
-        textParts.push({ text: section.text + '\n' });
+        textParts.push({ text: section.text + '\n', boldSpans: section.boldSpans });
         break;
       case 'code':
         textParts.push({ text: section.text + '\n' });
@@ -121,7 +182,7 @@ async function insertContent(
   }
 
   // First, insert all text at once
-  const fullText = textParts.map((p) => p.text).join('');
+  const fullText = textParts.map((p) => (p.prefix || '') + p.text).join('');
   if (!fullText.trim()) return;
 
   requests.push({
@@ -131,10 +192,12 @@ async function insertContent(
     },
   });
 
-  // Then apply heading styles
+  // Then apply heading styles and bold formatting
   let currentIndex = insertIndex;
   for (const part of textParts) {
-    const endIndex = currentIndex + part.text.length;
+    const prefixLen = (part.prefix || '').length;
+    const endIndex = currentIndex + prefixLen + part.text.length;
+
     if (part.style && part.style.startsWith('HEADING_')) {
       const headingLevel = parseInt(part.style.split('_')[1]);
       const namedStyle = headingLevel === 1 ? 'HEADING_1' : headingLevel === 2 ? 'HEADING_2' : 'HEADING_3';
@@ -146,6 +209,21 @@ async function insertContent(
         },
       });
     }
+
+    // Apply bold formatting
+    if (part.boldSpans && part.boldSpans.length > 0) {
+      const textStart = currentIndex + prefixLen; // offset past the bullet prefix
+      for (const span of part.boldSpans) {
+        requests.push({
+          updateTextStyle: {
+            range: { startIndex: textStart + span.start, endIndex: textStart + span.end },
+            textStyle: { bold: true },
+            fields: 'bold',
+          },
+        });
+      }
+    }
+
     currentIndex = endIndex;
   }
 
@@ -254,8 +332,20 @@ export async function exportToGoogleDoc(
   // Create the document
   const { docId, url } = await createDoc(accessToken, title);
 
-  // Parse and insert content
-  const sections = parseMarkdown(markdownContent);
+  // Parse and insert content — add title as H1 at top, skip duplicate first line
+  const parsed = parseMarkdown(markdownContent);
+  const titleNorm = title.toLowerCase().replace(/[^a-z0-9]/g, '');
+  // Skip first section if it matches the title (paragraph or heading)
+  if (parsed.length > 0 && (parsed[0].type === 'paragraph' || parsed[0].type === 'heading')) {
+    const firstNorm = parsed[0].text.toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (firstNorm.startsWith(titleNorm) || titleNorm.startsWith(firstNorm)) {
+      parsed.shift();
+    }
+  }
+  const sections: DocSection[] = [
+    { type: 'heading', text: title, level: 1 },
+    ...parsed,
+  ];
   await insertContent(accessToken, docId, sections);
 
   logActivity(brainPath, 'export-gdoc', `Exported to Google Doc: ${title}`);

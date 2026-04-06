@@ -15,12 +15,16 @@ export async function eod(
   // Gather context
   const parts: string[] = [];
 
-  // Today's daily log (morning brief section)
+  // Today's daily log (morning brief section — just the first brief, not duplicates)
   try {
     const todayLog = await fileManager.readFile(`daily-log/${today}.md`);
-    parts.push(`## Today's Morning Brief\n${todayLog}`);
+    // Only include the first morning brief section to avoid confusion from repeated runs
+    const briefMatch = todayLog.match(/## Morning Brief\n\n([\s\S]*?)(?=\n## Morning Brief|\n## EOD|$)/);
+    if (briefMatch) {
+      parts.push(`## Today's Morning Brief\n${briefMatch[1].trim()}`);
+    }
   } catch {
-    parts.push("## Today's Morning Brief\nNo morning brief found for today.");
+    // no daily log
   }
 
   // Chat session summary (last 20 messages)
@@ -31,6 +35,22 @@ export async function eod(
       .join('\n');
     parts.push(`## Today's Conversations\n${chatSummary}`);
   }
+
+  // Open tasks for tomorrow's priorities
+  try {
+    const taskFiles = await fileManager.listFiles('projects/*/tasks.md');
+    for (const file of taskFiles) {
+      try {
+        const content = await fileManager.readFile(file);
+        parts.push(`## ${file}\n${content}`);
+      } catch { /* skip */ }
+    }
+  } catch { /* no project tasks */ }
+
+  try {
+    const generalTasks = await fileManager.readFile('tasks.md');
+    parts.push(`## General Tasks\n${generalTasks}`);
+  } catch { /* no general tasks */ }
 
   const context = parts.join('\n\n---\n\n');
 
@@ -43,16 +63,20 @@ export async function eod(
         timestamp: Date.now(),
       },
     ],
-    `You are Keel, a personal AI chief of staff writing an end-of-day summary.
+    `You are Keel, a supportive personal AI chief of staff writing a quick end-of-day wrap-up.
 
-CRITICAL: Only reference things that actually happened in the conversations or were explicitly listed in the morning brief. NEVER invent accomplishments, tasks, or priorities. If placeholder text like "[Your Name]" or "X, Y, Z (please specify)" appears, ignore it — it's not real data. If there's not enough real content, say so honestly.
+RULES:
+- Be warm and brief. This is a friendly recap, not a performance review.
+- NEVER lecture, criticize, or ask the user to "clarify" things. They know what they did today.
+- ONLY reference things that actually happened in conversations or appear in task files. NEVER invent details.
+- If placeholder text like "[Your Name]" appears, ignore it.
+- If there wasn't much activity, just keep it short — don't pad with filler.
 
-Based on the morning brief and today's conversations, write an EOD summary that includes:
-1. **Accomplished** — what was actually done today (based on conversations)
-2. **Left Undone** — anything explicitly mentioned but not finished
-3. **Tomorrow's Priorities** — suggested based on real context only
+Write an EOD summary with these sections:
+1. **Today** — 2-4 bullet points of what happened (based on conversations). Keep it factual and positive.
+2. **Tomorrow** — pick 2-3 open tasks from the task files that make sense to focus on next. Just list them, no questions.
 
-Be concise and actionable. Use markdown formatting.`
+Use markdown. Keep the whole thing under 15 lines.`
   );
 
   // Append to daily log

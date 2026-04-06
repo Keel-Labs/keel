@@ -407,8 +407,6 @@ export default function App() {
       case 'chat':
         return null;
       case 'search':
-        return <SearchStub />;
-      case 'chats':
         return (
           <ChatsIndex
             currentSessionId={currentSessionId}

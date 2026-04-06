@@ -37,6 +37,14 @@ export async function dailyBrief(
     // no task files
   }
 
+  // General tasks
+  try {
+    const generalTasks = await fileManager.readFile('tasks.md');
+    parts.push(`## General Tasks\n${generalTasks}`);
+  } catch {
+    // no general tasks
+  }
+
   // Current Priorities from keel.md
   try {
     const priorities = await fileManager.readSection('keel.md', 'Current Priorities');
@@ -88,6 +96,7 @@ Based on the provided context, generate a morning briefing that includes:
 1. **Top Priorities for Today** — based on REAL open tasks and priorities (skip if none)
 2. **Carried Forward** — anything left undone from yesterday (skip if no yesterday log)
 3. **Suggested Focus Blocks** — 3 time-boxed blocks for the day (only if you have real tasks)
+4. **Open Tasks Summary** — a compact count of open tasks by project (e.g., "11 open tasks: 3 Keel app, 8 General"). Do NOT list every task — just the counts.
 
 Note: Calendar integration is not connected yet, so skip calendar items.
 
