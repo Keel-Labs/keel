@@ -784,8 +784,14 @@ function registerIpcHandlers() {
 
       // Extract and save memory in background (don't block the response)
       const allMessages = [...messages, { role: 'assistant' as const, content: fullResponse, timestamp: Date.now() }];
-      extractAndSaveMemory(allMessages, fileManager, llmClient).then(() => {
+      extractAndSaveMemory(allMessages, fileManager, llmClient).then((result) => {
         setSelfWriting();
+        if (result?.updated && !sender.isDestroyed()) {
+          sender.send('keel:memory-updated', {
+            requestId: streamRequestId,
+            summary: result.summary,
+          });
+        }
       }).catch((err) => {
         console.error('[main] Memory extraction failed:', err);
       });
