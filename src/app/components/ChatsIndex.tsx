@@ -39,10 +39,10 @@ export default function ChatsIndex({
       <div className="workspace-section">
         <div className="workspace-header">
           <div>
-            <div className="workspace-pane__eyebrow">Chat Workspace</div>
-            <h1 className="workspace-page-title">Chats</h1>
+            <div className="workspace-pane__eyebrow">Search</div>
+            <h1 className="workspace-page-title">Search</h1>
             <p className="workspace-page-description">
-              Browse recent conversations, reopen an active thread, or jump back into work without hunting through the rail.
+              Browse recent conversations
             </p>
           </div>
         </div>

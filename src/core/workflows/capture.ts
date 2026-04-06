@@ -7,10 +7,17 @@ import * as vectorStore from '../vectorStore';
 import { logActivity } from '../db';
 import { readGoogleDoc, extractDocId } from '../connectors/googleDocs';
 import { isGoogleConnected } from '../connectors/googleAuth';
+import { ingestWikiSource } from './wikiIngest';
 import type { GoogleOAuthConfig } from '../connectors/googleAuth';
 
 const URL_PATTERN = /^https?:\/\//;
 const GDOC_PATTERN = /docs\.google\.com\/document\/d\//;
+
+function firstSentence(text: string): string {
+  const cleaned = text.replace(/^#+\s*/gm, '').replace(/\*\*/g, '').trim();
+  const match = cleaned.match(/^(.+?[.!?])\s/);
+  return match ? match[1] : cleaned.slice(0, 120);
+}
 
 export async function capture(
   input: string,
@@ -65,7 +72,7 @@ export async function capture(
       [
         {
           role: 'user',
-          content: `Summarize the following in 3-5 sentences. Extract any action items as a bullet list at the end.\n\n${content.slice(0, 10000)}`,
+          content: `Summarize the following in 2-3 sentences. If there are action items, list them as bullets at the end.\n\n${content.slice(0, 10000)}`,
           timestamp: Date.now(),
         },
       ],
@@ -77,15 +84,15 @@ export async function capture(
 
   // Determine best project by embedding similarity
   let projectFolder = '';
+  let projectDisplayName = '';
   try {
     const queryVector = await embedText(content.slice(0, 1000));
     const results = await vectorStore.search(brainPath, queryVector, 3);
 
-    // Find the most common project folder from results
     const projectCounts = new Map<string, number>();
     for (const r of results) {
       const match = r.chunk.filePath.match(/^projects\/([^/]+)\//);
-      if (match) {
+      if (match && match[1] !== 'captures') {
         const count = projectCounts.get(match[1]) || 0;
         projectCounts.set(match[1], count + 1);
       }
@@ -98,25 +105,65 @@ export async function capture(
         projectFolder = proj;
       }
     }
+
+    // Try to get the display name from context.md
+    if (projectFolder) {
+      try {
+        const ctx = await fileManager.readFile(`projects/${projectFolder}/context.md`);
+        const titleMatch = ctx.match(/^#\s+(.+)/m);
+        projectDisplayName = titleMatch ? titleMatch[1].trim() : projectFolder;
+      } catch {
+        projectDisplayName = projectFolder;
+      }
+    }
   } catch {
     // No embeddings available — file to general captures
   }
 
-  // Write to the matched project, or projects/captures/ as fallback
   const date = new Date().toISOString().split('T')[0];
-  const slug = sourceLabel
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '')
-    .slice(0, 40);
 
-  const folder = projectFolder ? `projects/${projectFolder}` : 'projects/captures';
-  const fileName = `${folder}/${date}-${slug}.md`;
-  const fileContent = `# ${sourceLabel}
+  if (projectFolder) {
+    // --- Project matched: append to project context ---
+    const contextPath = `projects/${projectFolder}/context.md`;
+    const captureSection = `\n\n## Capture — ${date}: ${sourceLabel}\n${summary}\n`;
+
+    try {
+      const existing = await fileManager.readFile(contextPath);
+      await fileManager.writeFile(contextPath, existing.trimEnd() + captureSection);
+    } catch {
+      // context.md doesn't exist yet — create it
+      await fileManager.writeFile(contextPath, `# ${projectDisplayName}\n\nProject context and notes.\n${captureSection}`);
+    }
+
+    logActivity(brainPath, 'capture', `Appended to ${contextPath}`);
+
+    // Wiki integration: if project has a wiki knowledge base, also ingest
+    try {
+      const wikiOverview = `knowledge-bases/${projectFolder}/overview.md`;
+      if (await fileManager.fileExists(wikiOverview)) {
+        await ingestWikiSource(
+          `knowledge-bases/${projectFolder}`,
+          { sourceType: 'text', title: sourceLabel, text: content.slice(0, 10000) },
+          fileManager
+        );
+        console.log(`[capture] Also ingested into wiki for ${projectFolder}`);
+      }
+    } catch (err) {
+      console.error('[capture] Wiki ingest failed (non-blocking):', err);
+    }
+  } else {
+    // --- No project match: create standalone capture file ---
+    const slug = sourceLabel
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '')
+      .slice(0, 40);
+
+    const fileName = `projects/captures/${date}-${slug}.md`;
+    const fileContent = `# ${sourceLabel}
 
 **Captured:** ${new Date().toISOString()}
 ${URL_PATTERN.test(input.trim()) ? `**Source:** ${input.trim()}` : ''}
-${projectFolder ? `**Related project:** ${projectFolder}` : ''}
 
 ## Summary
 ${summary}
@@ -125,11 +172,11 @@ ${summary}
 ${content.slice(0, 3000)}
 `;
 
-  await fileManager.writeFile(fileName, fileContent);
+    await fileManager.writeFile(fileName, fileContent);
+    logActivity(brainPath, 'capture', `Filed to ${fileName}`);
+  }
 
-  logActivity(brainPath, 'capture', `Filed to ${fileName}`);
-
-  // Extract and save tasks from the captured content
+  // Extract and save tasks (same for both paths)
   try {
     const taskExtraction = await llmClient.chat(
       [{ role: 'user', content: `Extract tasks from this capture:\n\n${content.slice(0, 3000)}`, timestamp: Date.now() }],
@@ -145,17 +192,14 @@ Respond ONLY with valid JSON.`
         const projName = t.project?.trim() || projectFolder || '';
         if (projName) {
           const projSlug = projName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-          // Don't file tasks under "captures" pseudo-project
           if (projSlug === 'captures') continue;
           const tasksPath = `projects/${projSlug}/tasks.md`;
           const contextPath = `projects/${projSlug}/context.md`;
 
-          // Ensure project context exists
           if (!(await fileManager.fileExists(contextPath))) {
             await fileManager.writeFile(contextPath, `# ${projName}\n\nProject context and notes.\n`);
           }
 
-          // Append task
           try {
             const existing = await fileManager.readFile(tasksPath);
             if (!existing.includes(t.task)) {
@@ -165,7 +209,6 @@ Respond ONLY with valid JSON.`
             await fileManager.writeFile(tasksPath, `# ${projName} — Tasks\n\n- [ ] ${t.task}\n`);
           }
         } else {
-          // No project — add to general tasks
           try {
             const existing = await fileManager.readFile('tasks.md');
             if (!existing.includes(t.task)) {
@@ -179,9 +222,13 @@ Respond ONLY with valid JSON.`
       logActivity(brainPath, 'capture-tasks', `Extracted ${parsed.tasks.length} task(s) from capture`);
     }
   } catch (err) {
-    // Task extraction is best-effort
     console.error('[capture] Task extraction failed:', err);
   }
 
-  return `Captured and filed to ${fileName}${projectFolder ? ` (related to ${projectFolder})` : ''}`;
+  // Human-friendly response
+  const brief = firstSentence(summary);
+  if (projectFolder) {
+    return `Saved to **${projectDisplayName}**: ${brief}`;
+  }
+  return `Captured: ${brief}`;
 }

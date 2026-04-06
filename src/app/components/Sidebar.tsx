@@ -116,7 +116,6 @@ const PRIMARY_ITEMS: Array<{
   icon: React.ReactNode;
 }> = [
   { id: 'search', label: 'Search', icon: <SearchIcon /> },
-  { id: 'chats', label: 'Chats', icon: <ChatIcon /> },
   { id: 'inbox', label: 'Inbox', icon: <InboxIcon /> },
 ];
 
@@ -232,7 +231,7 @@ export default function Sidebar({
     window.keel.listSessions().then(setSessions).catch(() => {});
   }, [refreshSignal, currentSessionId]);
 
-  const recentSessions = useMemo(() => sessions.slice(0, 14), [sessions]);
+  const recentSessions = sessions;
   const isWikiMode = activeView === 'wiki';
 
   return (

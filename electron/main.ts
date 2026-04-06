@@ -734,9 +734,22 @@ function registerIpcHandlers() {
     return llmClient.chat(enrichedMessages, systemPrompt);
   });
 
+  // Track active stream AbortControllers for cancellation
+  const activeStreamControllers = new Map<string, AbortController>();
+
+  ipcMain.handle('keel:cancel-stream', (_event, requestId: string) => {
+    const controller = activeStreamControllers.get(requestId);
+    if (controller) {
+      controller.abort();
+      activeStreamControllers.delete(requestId);
+    }
+  });
+
   ipcMain.handle('keel:chat-stream', async (event, messages: Message[], requestId: string) => {
     const sender = event.sender;
     const streamRequestId = requestId || `request-${Date.now()}`;
+    const abortController = new AbortController();
+    activeStreamControllers.set(streamRequestId, abortController);
     const emitThinking = (step: string) => {
       if (!sender.isDestroyed()) {
         sender.send('keel:thinking-step', { requestId: streamRequestId, step });
@@ -749,20 +762,21 @@ function registerIpcHandlers() {
 
     logActivity(settings.brainPath, 'chat', lastMessage?.slice(0, 200));
 
+    let fullResponse = '';
+    let buffer = '';
+    let flushTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const flush = () => {
+      if (buffer && !sender.isDestroyed()) {
+        sender.send('keel:chat-stream-chunk', { requestId: streamRequestId, chunk: buffer });
+        buffer = '';
+      }
+      flushTimer = null;
+    };
+
     try {
-      let fullResponse = '';
-      let buffer = '';
-      let flushTimer: ReturnType<typeof setTimeout> | null = null;
-
-      const flush = () => {
-        if (buffer && !sender.isDestroyed()) {
-          sender.send('keel:chat-stream-chunk', { requestId: streamRequestId, chunk: buffer });
-          buffer = '';
-        }
-        flushTimer = null;
-      };
-
       await llmClient.chatStream(enrichedMessages, systemPrompt, (chunk: string) => {
+        if (abortController.signal.aborted) return;
         fullResponse += chunk;
         buffer += chunk;
         // Flush immediately if buffer hits 100 chars, otherwise batch at 50ms
@@ -772,11 +786,12 @@ function registerIpcHandlers() {
         } else if (!flushTimer) {
           flushTimer = setTimeout(flush, 50);
         }
-      });
+      }, abortController.signal);
 
       // Final flush
       if (flushTimer) clearTimeout(flushTimer);
       flush();
+      activeStreamControllers.delete(streamRequestId);
 
       if (!sender.isDestroyed()) {
         sender.send('keel:chat-stream-done', { requestId: streamRequestId });
@@ -811,6 +826,16 @@ function registerIpcHandlers() {
         console.error('[main] Auto-capture failed:', err);
       });
     } catch (error) {
+      activeStreamControllers.delete(streamRequestId);
+      // If aborted, treat as a graceful stop — send done instead of error
+      if (abortController.signal.aborted) {
+        if (flushTimer) clearTimeout(flushTimer);
+        flush();
+        if (!sender.isDestroyed()) {
+          sender.send('keel:chat-stream-done', { requestId: streamRequestId });
+        }
+        return;
+      }
       const message = error instanceof Error ? error.message : 'Unknown error';
       if (!sender.isDestroyed()) {
         sender.send('keel:chat-stream-error', { requestId: streamRequestId, error: message });

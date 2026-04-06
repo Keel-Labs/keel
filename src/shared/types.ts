@@ -158,6 +158,7 @@ export interface Reminder {
 export type IpcChannels =
   | 'keel:chat'
   | 'keel:chat-stream'
+  | 'keel:cancel-stream'
   | 'keel:chat-stream-chunk'
   | 'keel:chat-stream-done'
   | 'keel:chat-stream-error'
@@ -204,6 +205,7 @@ export type IpcChannels =
 export interface KeelAPI {
   chat: (messages: Message[]) => Promise<string>;
   chatStream: (messages: Message[], requestId: string) => Promise<void>;
+  cancelStream: (requestId: string) => Promise<void>;
   onStreamChunk: (callback: (event: { requestId: string; chunk: string }) => void) => () => void;
   onStreamDone: (callback: (event: { requestId: string }) => void) => () => void;
   onStreamError: (callback: (event: { requestId: string; error: string }) => void) => () => void;
