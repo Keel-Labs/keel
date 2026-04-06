@@ -1,8 +1,0 @@
-Initial release of Keel for iOS.
-
-• Chat with Claude, GPT-4o, or your preferred AI model
-• Persistent brain with your projects, notes, and preferences
-• Daily briefs and end-of-day summaries
-• Natural language reminders
-• Knowledge browser for your brain files
-• Sync with Keel desktop app
