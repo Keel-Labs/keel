@@ -8,6 +8,7 @@ interface Props {
   canGoForward: boolean;
   isSidebarCollapsed: boolean;
   isContextOpen: boolean;
+  sidebarWidth: number;
   onGoBack: () => void;
   onGoForward: () => void;
   onSetMode: (mode: DesktopMode) => void;
@@ -105,6 +106,7 @@ export default function DesktopTopBar({
   canGoForward,
   isSidebarCollapsed,
   isContextOpen,
+  sidebarWidth,
   onGoBack,
   onGoForward,
   onSetMode,
@@ -112,7 +114,7 @@ export default function DesktopTopBar({
   onToggleContext,
 }: Props) {
   return (
-    <div className="desktop-topbar">
+    <div className="desktop-topbar" style={{ '--sidebar-offset': `${sidebarWidth}px` } as React.CSSProperties}>
       <div className="desktop-topbar__leading">
         <ChromeButton
           title={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
