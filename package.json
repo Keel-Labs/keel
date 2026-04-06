@@ -14,6 +14,7 @@
     "electron:install-app-deps": "electron-builder install-app-deps",
     "package:mac:dir": "npm run build:desktop && npm run electron:install-app-deps && electron-builder --config electron-builder.config.mjs --mac --dir",
     "dist:mac": "npm run build:desktop && npm run electron:install-app-deps && electron-builder --config electron-builder.config.mjs --mac dmg --universal",
+    "dist:mac:release": "npm run build:desktop && npm run electron:install-app-deps && KEEL_FORCE_CODE_SIGNING=1 electron-builder --config electron-builder.config.mjs --mac dmg --universal",
     "dist:mac:arm64": "npm run build:desktop && npm run electron:install-app-deps && KEEL_MAC_SPLIT=1 electron-builder --config electron-builder.config.mjs --mac dmg --arm64",
     "dist:mac:x64": "npm run build:desktop && npm run electron:install-app-deps && KEEL_MAC_SPLIT=1 electron-builder --config electron-builder.config.mjs --mac dmg --x64",
     "build:mobile": "tsc && vite build --config vite.mobile.config.ts",

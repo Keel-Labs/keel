@@ -1,4 +1,5 @@
 const splitArtifacts = process.env.KEEL_MAC_SPLIT === '1';
+const forceCodeSigning = process.env.KEEL_FORCE_CODE_SIGNING === '1';
 
 const artifactName = splitArtifacts
   ? '${productName}-${version}-mac-${arch}.${ext}'
@@ -27,10 +28,12 @@ export default {
     target: ['dmg'],
     artifactName,
     x64ArchFiles: '**/*.darwin-arm64.node',
+    forceCodeSigning,
     hardenedRuntime: true,
     gatekeeperAssess: false,
     entitlements: 'build/entitlements.mac.plist',
     entitlementsInherit: 'build/entitlements.mac.inherit.plist',
+    notarize: true,
   },
   dmg: {
     artifactName,

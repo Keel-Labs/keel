@@ -2,6 +2,13 @@
 
 ## Prerequisites
 
+### Apple (macOS Desktop)
+1. [Apple Developer Account](https://developer.apple.com/programs/) ($99/year)
+2. `Developer ID Application` certificate exported as `.p12`
+3. App Store Connect API key (`.p8`) with `App Manager` access for notarization
+4. Final bundle identifier for Keel desktop
+5. GitHub repository secrets configured for the desktop release workflow
+
 ### Apple (iOS)
 1. [Apple Developer Account](https://developer.apple.com/programs/) ($99/year)
 2. App registered in [App Store Connect](https://appstoreconnect.apple.com)
@@ -16,6 +23,55 @@
 4. App icon: 512x512 PNG
 5. Feature graphic: 1024x500 PNG
 6. Screenshots: at minimum phone and 7" tablet
+
+---
+
+## Step-by-Step: macOS Desktop
+
+### 1. Prepare signing assets
+
+- Export your `Developer ID Application` certificate as a `.p12`
+- Create an App Store Connect API key and save:
+  - key contents (`.p8`)
+  - key ID
+  - issuer ID
+
+Detailed instructions are in [docs/mac-signing-and-notarization.md](/Users/djsam/.codex/worktrees/20fe/Keel/docs/mac-signing-and-notarization.md).
+
+### 2. Set GitHub secrets
+
+| Secret | Description |
+|--------|-------------|
+| `MAC_CERTIFICATE_P12_BASE64` | Base64-encoded exported `.p12` signing certificate |
+| `MAC_CERTIFICATE_PASSWORD` | Password for the exported `.p12` |
+| `APPLE_API_KEY_P8` | Raw contents of the App Store Connect `.p8` key |
+| `APPLE_API_KEY_ID` | App Store Connect API key ID |
+| `APPLE_API_ISSUER` | App Store Connect issuer ID |
+
+Recommended repository variable:
+
+| Variable | Description |
+|--------|-------------|
+| `KEEL_APP_ID` | Desktop bundle identifier |
+
+### 3. Build the signed notarized DMG
+
+Local:
+
+```bash
+npm run dist:mac:release
+```
+
+GitHub Actions:
+
+- `Actions -> Desktop macOS Release -> Run workflow`
+
+### 4. Retrieve artifacts
+
+The release workflow uploads:
+
+- signed notarized `*.dmg`
+- `builder-debug.yml` for troubleshooting
 
 ---
 
