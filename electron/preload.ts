@@ -90,6 +90,12 @@ const api: KeelAPI = {
     return () => ipcRenderer.off('keel:auto-capture-done', handler);
   },
 
+  onMemoryUpdated: (callback) => {
+    const handler = (_event: Electron.IpcRendererEvent, payload: { requestId: string; summary: string }) => callback(payload);
+    ipcRenderer.on('keel:memory-updated', handler);
+    return () => ipcRenderer.off('keel:memory-updated', handler);
+  },
+
   createReminder: (message: string, dueAt: number, recurring?: string) =>
     ipcRenderer.invoke('keel:create-reminder', message, dueAt, recurring),
 

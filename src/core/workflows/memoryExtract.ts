@@ -37,6 +37,37 @@ If there is NO new info (questions, casual chat, commands), respond:
 
 Respond ONLY with valid JSON.`;
 
+export interface MemoryExtractResult {
+  updated: boolean;
+  summary: string;
+}
+
+function sanitizeJsonResponse(raw: string): string {
+  let text = raw.trim();
+  // Strip markdown code fences
+  text = text.replace(/^```(?:json)?\s*\n?/i, '').replace(/\n?```\s*$/i, '');
+  text = text.trim();
+  // Extract first JSON object if surrounded by text
+  const match = text.match(/\{[\s\S]*\}/);
+  return match ? match[0] : text;
+}
+
+function flattenTaskSections(content: string): string {
+  if (!content.includes('## To Do') && !content.includes('## In Progress')) {
+    return content;
+  }
+  const lines = content.split('\n');
+  const tasks: string[] = [];
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (trimmed.startsWith('- [ ]') || trimmed.startsWith('- [x]')) {
+      const text = trimmed.replace(/^- \[.\]\s*/, '');
+      if (text) tasks.push(trimmed);
+    }
+  }
+  return `# Tasks\n\n${tasks.join('\n')}\n`;
+}
+
 interface MemoryUpdate {
   hasUpdates: boolean;
   profile?: { name?: string; role?: string };
@@ -51,7 +82,7 @@ export async function extractAndSaveMemory(
   recentMessages: Message[],
   fileManager: FileManager,
   llmClient: LLMClient
-): Promise<void> {
+): Promise<MemoryExtractResult | undefined> {
   // Only process if there are recent user messages with substance
   const lastUserMessages = recentMessages
     .filter((m) => m.role === 'user')
@@ -74,7 +105,15 @@ export async function extractAndSaveMemory(
       EXTRACT_PROMPT
     );
 
-    const update: MemoryUpdate = JSON.parse(response.trim());
+    console.log('[memory-extract] Raw LLM response:', response.slice(0, 500));
+
+    let update: MemoryUpdate;
+    try {
+      update = JSON.parse(sanitizeJsonResponse(response));
+    } catch (parseErr) {
+      console.error('[memory-extract] JSON parse failed. Raw response:', response.slice(0, 300));
+      return;
+    }
     if (!update.hasUpdates) return;
 
     // Read current keel.md (create from template if missing)
@@ -194,9 +233,14 @@ export async function extractAndSaveMemory(
             console.log(`[memory-extract] Created project context: ${contextPath}`);
           }
 
-          // Append tasks to project tasks file
+          // Append tasks to project tasks file (flatten old format if needed)
           try {
-            const existing = await fileManager.readFile(tasksPath);
+            const raw = await fileManager.readFile(tasksPath);
+            const existing = flattenTaskSections(raw);
+            if (existing !== raw) {
+              await fileManager.writeFile(tasksPath, existing);
+              console.log(`[memory-extract] Flattened old task sections in ${tasksPath}`);
+            }
             const tasksToAdd = tasks.filter(t => !existing.includes(t));
             if (tasksToAdd.length > 0) {
               const newContent = tasksToAdd.map(t => `- [ ] ${t}`).join('\n');
@@ -209,11 +253,16 @@ export async function extractAndSaveMemory(
             console.log(`[memory-extract] Created ${tasksPath} with ${tasks.length} task(s)`);
           }
         } else {
-          // Tasks without a project go to general tasks file
+          // Tasks without a project go to general tasks file (flatten old format if needed)
           const tasksPath = 'tasks.md';
           const newTasks = tasks.map(t => `- [ ] ${t}`).join('\n');
           try {
-            const existing = await fileManager.readFile(tasksPath);
+            const raw = await fileManager.readFile(tasksPath);
+            const existing = flattenTaskSections(raw);
+            if (existing !== raw) {
+              await fileManager.writeFile(tasksPath, existing);
+              console.log('[memory-extract] Flattened old task sections in tasks.md');
+            }
             const tasksToAdd = tasks.filter(t => !existing.includes(t));
             if (tasksToAdd.length > 0) {
               const newContent = tasksToAdd.map(t => `- [ ] ${t}`).join('\n');
@@ -227,6 +276,18 @@ export async function extractAndSaveMemory(
 
       const brainPath = fileManager.getBrainPath();
       logActivity(brainPath, 'memory-update', `Saved ${update.tasks.length} task(s) from conversation`);
+    }
+
+    // Build summary of what was saved
+    const summaryParts: string[] = [];
+    if (update.profile?.name || update.profile?.role) summaryParts.push('Updated profile');
+    if (update.projects && update.projects.length > 0) summaryParts.push(`Noted ${update.projects.length} project(s)`);
+    if (update.priorities && update.priorities.length > 0) summaryParts.push('Updated priorities');
+    if (update.tasks && update.tasks.length > 0) summaryParts.push(`Saved ${update.tasks.length} task(s)`);
+    if (update.people && update.people.length > 0) summaryParts.push(`Noted ${update.people.length} contact(s)`);
+
+    if (summaryParts.length > 0) {
+      return { updated: true, summary: summaryParts.join(', ') };
     }
   } catch (err) {
     // Memory extraction is best-effort — never fail the chat
