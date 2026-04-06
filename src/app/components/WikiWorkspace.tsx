@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { marked } from 'marked';
 import { useIsMobile } from '../../lib/useIsMobile';
+import type { WikiJob } from '../../shared/types';
 import type { WikiNavId, WikiSidebarBranch, WikiSidebarState } from './Sidebar';
 
 type WikiPageSection = 'home' | 'sources' | 'concepts' | 'open-questions' | 'outputs' | 'health' | 'activity-log';
@@ -347,6 +348,9 @@ export default function WikiWorkspace({
   const [activeNav, setActiveNav] = useState<WikiNavId>('synthesis');
   const [activeCollectionPrefix, setActiveCollectionPrefix] = useState<string | null>(null);
   const [selectedPagePath, setSelectedPagePath] = useState<string | null>(null);
+  const [jobs, setJobs] = useState<WikiJob[]>([]);
+  const [jobError, setJobError] = useState('');
+  const lastTerminalJobRef = useRef<string | null>(null);
 
   const loadBaseSummaries = useCallback(async () => {
     await window.keel.ensureBrain();
@@ -414,6 +418,17 @@ export default function WikiWorkspace({
     return filtered;
   }, [currentBasePath, selectedPagePath]);
 
+  const loadJobs = useCallback(async () => {
+    if (!currentBasePath) {
+      setJobs([]);
+      return [];
+    }
+
+    const nextJobs = await window.keel.listWikiJobs(currentBasePath);
+    setJobs(nextJobs);
+    return nextJobs;
+  }, [currentBasePath]);
+
   useEffect(() => {
     let cancelled = false;
 
@@ -461,6 +476,36 @@ export default function WikiWorkspace({
       cancelled = true;
     };
   }, [currentBasePath, loadCurrentBase]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      if (!currentBasePath) return;
+      try {
+        const nextJobs = await loadJobs();
+        if (cancelled) return;
+        const latestTerminal = nextJobs.find((job) => job.status === 'completed' || job.status === 'failed');
+        if (latestTerminal && latestTerminal.id !== lastTerminalJobRef.current) {
+          lastTerminalJobRef.current = latestTerminal.id;
+          await loadCurrentBase();
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setJobError(err instanceof Error ? err.message : 'Failed to load wiki jobs.');
+        }
+      }
+    })();
+
+    const interval = window.setInterval(() => {
+      loadJobs().catch(() => undefined);
+    }, 2000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [currentBasePath, loadCurrentBase, loadJobs]);
 
   const currentBase = useMemo(
     () => bases.find((base) => base.path === currentBasePath) || bases[0] || null,
@@ -515,6 +560,16 @@ export default function WikiWorkspace({
     [pages]
   );
 
+  const activeJob = useMemo(
+    () => jobs.find((job) => job.status === 'queued' || job.status === 'running') || null,
+    [jobs]
+  );
+
+  const latestJob = useMemo(
+    () => jobs[0] || null,
+    [jobs]
+  );
+
   const renderedPage = useMemo(() => {
     if (!selectedPage || !currentBasePath) return '';
     return renderWikiMarkdown(currentBasePath, selectedPage.relativePath, selectedPage.content);
@@ -561,6 +616,20 @@ export default function WikiWorkspace({
     setBaseMenuOpen(false);
     return true;
   }, [pages]);
+
+  const startCompile = useCallback(async () => {
+    if (!currentBasePath || activeJob) return;
+    setJobError('');
+    const job = await window.keel.startWikiCompile(currentBasePath);
+    setJobs((prev) => [job, ...prev.filter((candidate) => candidate.id !== job.id)]);
+  }, [activeJob, currentBasePath]);
+
+  const startHealthCheck = useCallback(async () => {
+    if (!currentBasePath || activeJob) return;
+    setJobError('');
+    const job = await window.keel.startWikiHealthCheck(currentBasePath);
+    setJobs((prev) => [job, ...prev.filter((candidate) => candidate.id !== job.id)]);
+  }, [activeJob, currentBasePath]);
 
   const openNav = useCallback((nav: WikiNavId) => {
     setActiveNav(nav);
@@ -816,7 +885,10 @@ export default function WikiWorkspace({
                     className="wiki-base-menu__option"
                     onClick={() => {
                       setBaseMenuOpen(false);
-                      window.keel.openUtilityWindow('settings', { section: 'knowledge-sources' }).catch(() => undefined);
+                      window.keel.openUtilityWindow('settings', {
+                        section: 'knowledge-sources',
+                        createBase: '1',
+                      }).catch(() => undefined);
                     }}
                   >
                     <span className="wiki-base-menu__option-title">Create New Base</span>
@@ -839,17 +911,55 @@ export default function WikiWorkspace({
             <button
               type="button"
               className="wiki-shell__action"
-                onClick={() => {
-                  const indexPage = pages.find((page) => page.relativePath === 'wiki/index.md');
-                  if (indexPage) openPage(indexPage.path);
-                }}
+              disabled={!!activeJob}
+              onClick={() => {
+                startCompile().catch((err) => {
+                  setJobError(err instanceof Error ? err.message : 'Compile failed.');
+                });
+              }}
             >
               Compile
+            </button>
+            <button
+              type="button"
+              className="wiki-shell__action"
+              disabled={!!activeJob}
+              onClick={() => {
+                startHealthCheck().catch((err) => {
+                  setJobError(err instanceof Error ? err.message : 'Health check failed.');
+                });
+              }}
+            >
+              Health Check
             </button>
           </div>
           <div className="wiki-shell__subtitle">
             {currentBase?.description || 'LLM-maintained wiki workspace'}
           </div>
+          {(activeJob || latestJob || jobError) && (
+            <div className="wiki-shell__job">
+              {jobError ? (
+                <>
+                  <span className="wiki-shell__job-status is-failed">Issue</span>
+                  <span className="wiki-shell__job-detail">{jobError}</span>
+                </>
+              ) : activeJob ? (
+                <>
+                  <span className="wiki-shell__job-status is-running">{activeJob.type === 'compile' ? 'Compile running' : 'Health running'}</span>
+                  <span className="wiki-shell__job-detail">{activeJob.detail}</span>
+                </>
+              ) : latestJob ? (
+                <>
+                  <span className={`wiki-shell__job-status ${latestJob.status === 'failed' ? 'is-failed' : 'is-completed'}`}>
+                    {latestJob.status === 'failed' ? 'Last run failed' : latestJob.type === 'compile' ? 'Compile complete' : 'Health complete'}
+                  </span>
+                  <span className="wiki-shell__job-detail">
+                    {latestJob.error || latestJob.detail} · {formatRelativeTime(latestJob.updatedAt)}
+                  </span>
+                </>
+              ) : null}
+            </div>
+          )}
         </div>
       </div>
 

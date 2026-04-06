@@ -96,6 +96,23 @@ export interface WikiBaseCreateResult {
   message: string;
 }
 
+export type WikiJobType = 'compile' | 'health';
+export type WikiJobStatus = 'queued' | 'running' | 'completed' | 'failed';
+
+export interface WikiJob {
+  id: string;
+  type: WikiJobType;
+  basePath: string;
+  status: WikiJobStatus;
+  title: string;
+  detail: string;
+  startedAt: number;
+  updatedAt: number;
+  finishedAt?: number;
+  outputPath?: string;
+  error?: string;
+}
+
 export type UtilityWindowKind = 'settings' | 'wiki-ingest';
 
 export interface ActivityLogEntry {
@@ -163,6 +180,9 @@ export type IpcChannels =
   | 'keel:pick-wiki-files'
   | 'keel:create-wiki-base'
   | 'keel:wiki-ingest-source'
+  | 'keel:start-wiki-compile'
+  | 'keel:start-wiki-health-check'
+  | 'keel:list-wiki-jobs'
   | 'keel:open-utility-window'
   | 'keel:close-window'
   | 'keel:scheduled-notification'
@@ -210,6 +230,9 @@ export interface KeelAPI {
   readFile: (filePath: string) => Promise<string>;
   writeFile: (filePath: string, content: string) => Promise<void>;
   ingestWikiSource: (basePath: string, input: WikiSourceInput) => Promise<WikiIngestResult>;
+  startWikiCompile: (basePath: string) => Promise<WikiJob>;
+  startWikiHealthCheck: (basePath: string) => Promise<WikiJob>;
+  listWikiJobs: (basePath?: string) => Promise<WikiJob[]>;
   onScheduledNotification: (callback: (notification: ScheduledNotification) => void) => void;
   removeScheduledNotificationListener: () => void;
   // Reminders
