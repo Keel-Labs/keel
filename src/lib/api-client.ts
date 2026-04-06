@@ -20,6 +20,7 @@ import type {
   WikiFileImport,
   WikiBaseCreateResult,
   WikiIngestResult,
+  WikiJob,
   WikiSourceInput,
   UtilityWindowKind,
 } from '../shared/types';
@@ -430,6 +431,18 @@ export const apiClient: KeelAPI = {
 
   async ingestWikiSource(_basePath: string, _input: WikiSourceInput): Promise<WikiIngestResult> {
     throw new Error('Wiki source ingest is not yet available in cloud mode.');
+  },
+
+  async startWikiCompile(_basePath: string): Promise<WikiJob> {
+    throw new Error('Wiki compile is not yet available in cloud mode.');
+  },
+
+  async startWikiHealthCheck(_basePath: string): Promise<WikiJob> {
+    throw new Error('Wiki health checks are not yet available in cloud mode.');
+  },
+
+  async listWikiJobs(): Promise<WikiJob[]> {
+    return [];
   },
 
   // Scheduled notifications (poll-based in cloud mode)

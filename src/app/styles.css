@@ -647,6 +647,44 @@ select {
   line-height: 1.6;
 }
 
+.wiki-shell__job {
+  margin-top: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  background: var(--surface-panel);
+}
+
+.wiki-shell__job-status {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.wiki-shell__job-status.is-running {
+  color: var(--accent-link);
+}
+
+.wiki-shell__job-status.is-completed {
+  color: var(--text-primary);
+}
+
+.wiki-shell__job-status.is-failed {
+  color: var(--danger-text);
+}
+
+.wiki-shell__job-detail {
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
 .wiki-shell__notice {
   margin-top: 14px;
   color: var(--accent-link);
@@ -668,6 +706,12 @@ select {
 .wiki-shell__action:hover,
 .wiki-shell__back:hover {
   background: var(--surface-selected);
+}
+
+.wiki-shell__action:disabled {
+  opacity: 0.55;
+  cursor: default;
+  background: var(--surface-panel);
 }
 
 .wiki-shell__body {
