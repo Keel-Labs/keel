@@ -1,0 +1,35 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="160" y1="96" x2="864" y2="928" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#17345C"/>
+      <stop offset="0.5" stop-color="#0E2344"/>
+      <stop offset="1" stop-color="#09172D"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(736 260) rotate(132.234) scale(420 500)">
+      <stop stop-color="#E9A184" stop-opacity="0.54"/>
+      <stop offset="1" stop-color="#E9A184" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="reef" x1="388" y1="524" x2="812" y2="820" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#E4A287"/>
+      <stop offset="1" stop-color="#C96C4C"/>
+    </linearGradient>
+    <filter id="shadow" x="128" y="96" width="768" height="832" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feFlood flood-opacity="0" result="BackgroundImageFix"/>
+      <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+      <feOffset dy="34"/>
+      <feGaussianBlur stdDeviation="36"/>
+      <feColorMatrix type="matrix" values="0 0 0 0 0.0196078 0 0 0 0 0.0666667 0 0 0 0 0.141176 0 0 0 0.38 0"/>
+      <feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_0_1"/>
+      <feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_0_1" result="shape"/>
+    </filter>
+  </defs>
+  <rect x="72" y="72" width="880" height="880" rx="220" fill="url(#bg)"/>
+  <rect x="72" y="72" width="880" height="880" rx="220" fill="url(#glow)"/>
+  <rect x="88" y="88" width="848" height="848" rx="204" stroke="#FFFFFF" stroke-opacity="0.12" stroke-width="6"/>
+  <g filter="url(#shadow)">
+    <path d="M380 230C380 203.49 401.49 182 428 182H458C484.51 182 506 203.49 506 230V792C506 818.51 484.51 840 458 840H428C401.49 840 380 818.51 380 792V230Z" fill="#F8F5F0"/>
+    <path d="M458 466L740 246C759.715 230.633 788.165 234.172 803.533 253.887L821.978 277.555C837.346 297.27 833.807 325.72 814.092 341.088L531.859 561.088C512.143 576.455 483.694 572.916 468.326 553.201L449.881 529.533C434.514 509.817 438.053 481.368 457.768 466H458Z" fill="#F8F5F0"/>
+    <path d="M470 548C486.552 527.57 516.511 524.434 536.941 540.985L772.764 732.046C793.194 748.598 796.33 778.557 779.779 798.987L759.904 823.514C743.353 843.944 713.394 847.08 692.964 830.529L457.141 639.468C436.711 622.916 433.575 592.957 450.126 572.527L470 548Z" fill="url(#reef)"/>
+  </g>
+  <path d="M232 818C305.634 855.152 402.563 878 512 878C677.685 878 814 825.594 876 753" stroke="#FFFFFF" stroke-opacity="0.08" stroke-width="22" stroke-linecap="round"/>
+</svg>
