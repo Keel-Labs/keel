@@ -209,6 +209,10 @@ function getInitialSourcesBasePath(): string {
   return getUtilityWindowSearchParam('basePath') || '';
 }
 
+function shouldOpenCreateBaseModalInitially(): boolean {
+  return getUtilityWindowSearchParam('createBase') === '1';
+}
+
 function statusTone(
   tone: 'neutral' | 'success' | 'warning' | 'danger' | 'accent'
 ): React.CSSProperties {
@@ -1543,6 +1547,7 @@ function WikiSourcesSection({
   const [newBaseError, setNewBaseError] = useState('');
   const [newBaseNotice, setNewBaseNotice] = useState('');
   const [isCreatingBase, setIsCreatingBase] = useState(false);
+  const [showCreateBaseModal, setShowCreateBaseModal] = useState(() => shouldOpenCreateBaseModalInitially());
   const [ingestMode, setIngestMode] = useState<WikiSourceType>('url');
   const [ingestTitle, setIngestTitle] = useState('');
   const [ingestUrl, setIngestUrl] = useState('');
@@ -1687,6 +1692,7 @@ function WikiSourcesSection({
       setNewBaseTitle('');
       setNewBaseDescription('');
       setNewBaseNotice(result.message);
+      setShowCreateBaseModal(false);
     } catch (err) {
       setNewBaseError(err instanceof Error ? err.message : 'Failed to create wiki base.');
     } finally {
@@ -1782,49 +1788,15 @@ function WikiSourcesSection({
         title="Wiki Base"
         description="Pick the target wiki base. New source packages will be written into its raw and wiki/source folders."
       >
-        <FieldRow
-          label="Create New Base"
-          description="Create a new wiki base with the default Keel structure: overview, index, log, health, and raw/wiki folders."
-        >
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <input
-              type="text"
-              value={newBaseTitle}
-              onChange={(event) => {
-                setNewBaseTitle(event.target.value);
-                setNewBaseError('');
-              }}
-              placeholder="e.g. Competitive Landscape"
-              style={inputStyle}
-            />
-            <textarea
-              value={newBaseDescription}
-              onChange={(event) => setNewBaseDescription(event.target.value)}
-              placeholder="Optional description for the wiki home page."
-              style={{ ...inputStyle, minHeight: 96, resize: 'vertical' }}
-            />
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-              <InlineNote>
-                Keel will create a new folder under <code style={inlineCodeStyle}>knowledge-bases/</code> and initialize a valid wiki skeleton.
-              </InlineNote>
-              <button
-                type="button"
-                onClick={handleCreateBase}
-                disabled={!newBaseTitle.trim() || isCreatingBase}
-                style={primaryButtonStyle(!newBaseTitle.trim() || isCreatingBase)}
-              >
-                {isCreatingBase ? 'Creating...' : 'Create Base'}
-              </button>
-            </div>
-            {newBaseError && <InlineMessage tone="danger">{newBaseError}</InlineMessage>}
-            {newBaseNotice && <InlineMessage tone="success">{newBaseNotice}</InlineMessage>}
-          </div>
-        </FieldRow>
-
         <FieldRow label="Target Base">
           <select
             value={currentBasePath}
             onChange={(event) => {
+              if (event.target.value === '__create__') {
+                setShowCreateBaseModal(true);
+                setNewBaseError('');
+                return;
+              }
               setCurrentBasePath(event.target.value);
               setIngestNotice('');
               setIngestError('');
@@ -1834,6 +1806,7 @@ function WikiSourcesSection({
             {bases.map((base) => (
               <option key={base.path} value={base.path}>{base.title}</option>
             ))}
+            <option value="__create__">Create New Base...</option>
           </select>
         </FieldRow>
 
@@ -1858,6 +1831,7 @@ function WikiSourcesSection({
         )}
 
         {error && <InlineMessage tone="danger">{error}</InlineMessage>}
+        {newBaseNotice && <InlineMessage tone="success">{newBaseNotice}</InlineMessage>}
       </SectionCard>
 
       <SectionCard
@@ -1997,6 +1971,95 @@ function WikiSourcesSection({
           </div>
         )}
       </SectionCard>
+
+      {showCreateBaseModal && (
+        <div
+          className="wiki-modal__backdrop"
+          style={{ position: 'fixed' }}
+          onClick={() => {
+            if (isCreatingBase) return;
+            setShowCreateBaseModal(false);
+            setNewBaseError('');
+          }}
+        >
+          <div className="wiki-modal" onClick={(event) => event.stopPropagation()}>
+            <div className="wiki-modal__header">
+              <div>
+                <div className="wiki-modal__eyebrow">Wiki Base</div>
+                <div className="wiki-modal__title">Create New Base</div>
+              </div>
+              <button
+                type="button"
+                className="wiki-modal__close"
+                onClick={() => {
+                  if (isCreatingBase) return;
+                  setShowCreateBaseModal(false);
+                  setNewBaseError('');
+                }}
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="wiki-modal__field">
+              <label className="wiki-modal__label">Base Name</label>
+              <input
+                type="text"
+                value={newBaseTitle}
+                onChange={(event) => {
+                  setNewBaseTitle(event.target.value);
+                  setNewBaseError('');
+                }}
+                placeholder="e.g. Competitive Landscape"
+                className="wiki-modal__input"
+              />
+            </div>
+
+            <div className="wiki-modal__field">
+              <label className="wiki-modal__label">Description</label>
+              <textarea
+                value={newBaseDescription}
+                onChange={(event) => setNewBaseDescription(event.target.value)}
+                placeholder="Optional description for the wiki home page."
+                className="wiki-modal__textarea"
+                style={{ minHeight: 120 }}
+              />
+            </div>
+
+            <div className="wiki-modal__field">
+              <InlineNote>
+                Keel will create a new folder under <code style={inlineCodeStyle}>knowledge-bases/</code> and initialize a valid wiki skeleton.
+              </InlineNote>
+            </div>
+
+            {newBaseError && <div className="wiki-modal__error">{newBaseError}</div>}
+
+            <div className="wiki-modal__footer">
+              <button
+                type="button"
+                className="wiki-modal__secondary"
+                onClick={() => {
+                  if (isCreatingBase) return;
+                  setShowCreateBaseModal(false);
+                  setNewBaseError('');
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="wiki-modal__primary"
+                onClick={() => {
+                  handleCreateBase().catch(() => undefined);
+                }}
+                disabled={!newBaseTitle.trim() || isCreatingBase}
+              >
+                {isCreatingBase ? 'Creating...' : 'Create Base'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

@@ -44,6 +44,7 @@ import { eod } from '../src/core/workflows/eod';
 import { extractAndSaveMemory } from '../src/core/workflows/memoryExtract';
 import { ingestWikiSource } from '../src/core/workflows/wikiIngest';
 import { createWikiBase } from '../src/core/workflows/wikiBase';
+import { compileWikiBase, runWikiHealthCheck } from '../src/core/workflows/wikiMaintenance';
 import {
   startOAuthFlow,
   saveTokens,
@@ -54,11 +55,12 @@ import {
 import { GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_SCOPES } from '../src/core/connectors/googleConfig';
 import { syncCalendar, getUpcomingEventsFormatted, createCalendarEvent } from '../src/core/connectors/googleCalendar';
 import { exportToGoogleDoc, readGoogleDoc, extractDocId } from '../src/core/connectors/googleDocs';
-import type { Message, Settings, UtilityWindowKind, WikiSourceInput } from '../src/shared/types';
+import type { Message, Settings, UtilityWindowKind, WikiJob, WikiSourceInput } from '../src/shared/types';
 
 let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 const utilityWindows = new Map<UtilityWindowKind, BrowserWindow>();
+const wikiJobs = new Map<string, WikiJob>();
 
 const settings = loadSettings();
 const fileManager = new FileManager(settings.brainPath);
@@ -69,6 +71,45 @@ let teamFileManager: TeamFileManager | null = settings.teamBrainPath
   : null;
 
 const isDev = process.env.NODE_ENV === 'development';
+
+function createWikiJob(type: WikiJob['type'], basePath: string, detail: string): WikiJob {
+  const now = Date.now();
+  const id = `wiki-job-${now}-${Math.random().toString(36).slice(2, 8)}`;
+  const title = type === 'compile' ? 'Compile wiki base' : 'Run health check';
+
+  const job: WikiJob = {
+    id,
+    type,
+    basePath,
+    status: 'queued',
+    title,
+    detail,
+    startedAt: now,
+    updatedAt: now,
+  };
+
+  wikiJobs.set(id, job);
+  return job;
+}
+
+function updateWikiJob(id: string, patch: Partial<WikiJob>): WikiJob | null {
+  const current = wikiJobs.get(id);
+  if (!current) return null;
+
+  const next: WikiJob = {
+    ...current,
+    ...patch,
+    updatedAt: Date.now(),
+  };
+  wikiJobs.set(id, next);
+  return next;
+}
+
+function listWikiJobsForBase(basePath?: string): WikiJob[] {
+  return Array.from(wikiJobs.values())
+    .filter((job) => !basePath || job.basePath === basePath)
+    .sort((a, b) => b.updatedAt - a.updatedAt);
+}
 
 function loadRendererWindow(targetWindow: BrowserWindow, query?: Record<string, string>) {
   if (isDev) {
@@ -874,6 +915,76 @@ function registerIpcHandlers() {
     const result = await ingestWikiSource(basePath, input, fileManager);
     logActivity(settings.brainPath, 'wiki-ingest', `${result.title} -> ${result.pagePath}`);
     return result;
+  });
+
+  ipcMain.handle('keel:start-wiki-compile', async (_event, basePath: string) => {
+    if (basePath.includes('..') || basePath.startsWith('.config')) {
+      throw new Error('Access denied');
+    }
+
+    const job = createWikiJob('compile', basePath, 'Preparing source packages for compile.');
+
+    void (async () => {
+      updateWikiJob(job.id, { status: 'running', detail: 'Compiling wiki pages and synthesis outputs.' });
+      try {
+        const result = await compileWikiBase(basePath, fileManager, llmClient);
+        updateWikiJob(job.id, {
+          status: 'completed',
+          detail: result.message,
+          finishedAt: Date.now(),
+          outputPath: result.synthesisPath,
+        });
+        logActivity(settings.brainPath, 'wiki-compile', `${basePath} -> ${result.synthesisPath}`);
+      } catch (error) {
+        updateWikiJob(job.id, {
+          status: 'failed',
+          detail: 'Compile failed.',
+          finishedAt: Date.now(),
+          error: error instanceof Error ? error.message : 'Unknown compile error',
+        });
+      }
+    })();
+
+    return job;
+  });
+
+  ipcMain.handle('keel:start-wiki-health-check', async (_event, basePath: string) => {
+    if (basePath.includes('..') || basePath.startsWith('.config')) {
+      throw new Error('Access denied');
+    }
+
+    const job = createWikiJob('health', basePath, 'Inspecting wiki coverage and provenance.');
+
+    void (async () => {
+      updateWikiJob(job.id, { status: 'running', detail: 'Running health checks across sources, concepts, and outputs.' });
+      try {
+        const result = await runWikiHealthCheck(basePath, fileManager);
+        updateWikiJob(job.id, {
+          status: 'completed',
+          detail: result.message,
+          finishedAt: Date.now(),
+          outputPath: result.reportPath,
+        });
+        logActivity(settings.brainPath, 'wiki-health', `${basePath} -> ${result.reportPath}`);
+      } catch (error) {
+        updateWikiJob(job.id, {
+          status: 'failed',
+          detail: 'Health check failed.',
+          finishedAt: Date.now(),
+          error: error instanceof Error ? error.message : 'Unknown health check error',
+        });
+      }
+    })();
+
+    return job;
+  });
+
+  ipcMain.handle('keel:list-wiki-jobs', async (_event, basePath?: string) => {
+    if (basePath && (basePath.includes('..') || basePath.startsWith('.config'))) {
+      throw new Error('Access denied');
+    }
+
+    return listWikiJobsForBase(basePath);
   });
 
   ipcMain.handle('keel:list-files', async (_event, dirPath: string) => {
