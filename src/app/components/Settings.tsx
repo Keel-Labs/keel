@@ -53,7 +53,6 @@ type SettingsSectionId =
   | 'knowledge-sources'
   | 'knowledge-team'
   | 'integrations-google'
-  | 'cloud-sync'
   | 'advanced-developer';
 
 const SETTINGS_SECTION_IDS: SettingsSectionId[] = [
@@ -67,7 +66,6 @@ const SETTINGS_SECTION_IDS: SettingsSectionId[] = [
   'knowledge-sources',
   'knowledge-team',
   'integrations-google',
-  'cloud-sync',
   'advanced-developer',
 ];
 
@@ -112,10 +110,6 @@ const SECTION_META: Record<SettingsSectionId, { title: string; description: stri
     title: 'Google',
     description: 'Manage Google account connection and sync behavior.',
   },
-  'cloud-sync': {
-    title: 'Sync & Migration',
-    description: 'Move desktop data to the cloud with a guided workflow.',
-  },
   'advanced-developer': {
     title: 'Developer',
     description: 'Advanced runtime controls and future diagnostics.',
@@ -154,12 +148,6 @@ const NAV_GROUPS: Array<{
     label: 'Integrations',
     items: [
       { id: 'integrations-google', label: 'Google' },
-    ],
-  },
-  {
-    label: 'Cloud',
-    items: [
-      { id: 'cloud-sync', label: 'Sync & Migration' },
     ],
   },
   {
@@ -1055,11 +1043,6 @@ export default function Settings({ onBack }: Props) {
               </>
             )}
           </>
-        );
-
-      case 'cloud-sync':
-        return (
-          <CloudMigrationSection />
         );
 
       case 'advanced-developer':
@@ -2120,240 +2103,3 @@ async function listSettingsMarkdownFiles(dirPath: string): Promise<Array<{ path:
   return files;
 }
 
-function CloudMigrationSection() {
-  const [serverUrl, setServerUrl] = useState(
-    () => localStorage.getItem('keel_cloud_server') || ''
-  );
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [migrating, setMigrating] = useState(false);
-  const [progress, setProgress] = useState<{ step: string; current: number; total: number } | null>(null);
-  const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null);
-  const [authStep, setAuthStep] = useState<'credentials' | 'ready' | 'migrating'>('credentials');
-  const [accessToken, setAccessToken] = useState<string | null>(null);
-
-  useEffect(() => {
-    const migrate = (window as any).keelMigrate;
-    if (migrate) {
-      migrate.onMigrationProgress((update: { step: string; current: number; total: number }) => setProgress(update));
-      return () => migrate.removeMigrationListeners();
-    }
-    return undefined;
-  }, []);
-
-  const handleAuth = async () => {
-    if (!serverUrl || !email || !password) {
-      setResult({ ok: false, message: 'Please fill in all fields.' });
-      return;
-    }
-
-    setResult(null);
-    try {
-      let res = await fetch(`${serverUrl}/api/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
-      });
-
-      if (!res.ok) {
-        res = await fetch(`${serverUrl}/api/auth/register`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password }),
-        });
-      }
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: 'Auth failed' }));
-        setResult({ ok: false, message: (err as { error?: string }).error || 'Authentication failed.' });
-        return;
-      }
-
-      const data = await res.json() as { accessToken: string; refreshToken: string };
-      setAccessToken(data.accessToken);
-      localStorage.setItem('keel_cloud_server', serverUrl);
-      setAuthStep('ready');
-      setResult({ ok: true, message: 'Authenticated. Ready to migrate.' });
-    } catch (err) {
-      setResult({ ok: false, message: err instanceof Error ? err.message : 'Connection failed.' });
-    }
-  };
-
-  const handleMigrate = async () => {
-    if (!accessToken || !serverUrl) return;
-
-    setMigrating(true);
-    setResult(null);
-    setAuthStep('migrating');
-
-    try {
-      const migrate = (window as any).keelMigrate;
-      const res = await migrate.migrateToCloud(serverUrl, accessToken);
-
-      if (res.ok) {
-        const imported = res.imported;
-        setResult({
-          ok: true,
-          message: `Migration complete. Synced ${imported.brainFiles} brain files, ${imported.chatSessions} chats, and ${imported.reminders} reminders.`,
-        });
-      } else {
-        setResult({ ok: false, message: res.error || 'Migration failed.' });
-      }
-    } catch (err) {
-      setResult({ ok: false, message: err instanceof Error ? err.message : 'Migration failed.' });
-    }
-
-    setMigrating(false);
-    setAuthStep('ready');
-  };
-
-  if (!isElectron) {
-    return (
-      <PlaceholderPanel
-        title="Desktop only"
-        description="Cloud migration is only available from the desktop app because it copies local data into the cloud workspace."
-      />
-    );
-  }
-
-  return (
-    <section
-      style={{
-        padding: '22px 24px',
-        borderRadius: 20,
-        background: 'var(--surface-panel)',
-        border: '1px solid var(--panel-border)',
-      }}
-    >
-      <div style={{ marginBottom: 18 }}>
-        <div style={{ fontSize: 18, fontWeight: 600, color: 'var(--text-primary)' }}>Cloud Migration Workflow</div>
-        <div style={{ marginTop: 6, fontSize: 14, lineHeight: 1.5, color: 'var(--text-muted)' }}>
-          Migrate desktop data so the same context is available from mobile and cloud clients.
-        </div>
-      </div>
-
-      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 18 }}>
-        <StatusBadge label="Step 1" tone="accent" />
-        <StatusBadge label={authStep === 'credentials' ? 'Authenticate' : authStep === 'ready' ? 'Ready' : 'Migrating'} tone={authStep === 'migrating' ? 'warning' : 'neutral'} />
-      </div>
-
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-        <FieldRow label="Server URL" description="Target Keel cloud server.">
-          <input
-            type="text"
-            value={serverUrl}
-            onChange={(e) => setServerUrl(e.target.value)}
-            placeholder="https://keel-api.fly.dev"
-            style={{
-              width: '100%',
-              padding: '12px 14px',
-              borderRadius: 'var(--radius-lg)',
-              background: 'var(--control-bg)',
-              border: '1px solid var(--control-border)',
-              color: 'var(--text-primary)',
-              fontSize: 'var(--text-base)',
-              outline: 'none',
-              fontFamily: 'inherit',
-            }}
-            disabled={authStep === 'migrating'}
-          />
-        </FieldRow>
-
-        {authStep === 'credentials' && (
-          <>
-            <FieldRow label="Email">
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
-                style={{
-                  width: '100%',
-                  padding: '12px 14px',
-                  borderRadius: 'var(--radius-lg)',
-                  background: 'var(--control-bg)',
-                  border: '1px solid var(--control-border)',
-                  color: 'var(--text-primary)',
-                  fontSize: 'var(--text-base)',
-                  outline: 'none',
-                  fontFamily: 'inherit',
-                }}
-              />
-            </FieldRow>
-            <FieldRow label="Password" description="A new cloud account will be created if one does not exist.">
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Cloud account password"
-                style={{
-                  width: '100%',
-                  padding: '12px 14px',
-                  borderRadius: 'var(--radius-lg)',
-                  background: 'var(--control-bg)',
-                  border: '1px solid var(--control-border)',
-                  color: 'var(--text-primary)',
-                  fontSize: 'var(--text-base)',
-                  outline: 'none',
-                  fontFamily: 'inherit',
-                }}
-              />
-            </FieldRow>
-            <button onClick={handleAuth} style={primaryButtonStyle(false)}>
-              Connect to Cloud
-            </button>
-          </>
-        )}
-
-        {authStep === 'ready' && (
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <button onClick={handleMigrate} disabled={migrating} style={primaryButtonStyle(migrating)}>
-              {migrating ? 'Migrating...' : 'Start Migration'}
-            </button>
-            <button
-              onClick={() => {
-                setAuthStep('credentials');
-                setAccessToken(null);
-                setResult(null);
-              }}
-              style={secondaryButtonStyle(false)}
-            >
-              Change Account
-            </button>
-          </div>
-        )}
-
-        {authStep === 'migrating' && progress && (
-          <div
-            style={{
-              padding: '14px 16px',
-              borderRadius: 14,
-              background: 'rgba(207,122,92,0.08)',
-              border: '1px solid rgba(207,122,92,0.18)',
-            }}
-          >
-            <div style={{ fontSize: 13, color: 'var(--text-primary)', marginBottom: 8 }}>{progress.step}</div>
-            {progress.total > 0 && (
-              <div style={{ height: 6, borderRadius: 4, background: 'var(--surface-selected)', overflow: 'hidden' }}>
-                <div
-                  style={{
-                    height: '100%',
-                    background: 'var(--accent)',
-                    width: `${Math.min(100, (progress.current / progress.total) * 100)}%`,
-                    transition: 'width 0.3s',
-                  }}
-                />
-              </div>
-            )}
-          </div>
-        )}
-
-        {result && (
-          <InlineMessage tone={result.ok ? 'success' : 'danger'}>
-            {result.message}
-          </InlineMessage>
-        )}
-      </div>
-    </section>
-  );
-}

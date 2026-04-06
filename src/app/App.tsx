@@ -4,15 +4,10 @@ import Sidebar, { type DesktopView, type WikiNavId, type WikiSidebarState } from
 import Settings from './components/Settings';
 import WikiWorkspace, { type WikiCommand } from './components/WikiWorkspace';
 import Onboarding from './components/Onboarding';
-import AuthScreen from './components/AuthScreen';
-import MobileNav from './components/MobileNav';
-import MobileHistory from './components/MobileHistory';
 import DesktopTopBar from './components/DesktopTopBar';
 import PlaceholderPane from './components/PlaceholderPane';
 import ChatsIndex from './components/ChatsIndex';
 import type { Settings as SettingsType } from '../shared/types';
-import { getKeelAPI, loadTokens, isAuthenticated, setOnAuthExpired } from '../lib/api-client';
-import { useIsMobile } from '../lib/useIsMobile';
 import { applyTheme } from './theme';
 import {
   CHAT_UNREAD_STORAGE_KEY,
@@ -27,14 +22,7 @@ import {
   shouldShowOnboarding,
 } from './onboarding';
 
-type MobileView = 'chat' | 'settings' | 'wiki' | 'history';
 type DesktopMode = 'chat' | 'wiki';
-
-const isElectron = typeof window !== 'undefined' && !!(window as any).keel;
-
-if (!isElectron) {
-  (window as any).keel = getKeelAPI();
-}
 
 function getUtilityWindowKind(): string | null {
   if (typeof window === 'undefined') return null;
@@ -113,7 +101,6 @@ export default function App() {
   const [loadSessionId, setLoadSessionId] = useState<string | null>(null);
   const [currentSessionId, setCurrentSessionId] = useState('');
   const [refreshSidebar, setRefreshSidebar] = useState(0);
-  const [mobileView, setMobileView] = useState<MobileView>('chat');
   const [desktopView, setDesktopView] = useState<DesktopView>('chat');
   const [desktopMode, setDesktopMode] = useState<DesktopMode>('chat');
   const [wikiContextOpen, setWikiContextOpen] = useState(false);
@@ -121,7 +108,6 @@ export default function App() {
   const [wikiCommand, setWikiCommand] = useState<WikiCommand | null>(null);
   const [showOnboarding, setShowOnboarding] = useState<boolean | null>(null);
   const [initialSettings, setInitialSettings] = useState<SettingsType | null>(null);
-  const [needsAuth, setNeedsAuth] = useState<boolean | null>(null);
   const [autoSidebarCollapsed, setAutoSidebarCollapsed] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
     return window.innerWidth < 1120;
@@ -149,9 +135,8 @@ export default function App() {
   const desktopHistoryRef = useRef(desktopHistory);
   const currentSessionIdRef = useRef(currentSessionId);
   const streamingSessionIdsRef = useRef(streamingSessionIds);
-  const isMobile = useIsMobile();
   const effectiveSidebarCollapsed = sidebarCollapsed || autoSidebarCollapsed;
-  const chatVisible = isMobile ? mobileView === 'chat' : desktopView === 'chat';
+  const chatVisible = desktopView === 'chat';
 
   useEffect(() => {
     sidebarWidthRef.current = sidebarWidth;
@@ -207,22 +192,6 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (isElectron) {
-      setNeedsAuth(false);
-      window.keel.getSettings().then((settings) => {
-        applyTheme(settings.theme);
-      }).catch(() => {});
-      return;
-    }
-    loadTokens();
-    setNeedsAuth(!isAuthenticated());
-    setOnAuthExpired(() => {
-      setNeedsAuth(true);
-    });
-  }, []);
-
-  useEffect(() => {
-    if (needsAuth !== false) return;
     window.keel.getSettings().then((settings) => {
       applyTheme(settings.theme);
       setInitialSettings(settings);
@@ -233,7 +202,7 @@ export default function App() {
     }).catch(() => {
       setShowOnboarding(true);
     });
-  }, [needsAuth]);
+  }, []);
 
   const navigateDesktop = useCallback((
     nextView: DesktopView,
@@ -310,14 +279,12 @@ export default function App() {
     setCurrentSessionId('');
     currentSessionIdRef.current = '';
     setNewChatSignal((value) => value + 1);
-    setMobileView('chat');
     navigateDesktop('chat', { mode: 'chat' });
   };
 
   const handleSelectSession = (id: string) => {
     markCurrentSessionUnreadIfStreaming(id);
     setLoadSessionId(id);
-    setMobileView('chat');
     navigateDesktop('chat', { mode: 'chat' });
   };
 
@@ -422,13 +389,6 @@ export default function App() {
     window.addEventListener('mouseup', onMouseUp);
   }, [effectiveSidebarCollapsed]);
 
-  const handleMobileNavigation = useCallback((view: MobileView) => {
-    if (view !== 'chat') {
-      markCurrentSessionUnreadIfStreaming();
-    }
-    setMobileView(view);
-  }, [markCurrentSessionUnreadIfStreaming]);
-
   const sessionIndicators = useMemo<Record<string, SessionIndicatorState>>(() => {
     const unread = new Set(unreadSessionIds);
     const ids = new Set([...Object.keys(streamingSessionIds), ...unread]);
@@ -477,19 +437,9 @@ export default function App() {
     }
   };
 
-  if (needsAuth === null || (needsAuth === false && showOnboarding === null)) {
+  if (showOnboarding === null) {
     return (
       <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-base)' }} />
-    );
-  }
-
-  if (needsAuth) {
-    return (
-      <AuthScreen
-        onAuthenticated={() => {
-          setNeedsAuth(false);
-        }}
-      />
     );
   }
 
@@ -501,49 +451,6 @@ export default function App() {
     return (
       <div style={{ height: '100vh', display: 'flex', background: 'var(--bg-base)' }}>
         <Settings onBack={() => window.keel.closeWindow()} />
-      </div>
-    );
-  }
-
-  if (isMobile) {
-    return (
-      <div style={{
-        height: '100vh',
-        display: 'flex',
-        flexDirection: 'column',
-        background: 'var(--bg-base)',
-      }}>
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-          <div className={mobileView === 'chat' ? 'app-view' : 'app-view is-hidden'}>
-            <Chat
-              newChatSignal={newChatSignal}
-              loadSessionId={loadSessionId}
-              onSessionChange={handleSessionChange}
-              onSessionStreamStateChange={handleSessionStreamStateChange}
-            />
-          </div>
-          {mobileView === 'history' && (
-            <MobileHistory
-              onSelectSession={(id) => {
-                handleSelectSession(id);
-                setMobileView('chat');
-              }}
-              refreshSignal={refreshSidebar}
-              sessionIndicators={sessionIndicators}
-            />
-          )}
-          {mobileView === 'settings' && (
-            <Settings onBack={() => setMobileView('chat')} />
-          )}
-          {mobileView === 'wiki' && (
-            <WikiWorkspace onBack={() => setMobileView('chat')} contextOpen={false} />
-          )}
-        </div>
-        <MobileNav
-          activeView={mobileView}
-          onNavigate={handleMobileNavigation}
-          onNewChat={handleNewChat}
-        />
       </div>
     );
   }
