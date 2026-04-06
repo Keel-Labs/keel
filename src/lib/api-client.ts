@@ -13,9 +13,15 @@ import type {
   Settings,
   FileEntry,
   KeelAPI,
+  OpenAIListResult,
   OllamaListResult,
   ScheduledNotification,
   Reminder,
+  WikiFileImport,
+  WikiBaseCreateResult,
+  WikiIngestResult,
+  WikiSourceInput,
+  UtilityWindowKind,
 } from '../shared/types';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001';
@@ -366,6 +372,22 @@ export const apiClient: KeelAPI = {
     return null;
   },
 
+  async pickWikiFiles(): Promise<WikiFileImport[]> {
+    throw new Error('Wiki file import is not yet available in cloud mode.');
+  },
+
+  async createWikiBase(_title: string, _description?: string): Promise<WikiBaseCreateResult> {
+    throw new Error('Wiki base creation is not yet available in cloud mode.');
+  },
+
+  async openUtilityWindow(_kind: UtilityWindowKind, _query?: Record<string, string>): Promise<void> {
+    throw new Error('Desktop utility windows are not available in cloud mode.');
+  },
+
+  async closeWindow(): Promise<void> {
+    // No-op in browser mode.
+  },
+
   async listFiles(dirPath: string): Promise<FileEntry[]> {
     const entries = await apiGet<Array<{ name: string; isDir: boolean; path: string }>>(
       `/api/brain/files?dir=${encodeURIComponent(dirPath)}`
@@ -385,6 +407,10 @@ export const apiClient: KeelAPI = {
 
   async writeFile(filePath: string, content: string): Promise<void> {
     await apiPut('/api/brain/file', { path: filePath, content });
+  },
+
+  async ingestWikiSource(_basePath: string, _input: WikiSourceInput): Promise<WikiIngestResult> {
+    throw new Error('Wiki source ingest is not yet available in cloud mode.');
   },
 
   // Scheduled notifications (poll-based in cloud mode)
@@ -449,6 +475,10 @@ export const apiClient: KeelAPI = {
 
   async googleCreateEvent(): Promise<{ id: string; htmlLink: string }> {
     throw new Error('Google Calendar coming soon to cloud mode.');
+  },
+
+  async openaiListModels(): Promise<OpenAIListResult> {
+    return { models: [], error: 'OpenAI model listing is only available in desktop mode.' };
   },
 
   // Ollama (not available in cloud mode — Ollama is local only)

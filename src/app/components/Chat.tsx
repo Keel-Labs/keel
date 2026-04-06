@@ -14,6 +14,19 @@ const OPENAI_MODELS = [
   { value: 'gpt-4.1-mini', label: 'GPT-4.1 Mini' },
 ];
 
+function formatOpenAIModelLabel(modelId: string): string {
+  const known = OPENAI_MODELS.find((model) => model.value === modelId);
+  if (known) return known.label;
+
+  return modelId
+    .split('-')
+    .map((part) => {
+      if (/^\d/.test(part)) return part;
+      return part.charAt(0).toUpperCase() + part.slice(1);
+    })
+    .join(' ');
+}
+
 const THINKING_MESSAGES = [
   'Moving fast and thinking things...',
   'Double-clicking into your ask...',
@@ -571,16 +584,23 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [currentProvider, setCurrentProvider] = useState<string>('claude');
   const [currentModel, setCurrentModel] = useState<string>('');
+  const [openaiModels, setOpenaiModels] = useState<string[]>([]);
+  const [openaiModelsLoading, setOpenaiModelsLoading] = useState(false);
   const [ollamaModels, setOllamaModels] = useState<OllamaModelInfo[]>([]);
   const [showModelDropdown, setShowModelDropdown] = useState(false);
   const [composerExpanded, setComposerExpanded] = useState(false);
   const justLoadedRef = useRef(false);
   const [availableProviders, setAvailableProviders] = useState<Set<string>>(new Set());
   const [openrouterModelName, setOpenrouterModelName] = useState<string>('');
+  const openaiModelOptionIds = Array.from(new Set([
+    ...openaiModels,
+    currentProvider === 'openai' ? currentModel : '',
+  ].filter(Boolean)));
+  const openaiModelOptions = openaiModelOptionIds
+    .map((modelId) => ({ value: modelId, label: formatOpenAIModelLabel(modelId) }));
 
-  // Load settings (timezone, model, provider) and detect all available providers
-  useEffect(() => {
-    window.keel.getSettings().then((s) => {
+  const syncProviderSettings = useCallback(() => {
+    return window.keel.getSettings().then((s) => {
       setUserTimezone(s.timezone || '');
       setUserName(s.userName || '');
       setCurrentProvider(s.provider);
@@ -593,10 +613,25 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
       // Detect all available providers
       const available = new Set<string>();
       if (s.anthropicApiKey) available.add('claude');
-      if (s.openaiApiKey) available.add('openai');
+      if (s.openaiApiKey) {
+        available.add('openai');
+        setOpenaiModelsLoading(true);
+        window.keel.openaiListModels().then((result) => {
+          setOpenaiModels(result.models);
+          setOpenaiModelsLoading(false);
+        }).catch(() => {
+          setOpenaiModels([]);
+          setOpenaiModelsLoading(false);
+        });
+      } else {
+        setOpenaiModels([]);
+        setOpenaiModelsLoading(false);
+      }
       if (s.openrouterApiKey) {
         available.add('openrouter');
         setOpenrouterModelName(s.openrouterModel || '');
+      } else {
+        setOpenrouterModelName('');
       }
       // Always try Ollama
       window.keel.ollamaListModels().then((r) => {
@@ -604,11 +639,29 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
           setOllamaModels(r.models);
           available.add('ollama');
           setAvailableProviders(new Set(available));
+        } else {
+          setOllamaModels([]);
+          setAvailableProviders(new Set(available));
         }
-      }).catch(() => {});
+      }).catch(() => {
+        setOllamaModels([]);
+        setAvailableProviders(new Set(available));
+      });
       setAvailableProviders(new Set(available));
     }).catch(() => {});
   }, []);
+
+  // Load settings (timezone, model, provider) and detect all available providers
+  useEffect(() => {
+    syncProviderSettings();
+
+    const handleFocus = () => {
+      syncProviderSettings();
+    };
+
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [syncProviderSettings]);
 
   const formatTime = (ms: number) => {
     const opts: Intl.DateTimeFormatOptions = { dateStyle: 'medium', timeStyle: 'short' };
@@ -727,7 +780,7 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
       return CLAUDE_MODELS.find((m) => m.value === currentModel)?.label || currentModel;
     }
     if (currentProvider === 'openai') {
-      return OPENAI_MODELS.find((m) => m.value === currentModel)?.label || currentModel;
+      return openaiModelOptions.find((m) => m.value === currentModel)?.label || currentModel;
     }
     if (currentProvider === 'ollama') {
       const found = ollamaModels.find((m) => m.name === currentModel);
@@ -1230,7 +1283,12 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
                   <>
 	                    {availableProviders.has('claude') && <div style={{ height: 1, background: 'var(--panel-border)', margin: '4px 0' }} />}
 	                    <div style={{ fontSize: 10, color: 'var(--text-disabled)', padding: '6px 14px 2px', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600 }}>OpenAI</div>
-	                    {OPENAI_MODELS.map((m) => {
+	                    {openaiModelsLoading && openaiModelOptions.length === 0 && (
+	                      <div style={{ padding: '8px 14px', color: 'var(--text-muted)', fontSize: 12 }}>
+	                        Loading live OpenAI models...
+	                      </div>
+	                    )}
+	                    {openaiModelOptions.map((m) => {
 	                      const active = currentProvider === 'openai' && currentModel === m.value;
 	                      return (
 	                        <button key={`openai-${m.value}`} onClick={() => handleModelChange('openai', m.value)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '7px 14px', border: 'none', cursor: 'pointer', background: active ? 'var(--accent-bg)' : 'transparent', color: active ? 'var(--accent-link)' : 'var(--text-secondary)', fontSize: 12, transition: 'background 0.1s' }}
