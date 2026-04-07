@@ -22,6 +22,7 @@ function extractGdocUrl(content: string): { cleanContent: string; gdocUrl: strin
 
 export default function Message({ message }: Props) {
   const isUser = message.role === 'user';
+  const visibleContent = message.displayContent ?? message.content;
 
   const { cleanContent, gdocUrl } = useMemo(
     () => (isUser ? { cleanContent: message.content, gdocUrl: null } : extractGdocUrl(message.content)),
@@ -60,7 +61,29 @@ export default function Message({ message }: Props) {
               ))}
             </div>
           )}
-          {message.content}
+          {message.documents && message.documents.length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: visibleContent ? 8 : 0 }}>
+              {message.documents.map((document, index) => (
+                <div
+                  key={`${document.name}-${index}`}
+                  style={{
+                    display: 'inline-flex',
+                    flexDirection: 'column',
+                    gap: 2,
+                    padding: '8px 10px',
+                    minWidth: 160,
+                    borderRadius: 12,
+                    border: '1px solid var(--panel-border-strong)',
+                    background: 'color-mix(in srgb, var(--user-message-bg) 88%, white 12%)',
+                  }}
+                >
+                  <span style={{ fontWeight: 600 }}>{document.name}</span>
+                  <span style={{ fontSize: 12, opacity: 0.78 }}>{document.warning || document.mimeType}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          {visibleContent}
         </div>
       </div>
     );

@@ -12,7 +12,7 @@ import type { WikiIngestResult, WikiSourceInput } from '../../shared/types';
 const URL_PATTERN = /^https?:\/\//i;
 const SUPPORTED_IMPORT_EXTENSIONS = new Set(['.md', '.markdown', '.txt', '.pdf', '.docx', '.pptx']);
 
-interface ResolvedSource {
+export interface ResolvedSource {
   title: string;
   normalizedContent: string;
   origin: string;
@@ -167,12 +167,25 @@ async function resolveFileSource(input: WikiSourceInput): Promise<ResolvedSource
     throw new Error('Choose a file to import.');
   }
 
-  const extension = path.extname(filePath).toLowerCase();
+  return extractFileSource(filePath, input.fileName, input.title);
+}
+
+export async function extractFileSource(
+  filePath: string,
+  fileName?: string,
+  titleOverride?: string,
+): Promise<ResolvedSource> {
+  const normalizedPath = filePath.trim();
+  if (!normalizedPath) {
+    throw new Error('Choose a file to import.');
+  }
+
+  const extension = path.extname(normalizedPath).toLowerCase();
   if (!SUPPORTED_IMPORT_EXTENSIONS.has(extension)) {
     throw new Error('Supported files: Markdown, text, PDF, Word (.docx), and PowerPoint (.pptx).');
   }
 
-  const fileBuffer = await fs.readFile(filePath);
+  const fileBuffer = await fs.readFile(normalizedPath);
   let content = '';
   let warning: string | undefined;
   let extractor = 'filesystem-text';
@@ -209,12 +222,12 @@ async function resolveFileSource(input: WikiSourceInput): Promise<ResolvedSource
     throw new Error('The selected file is empty.');
   }
 
-  const fallbackName = path.basename(filePath, extension);
+  const fallbackName = path.basename(fileName || normalizedPath, extension);
 
   return {
-    title: input.title?.trim() || deriveTitle(undefined, content) || fallbackName,
+    title: titleOverride?.trim() || deriveTitle(undefined, content) || fallbackName,
     normalizedContent: content,
-    origin: filePath,
+    origin: normalizedPath,
     sourceType: 'file',
     extractor,
     mimeType,
