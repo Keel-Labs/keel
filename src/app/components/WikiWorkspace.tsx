@@ -610,15 +610,26 @@ export default function WikiWorkspace({
   );
 
   const openPage = useCallback((path: string): boolean => {
-    const page = pages.find((candidate) => candidate.path === path);
-    if (!page) return false;
-    const nav = mapPageSectionToNav(page.section);
-    setSelectedPagePath(page.path);
+    const baseMatch = path.match(/^(knowledge-bases\/[^/]+)/);
+    const targetBasePath = baseMatch?.[1];
+    if (!targetBasePath) return false;
+
+    const relativePath = path.startsWith(`${targetBasePath}/`)
+      ? path.slice(`${targetBasePath}/`.length)
+      : '';
+    const section = classifySection(relativePath);
+    if (!section) return false;
+
+    const nav = mapPageSectionToNav(section);
+    if (currentBasePath !== targetBasePath) {
+      setCurrentBasePath(targetBasePath);
+    }
+    setSelectedPagePath(path);
     setActiveNav(nav);
-    setActiveCollectionPrefix(getCollectionPrefixForPage(page.relativePath, nav));
+    setActiveCollectionPrefix(getCollectionPrefixForPage(relativePath, nav));
     setBaseMenuOpen(false);
     return true;
-  }, [pages]);
+  }, [currentBasePath]);
 
   const startCompile = useCallback(async () => {
     if (!currentBasePath || activeJob) return;
