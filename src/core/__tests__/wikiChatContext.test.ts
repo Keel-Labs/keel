@@ -32,6 +32,8 @@ describe('assembleWikiChatContext', () => {
     });
 
     expect(result.context).toContain('Retrieval quality determines whether durable memory is useful');
+    expect(result.context).toContain('Reference [1] | Concept: Retrieval');
+    expect(result.context).not.toContain('--- knowledge-bases/research-base/wiki/concepts/compiled/retrieval.md ---');
     expect(result.citations).toContain('knowledge-bases/research-base/wiki/concepts/compiled/retrieval.md');
   });
 

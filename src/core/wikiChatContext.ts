@@ -104,9 +104,11 @@ export async function assembleWikiChatContext({
   const citations: string[] = [];
   let totalChars = 0;
 
-  for (const [filePath, snippets] of grouped) {
+  for (const [index, [filePath, snippets]] of Array.from(grouped.entries()).entries()) {
     const snippetText = snippets.join('\n\n');
-    const section = `\n\n--- ${filePath} ---\n\n${snippetText}`;
+    const referenceNumber = index + 1;
+    const sectionLabel = formatWikiReferenceLabel(filePath);
+    const section = `\n\n--- Reference [${referenceNumber}] | ${sectionLabel} ---\n\n${snippetText}`;
     if (totalChars + section.length > MAX_CONTEXT_CHARS) break;
     sections.push(section);
     citations.push(filePath);
@@ -118,13 +120,37 @@ export async function assembleWikiChatContext({
     `Dig Deep: ${digDeep ? 'on' : 'off'}`,
     'Use this selected wiki base when it is relevant to the user request.',
     'If the wiki does not contain enough evidence, say so plainly.',
-    'Use the cited wiki paths provided here when grounding your answer.',
+    'If you cite the wiki, cite by reference number like [1] or [2].',
+    'Do not print raw file paths or inline "Source:" lines. The app renders the final references separately.',
   ].join('\n');
 
   return {
     context: `${contextHeader}${sections.join('')}`,
     citations,
   };
+}
+
+function formatWikiReferenceLabel(filePath: string): string {
+  if (filePath.endsWith('/wiki/index.md')) return 'Wiki Index';
+  if (filePath.endsWith('/wiki/log.md')) return 'Activity Log';
+  if (filePath.endsWith('/overview.md')) return 'Overview';
+  if (filePath.endsWith('/health/latest.md')) return 'Health Check';
+
+  const fileName = filePath.split('/').pop()?.replace(/\.md$/, '') || filePath;
+  const title = fileName
+    .split(/[-_]+/g)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+
+  if (filePath.includes('/wiki/sources/')) return `Source: ${title}`;
+  if (filePath.includes('/wiki/concepts/')) return `Concept: ${title}`;
+  if (filePath.includes('/wiki/open-questions/')) return `Open Question: ${title}`;
+  if (filePath.includes('/outputs/')) return `Output: ${title}`;
+  if (filePath.includes('/raw/')) return `Raw Source: ${title}`;
+  if (filePath.includes('/health/')) return `Health: ${title}`;
+
+  return title;
 }
 
 function buildPathPrefixes(basePath: string, digDeep: boolean): string[] {
