@@ -368,6 +368,12 @@ export default function App() {
     setWikiCommand({ type: 'page', target: path, nonce: Date.now() });
   };
 
+  const handleOpenWikiCitation = useCallback((path: string) => {
+    markCurrentSessionUnreadIfStreaming();
+    setWikiCommand({ type: 'page', target: path, nonce: Date.now() });
+    navigateDesktop('wiki', { mode: 'wiki' });
+  }, [markCurrentSessionUnreadIfStreaming, navigateDesktop]);
+
   const handleToggleSidebar = () => {
     setSidebarCollapsed((previous) => {
       if (previous) {
@@ -505,6 +511,7 @@ export default function App() {
               loadSessionId={loadSessionId}
               onSessionChange={handleSessionChange}
               onSessionStreamStateChange={handleSessionStreamStateChange}
+              onOpenWikiPage={handleOpenWikiCitation}
             />
           </div>
           {desktopView !== 'chat' && renderDesktopView()}

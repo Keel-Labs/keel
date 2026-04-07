@@ -1,16 +1,11 @@
-import React, { useMemo } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import { marked } from 'marked';
 import type { Message as MessageType } from '../../shared/types';
-
-const renderer = new marked.Renderer();
-renderer.link = ({ href, text }) => {
-  return `<a href="${href}" target="_blank" rel="noopener noreferrer">${text}</a>`;
-};
-
-marked.setOptions({ breaks: true, gfm: true, renderer });
+import { formatWikiChatCitations } from './wikiChatCitations';
 
 interface Props {
   message: MessageType;
+  onOpenWikiPage?: (path: string) => void;
 }
 
 function extractGdocUrl(content: string): { cleanContent: string; gdocUrl: string | null } {
@@ -20,7 +15,20 @@ function extractGdocUrl(content: string): { cleanContent: string; gdocUrl: strin
   return { cleanContent, gdocUrl: match[1] };
 }
 
-export default function Message({ message }: Props) {
+function renderMessageMarkdown(content: string): string {
+  const renderer = new marked.Renderer();
+  renderer.link = ({ href = '', text }) => {
+    if (href.startsWith('knowledge-bases/')) {
+      const citationClass = /^\[\d+]$/.test(text) ? ' wiki-citation-link' : '';
+      return `<button type="button" class="wiki-inline-link${citationClass}" data-wiki-path="${encodeURIComponent(href)}">${text}</button>`;
+    }
+    return `<a href="${href}" target="_blank" rel="noopener noreferrer">${text}</a>`;
+  };
+
+  return marked.parse(content, { breaks: true, gfm: true, renderer }) as string;
+}
+
+export default function Message({ message, onOpenWikiPage }: Props) {
   const isUser = message.role === 'user';
   const visibleContent = message.displayContent ?? message.content;
 
@@ -29,10 +37,27 @@ export default function Message({ message }: Props) {
     [message.content, isUser]
   );
 
+  const formattedContent = useMemo(() => {
+    if (isUser) return cleanContent;
+    return formatWikiChatCitations(cleanContent).content;
+  }, [cleanContent, isUser]);
+
   const renderedContent = useMemo(() => {
     if (isUser) return null;
-    return marked.parse(cleanContent) as string;
-  }, [cleanContent, isUser]);
+    return renderMessageMarkdown(formattedContent);
+  }, [formattedContent, isUser]);
+
+  const handleRenderedContentClick = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
+    if (!onOpenWikiPage) return;
+    const target = event.target as HTMLElement;
+    const linkTarget = target.closest('[data-wiki-path]') as HTMLElement | null;
+    if (!linkTarget) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const encoded = linkTarget.dataset.wikiPath;
+    if (!encoded) return;
+    onOpenWikiPage(decodeURIComponent(encoded));
+  }, [onOpenWikiPage]);
 
   if (isUser) {
     return (
@@ -103,6 +128,7 @@ export default function Message({ message }: Props) {
             lineHeight: 1.78,
             color: 'var(--text-primary)',
           }}
+          onClick={handleRenderedContentClick}
           dangerouslySetInnerHTML={{ __html: renderedContent || '' }}
         />
         {gdocUrl && (

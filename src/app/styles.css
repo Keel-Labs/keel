@@ -2244,6 +2244,13 @@ select {
   text-decoration: underline;
 }
 
+.markdown-body .wiki-citation-link {
+  font-size: 0.68em;
+  vertical-align: super;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
 .markdown-body .wiki-inline-link:focus,
 .markdown-body .wiki-inline-link:focus-visible {
   outline: none;

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback, useMemo, useDeferredValue } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import type {
   ChatDocumentAttachment,
   ChatRequest,
@@ -10,6 +10,7 @@ import type {
   StoredChatSession,
   WikiBaseSummary,
 } from '../../shared/types';
+import { filterWikiBases } from './chatWikiBaseMenu';
 import Message from './Message';
 
 const CLAUDE_MODELS = [
@@ -741,6 +742,7 @@ interface ChatProps {
   loadSessionId: string | null;
   onSessionChange: (id: string) => void;
   onSessionStreamStateChange?: (sessionId: string, isStreaming: boolean) => void;
+  onOpenWikiPage?: (path: string) => void;
 }
 
 export default function Chat({
@@ -748,6 +750,7 @@ export default function Chat({
   loadSessionId,
   onSessionChange,
   onSessionStreamStateChange,
+  onOpenWikiPage,
 }: ChatProps) {
   const [messages, setMessages] = useState<MessageType[]>([]);
   const [input, setInput] = useState('');
@@ -790,7 +793,6 @@ export default function Chat({
   const actionButtonRef = useRef<HTMLButtonElement>(null);
   const [availableProviders, setAvailableProviders] = useState<Set<string>>(new Set());
   const [openrouterModelName, setOpenrouterModelName] = useState<string>('');
-  const deferredWikiSearch = useDeferredValue(wikiSearch);
   const openaiModelOptionIds = Array.from(new Set([
     ...openaiModels,
     currentProvider === 'openai' ? currentModel : '',
@@ -1268,13 +1270,8 @@ export default function Chat({
   const showHeader = messages.length > 0 || isStreaming;
   const emptyStateGreeting = getTimeOfDayGreeting(userName, userTimezone || undefined);
   const filteredWikiBases = useMemo(() => {
-    const normalized = deferredWikiSearch.trim().toLowerCase();
-    if (!normalized) return wikiBases;
-    return wikiBases.filter((base) => {
-      const haystack = `${base.title} ${base.slug} ${base.description || ''}`.toLowerCase();
-      return haystack.includes(normalized);
-    });
-  }, [deferredWikiSearch, wikiBases]);
+    return filterWikiBases(wikiBases, wikiSearch);
+  }, [wikiBases, wikiSearch]);
   const hasComposerAttachments = attachedImages.length > 0 || attachedDocuments.length > 0;
   const isWikiBaseLocked = !!sessionMetadata.wikiBasePath;
   const selectedWikiBaseLabel = sessionMetadata.wikiBaseTitle || sessionMetadata.wikiBaseSlug || '';
@@ -1343,6 +1340,22 @@ export default function Chat({
     sessionMetadataCacheRef.current.set(sessionId, nextMetadata);
     onSessionChange(sessionId);
     closeActionMenu();
+  };
+
+  const handleToggleWikiSubmenu = async () => {
+    if (isWikiBaseLocked) return;
+
+    const nextShowWikiSubmenu = !showWikiSubmenu;
+    setShowWikiSubmenu(nextShowWikiSubmenu);
+    setWikiSearch('');
+
+    if (!nextShowWikiSubmenu) return;
+
+    try {
+      await loadWikiBases();
+    } catch {
+      // Keep showing the last known list if the refresh fails.
+    }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1739,7 +1752,7 @@ export default function Chat({
           )}
 
           {messages.map((msg, i) => (
-            <Message key={i} message={msg} />
+            <Message key={i} message={msg} onOpenWikiPage={onOpenWikiPage} />
           ))}
 
           {isStreaming && !streamingContent && <ThinkingIndicator />}
@@ -1763,6 +1776,7 @@ export default function Chat({
                 content: streamingContent,
                 timestamp: Date.now(),
               }}
+              onOpenWikiPage={onOpenWikiPage}
             />
           )}
 
@@ -1773,6 +1787,7 @@ export default function Chat({
                 content: 'Writing your document...',
                 timestamp: Date.now(),
               }}
+              onOpenWikiPage={onOpenWikiPage}
             />
           )}
         </div>
@@ -1913,10 +1928,7 @@ export default function Chat({
                       <button
                         className="chat-composer__menu-item"
                         onClick={() => {
-                          if (!showWikiSubmenu && wikiBases.length === 0) {
-                            loadWikiBases().catch(() => {});
-                          }
-                          setShowWikiSubmenu((value) => !value);
+                          handleToggleWikiSubmenu().catch(() => {});
                         }}
                         disabled={isWikiBaseLocked}
                       >
@@ -1952,9 +1964,6 @@ export default function Chat({
                                 onClick={() => handleSelectWikiBase(base)}
                               >
                                 <span className="chat-composer__submenu-title">{base.title}</span>
-                                <span className="chat-composer__submenu-description">
-                                  {base.description || base.slug}
-                                </span>
                               </button>
                             ))}
                           </div>
