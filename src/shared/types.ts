@@ -40,7 +40,7 @@ export interface ChatRequest {
 }
 
 export interface Settings {
-  theme: 'dark' | 'light';
+  theme: 'system' | 'dark' | 'light';
   hasCompletedOnboarding: boolean;
   provider: 'claude' | 'openai' | 'openrouter' | 'ollama';
   // Claude
