@@ -199,6 +199,27 @@ export default function App() {
     });
   }, []);
 
+  useEffect(() => {
+    const syncThemeFromSettings = () => {
+      window.keel.getSettings().then((settings) => {
+        applyTheme(settings.theme);
+      }).catch(() => {});
+    };
+
+    const mediaQuery = typeof window.matchMedia === 'function'
+      ? window.matchMedia('(prefers-color-scheme: dark)')
+      : null;
+
+    syncThemeFromSettings();
+    window.addEventListener('focus', syncThemeFromSettings);
+    mediaQuery?.addEventListener?.('change', syncThemeFromSettings);
+
+    return () => {
+      window.removeEventListener('focus', syncThemeFromSettings);
+      mediaQuery?.removeEventListener?.('change', syncThemeFromSettings);
+    };
+  }, []);
+
   const navigateDesktop = useCallback((
     nextView: DesktopView,
     options: { mode?: DesktopMode; pushHistory?: boolean } = {},

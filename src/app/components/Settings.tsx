@@ -251,6 +251,8 @@ export default function Settings({ onBack, navigation }: Props) {
     () => typeof window !== 'undefined' && window.innerWidth < 980
   );
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const latestSettingsRef = useRef<SettingsType | null>(null);
+  const hasPendingSaveRef = useRef(false);
 
   const fetchOpenAIModels = useCallback(async () => {
     setOpenaiModelsLoading(true);
@@ -288,6 +290,7 @@ export default function Settings({ onBack, navigation }: Props) {
   useEffect(() => {
     window.keel.getSettings().then((s) => {
       setSettings(s);
+      latestSettingsRef.current = s;
       if (s.provider === 'ollama') fetchOllamaModels();
       if (s.openaiApiKey) fetchOpenAIModels();
     }).catch(() => {});
@@ -320,6 +323,9 @@ export default function Settings({ onBack, navigation }: Props) {
 
   useEffect(() => () => {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    if (hasPendingSaveRef.current && latestSettingsRef.current) {
+      void window.keel.saveSettings(latestSettingsRef.current);
+    }
   }, []);
 
   useEffect(() => {
@@ -328,36 +334,44 @@ export default function Settings({ onBack, navigation }: Props) {
 
   if (!settings) return null;
 
-  const update = (partial: Partial<SettingsType>) => {
-    const newSettings = { ...settings, ...partial };
-    setSettings(newSettings);
-    if (partial.theme) applyTheme(newSettings.theme);
-    setSaved(false);
-
-    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-    saveTimerRef.current = setTimeout(async () => {
-      setSaving(true);
-      try {
-        await window.keel.saveSettings(newSettings);
-        setSaved(true);
-      } catch {
-        // Save feedback remains local to the page for now.
-      }
-      setSaving(false);
-    }, 500);
-  };
-
-  const save = async () => {
-    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+  const persistSettings = async (nextSettings: SettingsType) => {
     setSaving(true);
     try {
-      applyTheme(settings.theme);
-      await window.keel.saveSettings(settings);
+      applyTheme(nextSettings.theme);
+      await window.keel.saveSettings(nextSettings);
+      hasPendingSaveRef.current = false;
       setSaved(true);
     } catch {
       // Save feedback remains local to the page for now.
     }
     setSaving(false);
+  };
+
+  const update = (partial: Partial<SettingsType>) => {
+    const newSettings = { ...settings, ...partial };
+    setSettings(newSettings);
+    latestSettingsRef.current = newSettings;
+    if ('theme' in partial) applyTheme(newSettings.theme);
+    setSaved(false);
+    hasPendingSaveRef.current = true;
+
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(async () => {
+      await persistSettings(newSettings);
+    }, 500);
+  };
+
+  const save = async () => {
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    hasPendingSaveRef.current = true;
+    await persistSettings(settings);
+  };
+
+  const handleBack = async () => {
+    if (hasPendingSaveRef.current) {
+      await save();
+    }
+    onBack();
   };
 
   const toggleKeyVisibility = (key: string) => {
@@ -398,7 +412,7 @@ export default function Settings({ onBack, navigation }: Props) {
   };
 
   const summaryChips = [
-    { label: 'Theme', value: settings.theme === 'light' ? 'Light' : 'Dark' },
+    { label: 'Theme', value: settings.theme === 'system' ? 'System' : settings.theme === 'light' ? 'Light' : 'Dark' },
     { label: 'Provider', value: providerLabel(settings.provider) },
     { label: 'Timezone', value: settings.timezone || 'Auto' },
     { label: 'Google', value: googleConnected ? 'Connected' : googleConfigured ? 'Ready to connect' : 'Unavailable' },
@@ -709,10 +723,10 @@ export default function Settings({ onBack, navigation }: Props) {
             <SectionCard title="Preferences" description="Personal defaults that shape how Keel behaves for you.">
               <FieldRow
                 label="Theme"
-                description="Switch the desktop app between the dark and light workspace themes."
+                description="Follow your OS appearance by default, or override it with a manual light or dark theme."
               >
                 <div style={{ display: 'inline-flex', gap: 6, padding: 4, borderRadius: 14, background: 'var(--surface-muted)', border: '1px solid var(--panel-border)' }}>
-                  {(['dark', 'light'] as const).map((themeOption) => {
+                  {(['system', 'dark', 'light'] as const).map((themeOption) => {
                     const active = settings.theme === themeOption;
                     return (
                       <button
@@ -729,7 +743,11 @@ export default function Settings({ onBack, navigation }: Props) {
                           cursor: 'pointer',
                         }}
                       >
-                        {themeOption === 'dark' ? 'Dark mode' : 'Light mode'}
+                        {themeOption === 'system'
+                          ? 'Use system'
+                          : themeOption === 'dark'
+                            ? 'Dark mode'
+                            : 'Light mode'}
                       </button>
                     );
                   })}
@@ -1103,7 +1121,7 @@ export default function Settings({ onBack, navigation }: Props) {
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <button
-            onClick={onBack}
+            onClick={() => { handleBack().catch(() => onBack()); }}
             style={{
               background: 'none',
               border: 'none',
