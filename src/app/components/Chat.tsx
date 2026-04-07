@@ -503,19 +503,22 @@ function isGoogleDocCommand(text: string): 'export-only' | 'write-and-export' | 
   const t = text.trim().toLowerCase();
   if (!/google\s*doc/i.test(t)) return false;
 
+  // Strip common filler prefixes for easier matching
+  const stripped = t
+    .replace(/^(could you|can you|would you|will you|please|ok|okay|yes|yeah|sure)\s*,?\s*/i, '')
+    .trim();
+
   // "export-only" — commands that reference existing content to export
-  // e.g., "put that in a google doc", "make a google doc with this info", "ok make a google doc"
-  if (/^(export|save|send|put)\s.*google\s*doc/i.test(t)) return 'export-only';
-  if (/^(create|make)\s+(a\s+)?google\s*doc/i.test(t)) return 'export-only';
-  // References to existing content at the START: "put this in a google doc", "make a google doc with this"
-  // But NOT "write X and put it in a google doc" (where "it" refers to something being written)
-  if (/^(put|save|send|export)\s+(this|that|it|the above)/i.test(t)) return 'export-only';
-  if (/google\s*docs?\s+(with|from|of|for)\s+(this|that|the above|this info)/i.test(t)) return 'export-only';
-  // Starts with filler words then immediately an export verb: "ok make a google doc", "yeah put it in a google doc"
-  // Must be short (< 60 chars) to avoid matching "can you write X and put it in a google doc"
-  if (t.length < 60 && /^(ok|okay|yes|yeah|sure|please)\s*,?\s*(make|create|put|save|export|send)/i.test(t)) return 'export-only';
+  // Direct export verbs at start: "put this in a google doc", "export to google doc"
+  if (/^(export|save|send|put|place|add)\s.*google\s*doc/i.test(stripped)) return 'export-only';
+  if (/^(create|make)\s+(a\s+)?google\s*doc/i.test(stripped)) return 'export-only';
+  // References to existing content (this/that/it) anywhere with google doc
+  if (/(put|save|send|export|place|add|move)\s+(this|that|it|the above)\s.*(google\s*doc)/i.test(stripped)) return 'export-only';
+  if (/google\s*docs?\s+(with|from|of|for)\s+(this|that|the above|this info)/i.test(stripped)) return 'export-only';
+  // "(put/save/turn) this (in/into) a google doc" — reference to existing content
+  if (/(this|that|it|the above).*(in|into|to|as)\s+(a\s+)?google\s*doc/i.test(stripped)) return 'export-only';
   // Short commands (just the google doc request, not much else)
-  if (t.replace(/google\s*docs?/i, '').replace(/[^a-z]/g, '').length < 20) return 'export-only';
+  if (stripped.replace(/google\s*docs?/i, '').replace(/[^a-z]/g, '').length < 20) return 'export-only';
 
   // "write-and-export" — user wants something NEW written AND exported
   // e.g., "write a recommendation on X and put it in a google doc"
@@ -1012,38 +1015,38 @@ export default function Chat({
         if (pendingGoogleExportRef.current && stream.accumulated) {
           pendingGoogleExportRef.current = false;
           const fullContent = stream.accumulated;
-          const titleMatch = fullContent.match(/^#*\s*(.{1,60})/m);
-          const title = titleMatch ? titleMatch[1].replace(/[*#]/g, '').trim() : 'Keel Export';
+
+          // Extract title: prefer markdown headings, then derive from user request
+          const headingMatch = fullContent.match(/^#+\s+(.{1,60})/m);
+          let title = headingMatch ? headingMatch[1].replace(/[*#]/g, '').trim() : '';
+          if (!title) {
+            // Derive from user's request
+            const userMsg = stream.baseMessages.filter((m) => m.role === 'user').pop();
+            if (userMsg) {
+              const req = userMsg.content
+                .replace(/\b(and\s+)?(put|place|save|export|send|add)\s+(it\s+)?(in|into|to|as)\s+(a\s+)?google\s*docs?\b/gi, '')
+                .replace(/\b(can you|could you|please|write|draft|create)\b/gi, '')
+                .replace(/\s{2,}/g, ' ').trim();
+              if (req.length > 5 && req.length <= 80) {
+                title = req.charAt(0).toUpperCase() + req.slice(1);
+              }
+            }
+          }
+          if (!title) title = 'Keel Export';
 
           if (targetSessionId === currentSessionIdRef.current) {
             justLoadedRef.current = true;
             resetStreamingUi();
             setMessages([
               ...stream.baseMessages,
-              { role: 'assistant' as const, content: 'Exporting to Google Doc...', timestamp: Date.now() },
+              { role: 'assistant' as const, content: 'Exporting your document...', timestamp: Date.now() },
             ]);
           }
 
           window.keel.googleExportDoc(fullContent, title).then((url: string) => {
-            // Extract first real paragraph sentence (skip title, headings, short lines)
-            const lines = fullContent.split('\n');
-            let summary = '';
-            for (const line of lines) {
-              const stripped = line.replace(/^#+\s*/, '').replace(/\*\*/g, '').trim();
-              // Skip empty lines, headings, title-like lines (< 40 chars without a period)
-              if (!stripped) continue;
-              if (line.match(/^#{1,3}\s/)) continue;
-              if (stripped.length < 40 && !stripped.includes('.')) continue;
-              // Found a real paragraph line — grab first sentence
-              const sentenceMatch = stripped.match(/^(.+?[.!?])\s/);
-              summary = sentenceMatch ? sentenceMatch[1] : stripped.slice(0, 140);
-              break;
-            }
-            if (!summary) summary = title;
-
             const doneMessages = [
               ...stream.baseMessages,
-              { role: 'assistant' as const, content: `**${title}**\n\n${summary}\n\n${url}`, timestamp: Date.now() },
+              { role: 'assistant' as const, content: `Done — I wrote "${title}" for you.\n\n<!-- gdoc:${url} -->`, timestamp: Date.now() },
             ];
             sessionMessagesCacheRef.current.set(targetSessionId, doneMessages);
             window.keel.saveChat(targetSessionId, doneMessages).catch(() => {});
@@ -1111,8 +1114,6 @@ export default function Chat({
     for (let i = messages.length - 1; i >= 0; i--) {
       if (messages[i].role === 'assistant') {
         const content = messages[i].content;
-        // Skip export confirmations and short system messages
-        if (/Exported to Google Doc|docs\.google\.com\/document|Exporting to Google Doc/i.test(content)) continue;
         if (content.length < 20) continue;
         return content;
       }
@@ -1246,13 +1247,13 @@ export default function Chat({
         ]);
       } else {
         try {
-          // Derive title from first line of content
-          const titleMatch = lastContent.match(/^#*\s*(.{1,60})/m);
-          const title = titleMatch ? titleMatch[1].replace(/[*#]/g, '').trim() : 'Keel Export';
+          // Derive title from markdown heading, fallback to first line
+          const headingMatch = lastContent.match(/^#+\s+(.{1,60})/m);
+          const title = headingMatch ? headingMatch[1].replace(/[*#]/g, '').trim() : 'Keel Export';
           const url = await window.keel.googleExportDoc(lastContent, title);
           setMessages((prev) => [
             ...prev,
-            { role: 'assistant', content: `Exported to Google Doc: ${url}`, timestamp: Date.now() },
+            { role: 'assistant', content: `Done — exported your response.\n\n<!-- gdoc:${url} -->`, timestamp: Date.now() },
           ]);
         } catch (error) {
           const msg = error instanceof Error ? error.message : 'Google Doc export failed';
@@ -1461,10 +1462,10 @@ export default function Chat({
     sessionMessagesCacheRef.current.set(targetSessionId, updatedMessages);
     onSessionStreamStateChange?.(targetSessionId, true);
 
-    // Filter out export confirmation messages so the LLM doesn't mimic them
+    // Strip hidden gdoc markers from messages before sending to LLM
     const llmMessages = updatedMessages.map((m) => {
-      if (m.role === 'assistant' && /docs\.google\.com\/document\/d\/|Exported to Google Doc|Open Google Doc|\[Open document\]/.test(m.content)) {
-        return { ...m, content: '(Document was exported to Google Doc successfully.)' };
+      if (m.role === 'assistant' && m.content.includes('<!-- gdoc:')) {
+        return { ...m, content: m.content.replace(/\n*<!-- gdoc:.+? -->/g, '').trim() };
       }
       return m;
     });
