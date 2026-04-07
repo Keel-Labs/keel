@@ -43,9 +43,11 @@ import { autoCapture } from '../src/core/workflows/autoCapture';
 import { dailyBrief } from '../src/core/workflows/dailyBrief';
 import { eod } from '../src/core/workflows/eod';
 import { extractAndSaveMemory } from '../src/core/workflows/memoryExtract';
-import { ingestWikiSource } from '../src/core/workflows/wikiIngest';
+import { extractFileSource, ingestWikiSource } from '../src/core/workflows/wikiIngest';
 import { createWikiBase } from '../src/core/workflows/wikiBase';
 import { compileWikiBase, runWikiHealthCheck } from '../src/core/workflows/wikiMaintenance';
+import { listWikiBaseSummaries } from '../src/core/wikiBaseSummaries';
+import { assembleWikiChatContext } from '../src/core/wikiChatContext';
 import {
   startOAuthFlow,
   saveTokens,
@@ -56,7 +58,16 @@ import {
 import { GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_SCOPES } from '../src/core/connectors/googleConfig';
 import { syncCalendar, getUpcomingEventsFormatted, createCalendarEvent } from '../src/core/connectors/googleCalendar';
 import { exportToGoogleDoc, readGoogleDoc, extractDocId } from '../src/core/connectors/googleDocs';
-import type { Message, Settings, UtilityWindowKind, WikiJob, WikiSourceInput } from '../src/shared/types';
+import type {
+  ChatDocumentAttachment,
+  ChatRequest,
+  Message,
+  Settings,
+  StoredChatSession,
+  UtilityWindowKind,
+  WikiJob,
+  WikiSourceInput,
+} from '../src/shared/types';
 
 let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
@@ -110,6 +121,24 @@ function listWikiJobsForBase(basePath?: string): WikiJob[] {
   return Array.from(wikiJobs.values())
     .filter((job) => !basePath || job.basePath === basePath)
     .sort((a, b) => b.updatedAt - a.updatedAt);
+}
+
+function normalizeChatRequest(request: ChatRequest | Message[]): ChatRequest {
+  if (Array.isArray(request)) {
+    return { messages: request };
+  }
+
+  if (request && typeof request === 'object' && Array.isArray(request.messages)) {
+    return request;
+  }
+
+  return { messages: [] };
+}
+
+function buildWikiCitationBlock(citations: string[]): string {
+  if (citations.length === 0) return '';
+  const lines = citations.map((citation) => `- [${citation}]`);
+  return `\n\n**Wiki citations**\n${lines.join('\n')}`;
 }
 
 function loadRendererWindow(targetWindow: BrowserWindow, query?: Record<string, string>) {
@@ -726,12 +755,31 @@ function registerIpcHandlers() {
     return enriched;
   }
 
-  ipcMain.handle('keel:chat', async (_event, messages: Message[]) => {
-    const enrichedMessages = await enrichMessages(messages);
+  ipcMain.handle('keel:chat', async (_event, request: ChatRequest | Message[]) => {
+    const normalizedRequest = normalizeChatRequest(request);
+    const enrichedMessages = await enrichMessages(normalizedRequest.messages);
     const lastMessage = enrichedMessages[enrichedMessages.length - 1]?.content;
-    const systemPrompt = await contextAssembler.assembleContext(lastMessage, () => {});
+    const retrievalQuery = normalizedRequest.messages[normalizedRequest.messages.length - 1]?.displayContent?.trim() || lastMessage;
+    let systemPrompt = await contextAssembler.assembleContext(retrievalQuery, () => {});
+    let wikiCitations: string[] = [];
+
+    if (normalizedRequest.sessionMetadata?.wikiBasePath && retrievalQuery) {
+      const wikiContext = await assembleWikiChatContext({
+        fileManager,
+        basePath: normalizedRequest.sessionMetadata.wikiBasePath,
+        query: retrievalQuery,
+        digDeep: !!normalizedRequest.sessionMetadata.digDeep,
+      });
+      if (wikiContext.context) {
+        systemPrompt += `\n\n--- Selected Wiki Context ---\n\n${wikiContext.context}`;
+        wikiCitations = wikiContext.citations;
+      }
+    }
+
     logActivity(settings.brainPath, 'chat', lastMessage?.slice(0, 200));
-    return llmClient.chat(enrichedMessages, systemPrompt);
+    const response = await llmClient.chat(enrichedMessages, systemPrompt);
+    const citationBlock = buildWikiCitationBlock(wikiCitations);
+    return citationBlock ? `${response}${citationBlock}` : response;
   });
 
   // Track active stream AbortControllers for cancellation
@@ -745,9 +793,10 @@ function registerIpcHandlers() {
     }
   });
 
-  ipcMain.handle('keel:chat-stream', async (event, messages: Message[], requestId: string) => {
+  ipcMain.handle('keel:chat-stream', async (event, request: ChatRequest | Message[], requestId: string) => {
     const sender = event.sender;
     const streamRequestId = requestId || `request-${Date.now()}`;
+    const normalizedRequest = normalizeChatRequest(request);
     const abortController = new AbortController();
     activeStreamControllers.set(streamRequestId, abortController);
     const emitThinking = (step: string) => {
@@ -755,9 +804,27 @@ function registerIpcHandlers() {
         sender.send('keel:thinking-step', { requestId: streamRequestId, step });
       }
     };
-    const enrichedMessages = await enrichMessages(messages, emitThinking);
+    const enrichedMessages = await enrichMessages(normalizedRequest.messages, emitThinking);
     const lastMessage = enrichedMessages[enrichedMessages.length - 1]?.content;
-    const systemPrompt = await contextAssembler.assembleContext(lastMessage, emitThinking);
+    const retrievalQuery = normalizedRequest.messages[normalizedRequest.messages.length - 1]?.displayContent?.trim() || lastMessage;
+    let systemPrompt = await contextAssembler.assembleContext(retrievalQuery, emitThinking);
+    let wikiCitations: string[] = [];
+
+    if (normalizedRequest.sessionMetadata?.wikiBasePath && retrievalQuery) {
+      emitThinking('Searching selected wiki base');
+      const wikiContext = await assembleWikiChatContext({
+        fileManager,
+        basePath: normalizedRequest.sessionMetadata.wikiBasePath,
+        query: retrievalQuery,
+        digDeep: !!normalizedRequest.sessionMetadata.digDeep,
+      });
+      if (wikiContext.context) {
+        systemPrompt += `\n\n--- Selected Wiki Context ---\n\n${wikiContext.context}`;
+        wikiCitations = wikiContext.citations;
+      } else {
+        emitThinking('Selected wiki base has no strong match');
+      }
+    }
     emitThinking('Generating answer');
 
     logActivity(settings.brainPath, 'chat', lastMessage?.slice(0, 200));
@@ -788,6 +855,12 @@ function registerIpcHandlers() {
         }
       }, abortController.signal);
 
+      const citationBlock = buildWikiCitationBlock(wikiCitations);
+      if (citationBlock) {
+        fullResponse += citationBlock;
+        buffer += citationBlock;
+      }
+
       // Final flush
       if (flushTimer) clearTimeout(flushTimer);
       flush();
@@ -798,7 +871,7 @@ function registerIpcHandlers() {
       }
 
       // Extract and save memory in background (don't block the response)
-      const allMessages = [...messages, { role: 'assistant' as const, content: fullResponse, timestamp: Date.now() }];
+      const allMessages = [...normalizedRequest.messages, { role: 'assistant' as const, content: fullResponse, timestamp: Date.now() }];
       extractAndSaveMemory(allMessages, fileManager, llmClient).then((result) => {
         setSelfWriting();
         if (result?.updated && !sender.isDestroyed()) {
@@ -877,8 +950,8 @@ function registerIpcHandlers() {
     return exportToPdf(markdownContent, title);
   });
 
-  ipcMain.handle('keel:save-chat', async (_event, sessionId: string, messages: Message[]) => {
-    saveChatSession(settings.brainPath, sessionId, messages);
+  ipcMain.handle('keel:save-chat', async (_event, sessionId: string, session: StoredChatSession) => {
+    saveChatSession(settings.brainPath, sessionId, session);
   });
 
   ipcMain.handle('keel:load-chat', async (_event, sessionId: string) => {
@@ -894,13 +967,15 @@ function registerIpcHandlers() {
     return sessions.map((s) => {
       let title = 'New Chat';
       try {
-        const msgs = JSON.parse(
+        const session = JSON.parse(
           (getDb(settings.brainPath)
             .prepare('SELECT messages FROM chat_sessions WHERE id = ?')
             .get(s.id) as any)?.messages || '[]'
         );
-        const firstUser = msgs.find((m: any) => m.role === 'user');
-        if (firstUser) title = firstUser.content.slice(0, 60);
+        const messages = Array.isArray(session) ? session : session.messages || [];
+        const firstUser = messages.find((m: any) => m.role === 'user');
+        const visibleContent = firstUser?.displayContent || firstUser?.content;
+        if (visibleContent) title = visibleContent.slice(0, 60);
       } catch {}
       return { id: s.id, title, updatedAt: s.updatedAt };
     });
@@ -916,6 +991,31 @@ function registerIpcHandlers() {
     });
     if (result.canceled || result.filePaths.length === 0) return null;
     return result.filePaths[0];
+  });
+
+  ipcMain.handle('keel:pick-chat-documents', async () => {
+    const result = await dialog.showOpenDialog(mainWindow!, {
+      title: 'Choose Document',
+      properties: ['openFile', 'multiSelections'],
+      filters: [
+        { name: 'Supported Documents', extensions: ['md', 'markdown', 'txt', 'pdf', 'docx', 'pptx'] },
+      ],
+    });
+
+    if (result.canceled || result.filePaths.length === 0) return [];
+
+    const documents: ChatDocumentAttachment[] = [];
+    for (const filePath of result.filePaths) {
+      const extracted = await extractFileSource(filePath, path.basename(filePath));
+      documents.push({
+        name: path.basename(filePath),
+        mimeType: extracted.mimeType,
+        content: extracted.normalizedContent,
+        warning: extracted.warning,
+      });
+    }
+
+    return documents;
   });
 
   ipcMain.handle('keel:open-utility-window', async (_event, kind: UtilityWindowKind, query?: Record<string, string>) => {
@@ -1032,6 +1132,10 @@ function registerIpcHandlers() {
     }
 
     return listWikiJobsForBase(basePath);
+  });
+
+  ipcMain.handle('keel:list-wiki-bases', async () => {
+    return listWikiBaseSummaries(settings.brainPath);
   });
 
   ipcMain.handle('keel:list-files', async (_event, dirPath: string) => {

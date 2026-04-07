@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3';
 import * as path from 'path';
 import * as fs from 'fs';
-import type { FileIndex, ActivityLogEntry, Message } from '../shared/types';
+import type { FileIndex, ActivityLogEntry, Message, StoredChatSession } from '../shared/types';
 
 let db: Database.Database | null = null;
 
@@ -240,6 +240,37 @@ export function searchChunksFts(brainPath: string, query: string, limit = 10): C
   }
 }
 
+export function searchChunksFtsByPrefixes(
+  brainPath: string,
+  query: string,
+  prefixes: string[],
+  limit = 10
+): ChunkRow[] {
+  if (prefixes.length === 0) return [];
+
+  const d = getDb(brainPath);
+  const whereClause = prefixes.map(() => 'f.path LIKE ?').join(' OR ');
+  const likeValues = prefixes.map((prefix) => `${prefix}%`);
+
+  try {
+    const rows = d.prepare(`
+      SELECT c.id, c.file_id as fileId, f.path as filePath, c.breadcrumb, c.content,
+             c.start_line as startLine, c.end_line as endLine, f.updated_at as updatedAt
+      FROM chunks_fts
+      JOIN chunks c ON chunks_fts.rowid = c.id
+      JOIN files f ON c.file_id = f.id
+      WHERE chunks_fts MATCH ?
+        AND (${whereClause})
+      ORDER BY rank
+      LIMIT ?
+    `).all(query, ...likeValues, limit) as ChunkRow[];
+
+    return rows;
+  } catch {
+    return [];
+  }
+}
+
 export function getChunksByIds(brainPath: string, ids: number[]): ChunkRow[] {
   if (ids.length === 0) return [];
   const d = getDb(brainPath);
@@ -293,20 +324,21 @@ export function getRecentActivity(
 export function saveChatSession(
   brainPath: string,
   sessionId: string,
-  messages: Message[]
+  session: StoredChatSession | Message[]
 ): void {
   const d = getDb(brainPath);
   const now = Date.now();
+  const normalized = normalizeStoredChatSession(session);
   d.prepare(
     `INSERT OR REPLACE INTO chat_sessions (id, messages, created_at, updated_at)
      VALUES (?, ?, COALESCE((SELECT created_at FROM chat_sessions WHERE id = ?), ?), ?)`
-  ).run(sessionId, JSON.stringify(messages), sessionId, now, now);
+  ).run(sessionId, JSON.stringify(normalized), sessionId, now, now);
 }
 
 export function loadChatSession(
   brainPath: string,
   sessionId: string
-): Message[] | null {
+): StoredChatSession | null {
   const d = getDb(brainPath);
   const row = d
     .prepare('SELECT messages FROM chat_sessions WHERE id = ?')
@@ -314,7 +346,7 @@ export function loadChatSession(
 
   if (!row) return null;
   try {
-    return JSON.parse(row.messages);
+    return normalizeStoredChatSession(JSON.parse(row.messages));
   } catch {
     return null;
   }
@@ -339,9 +371,28 @@ export function listChatSessions(
 
   return rows.map((r) => {
     let messageCount = 0;
-    try { messageCount = JSON.parse(r.messages).length; } catch {}
+    try {
+      messageCount = normalizeStoredChatSession(JSON.parse(r.messages)).messages.length;
+    } catch {}
     return { id: r.id, messageCount, updatedAt: r.updated_at };
   });
+}
+
+export function normalizeStoredChatSession(
+  session: StoredChatSession | Message[] | unknown
+): StoredChatSession {
+  if (Array.isArray(session)) {
+    return { messages: session };
+  }
+
+  if (session && typeof session === 'object' && Array.isArray((session as StoredChatSession).messages)) {
+    return {
+      messages: (session as StoredChatSession).messages,
+      metadata: (session as StoredChatSession).metadata,
+    };
+  }
+
+  return { messages: [] };
 }
 
 // --- Sync State ---

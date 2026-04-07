@@ -96,11 +96,11 @@ export async function exportLocalData(
   for (let i = 0; i < sessionList.length; i++) {
     report('Exporting chat sessions', i, sessionList.length);
     const s = sessionList[i];
-    const messages = loadChatSession(brainPath, s.id);
-    if (messages && messages.length > 0) {
+    const session = loadChatSession(brainPath, s.id);
+    if (session && session.messages.length > 0) {
       chatSessions.push({
         id: s.id,
-        messages,
+        messages: session.messages,
         createdAt: s.updatedAt, // Desktop doesn't store separate createdAt in listing
         updatedAt: s.updatedAt,
       });

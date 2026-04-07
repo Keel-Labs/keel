@@ -1,5 +1,15 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
-import type { Message as MessageType, MessageImage, Settings as SettingsType, OllamaModelInfo } from '../../shared/types';
+import React, { useState, useRef, useEffect, useCallback, useMemo, useDeferredValue } from 'react';
+import type {
+  ChatDocumentAttachment,
+  ChatRequest,
+  ChatSessionMetadata,
+  Message as MessageType,
+  MessageImage,
+  OllamaModelInfo,
+  Settings as SettingsType,
+  StoredChatSession,
+  WikiBaseSummary,
+} from '../../shared/types';
 import Message from './Message';
 
 const CLAUDE_MODELS = [
@@ -694,9 +704,34 @@ function generateRequestId(): string {
   return `request-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+function buildDocumentContext(documents: ChatDocumentAttachment[]): string {
+  if (documents.length === 0) return '';
+
+  return documents
+    .map((document) => {
+      const content = document.content.trim().slice(0, 18_000);
+      const warningLine = document.warning ? `Warning: ${document.warning}\n` : '';
+      return `\n\n--- Attached Document: "${document.name}" (${document.mimeType}) ---\n${warningLine}${content}`;
+    })
+    .join('');
+}
+
+function getUserVisibleMessageContent(message: MessageType): string {
+  return message.displayContent ?? message.content;
+}
+
+function buildStoredChatSession(messages: MessageType[], metadata: ChatSessionMetadata): StoredChatSession {
+  const normalizedMetadata = metadata.wikiBasePath ? metadata : undefined;
+  return {
+    messages,
+    metadata: normalizedMetadata,
+  };
+}
+
 type SessionStreamState = {
   requestId: string;
   baseMessages: MessageType[];
+  sessionMetadata: ChatSessionMetadata;
   accumulated: string;
   steps: string[];
 };
@@ -727,6 +762,11 @@ export default function Chat({
   const [activityExpanded, setActivityExpanded] = useState(true);
   const [activityManuallyToggled, setActivityManuallyToggled] = useState(false);
   const [attachedImages, setAttachedImages] = useState<MessageImage[]>([]);
+  const [attachedDocuments, setAttachedDocuments] = useState<ChatDocumentAttachment[]>([]);
+  const [sessionMetadata, setSessionMetadata] = useState<ChatSessionMetadata>({});
+  const [wikiBases, setWikiBases] = useState<WikiBaseSummary[]>([]);
+  const [wikiBasesLoading, setWikiBasesLoading] = useState(false);
+  const [wikiSearch, setWikiSearch] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [currentProvider, setCurrentProvider] = useState<string>('claude');
   const [currentModel, setCurrentModel] = useState<string>('');
@@ -734,17 +774,23 @@ export default function Chat({
   const [openaiModelsLoading, setOpenaiModelsLoading] = useState(false);
   const [ollamaModels, setOllamaModels] = useState<OllamaModelInfo[]>([]);
   const [showModelDropdown, setShowModelDropdown] = useState(false);
+  const [showActionMenu, setShowActionMenu] = useState(false);
+  const [showWikiSubmenu, setShowWikiSubmenu] = useState(false);
+  const [actionMenuDirection, setActionMenuDirection] = useState<'up' | 'down'>('up');
   const [composerExpanded, setComposerExpanded] = useState(false);
   const justLoadedRef = useRef(false);
   const currentSessionIdRef = useRef(sessionId);
   const activeRequestIdRef = useRef<string | null>(null);
   const sessionMessagesCacheRef = useRef(new Map<string, MessageType[]>());
+  const sessionMetadataCacheRef = useRef(new Map<string, ChatSessionMetadata>());
   const sessionStreamsRef = useRef(new Map<string, SessionStreamState>());
   const requestSessionMapRef = useRef(new Map<string, string>());
   const streamCleanupRef = useRef<Array<() => void>>([]);
   const pendingGoogleExportRef = useRef(false);
+  const actionButtonRef = useRef<HTMLButtonElement>(null);
   const [availableProviders, setAvailableProviders] = useState<Set<string>>(new Set());
   const [openrouterModelName, setOpenrouterModelName] = useState<string>('');
+  const deferredWikiSearch = useDeferredValue(wikiSearch);
   const openaiModelOptionIds = Array.from(new Set([
     ...openaiModels,
     currentProvider === 'openai' ? currentModel : '',
@@ -816,6 +862,22 @@ export default function Chat({
     return () => window.removeEventListener('focus', handleFocus);
   }, [syncProviderSettings]);
 
+  const loadWikiBases = useCallback(async () => {
+    setWikiBasesLoading(true);
+    try {
+      const summaries = await window.keel.listWikiBases();
+      setWikiBases(summaries);
+    } catch {
+      setWikiBases([]);
+    } finally {
+      setWikiBasesLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadWikiBases().catch(() => {});
+  }, [loadWikiBases]);
+
   const clearStreamSubscriptions = useCallback(() => {
     for (const unsubscribe of streamCleanupRef.current) {
       unsubscribe();
@@ -871,13 +933,19 @@ export default function Chat({
   useEffect(() => {
     if (loadSessionId && loadSessionId !== sessionId) {
       (async () => {
-        const saved = sessionMessagesCacheRef.current.get(loadSessionId)
-          ?? sessionStreamsRef.current.get(loadSessionId)?.baseMessages
-          ?? await window.keel.loadChat(loadSessionId);
+        const cachedMessages = sessionMessagesCacheRef.current.get(loadSessionId);
+        const cachedMetadata = sessionMetadataCacheRef.current.get(loadSessionId);
+        const streaming = sessionStreamsRef.current.get(loadSessionId);
+        const saved = cachedMessages
+          ? { messages: cachedMessages, metadata: cachedMetadata }
+          : streaming
+            ? { messages: streaming.baseMessages, metadata: streaming.sessionMetadata }
+            : await window.keel.loadChat(loadSessionId);
         if (saved) {
           justLoadedRef.current = true;
           setSessionId(loadSessionId);
-          setMessages(saved);
+          setMessages(saved.messages);
+          setSessionMetadata(saved.metadata || {});
           onSessionChange(loadSessionId);
           syncVisibleStreamState(loadSessionId);
         }
@@ -928,17 +996,21 @@ export default function Chat({
     return cleanup;
   }, []);
 
-  // Auto-save messages whenever they change (skip if just loaded from DB)
+  // Auto-save chat session whenever messages or session-scoped metadata change.
   useEffect(() => {
-    if (messages.length > 0) {
-      sessionMessagesCacheRef.current.set(sessionId, messages);
-      if (justLoadedRef.current) {
-        justLoadedRef.current = false;
-        return;
-      }
-      window.keel.saveChat(sessionId, messages).catch(() => {});
+    const hasSessionState = messages.length > 0 || !!sessionMetadata.wikiBasePath;
+    if (!hasSessionState) return;
+
+    sessionMessagesCacheRef.current.set(sessionId, messages);
+    sessionMetadataCacheRef.current.set(sessionId, sessionMetadata);
+
+    if (justLoadedRef.current) {
+      justLoadedRef.current = false;
+      return;
     }
-  }, [messages, sessionId]);
+
+    window.keel.saveChat(sessionId, buildStoredChatSession(messages, sessionMetadata)).catch(() => {});
+  }, [messages, sessionId, sessionMetadata]);
 
   const scrollToBottom = useCallback(() => {
     if (scrollRef.current) {
@@ -955,9 +1027,18 @@ export default function Chat({
       textareaRef.current.style.height = 'auto';
       const nextHeight = Math.min(textareaRef.current.scrollHeight, 160);
       textareaRef.current.style.height = `${nextHeight}px`;
-      setComposerExpanded(nextHeight > 66 || attachedImages.length > 0);
+      setComposerExpanded(nextHeight > 66 || attachedImages.length > 0 || attachedDocuments.length > 0 || !!sessionMetadata.wikiBasePath);
     }
-  }, [input, attachedImages.length]);
+  }, [input, attachedDocuments.length, attachedImages.length, sessionMetadata.wikiBasePath]);
+
+  useEffect(() => {
+    if (!showActionMenu || !actionButtonRef.current) return;
+    const rect = actionButtonRef.current.getBoundingClientRect();
+    const estimatedHeight = showWikiSubmenu ? 360 : 180;
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const spaceAbove = rect.top;
+    setActionMenuDirection(spaceBelow < estimatedHeight && spaceAbove > spaceBelow ? 'up' : 'down');
+  }, [showActionMenu, showWikiSubmenu, wikiBases.length]);
 
   useEffect(() => {
     if (isStreaming && streamingContent && !activityManuallyToggled) {
@@ -1049,9 +1130,11 @@ export default function Chat({
               { role: 'assistant' as const, content: `Done — I wrote "${title}" for you.\n\n<!-- gdoc:${url} -->`, timestamp: Date.now() },
             ];
             sessionMessagesCacheRef.current.set(targetSessionId, doneMessages);
-            window.keel.saveChat(targetSessionId, doneMessages).catch(() => {});
+            sessionMetadataCacheRef.current.set(targetSessionId, stream.sessionMetadata);
+            window.keel.saveChat(targetSessionId, buildStoredChatSession(doneMessages, stream.sessionMetadata)).catch(() => {});
             if (targetSessionId === currentSessionIdRef.current) {
               setMessages(doneMessages);
+              setSessionMetadata(stream.sessionMetadata);
             }
           }).catch((err: unknown) => {
             const errMsg = err instanceof Error ? err.message : 'Google Doc export failed';
@@ -1060,9 +1143,11 @@ export default function Chat({
               { role: 'assistant' as const, content: errMsg, timestamp: Date.now() },
             ];
             sessionMessagesCacheRef.current.set(targetSessionId, errorMessages);
-            window.keel.saveChat(targetSessionId, errorMessages).catch(() => {});
+            sessionMetadataCacheRef.current.set(targetSessionId, stream.sessionMetadata);
+            window.keel.saveChat(targetSessionId, buildStoredChatSession(errorMessages, stream.sessionMetadata)).catch(() => {});
             if (targetSessionId === currentSessionIdRef.current) {
               setMessages(errorMessages);
+              setSessionMetadata(stream.sessionMetadata);
             }
           });
           return;
@@ -1073,11 +1158,13 @@ export default function Chat({
           { role: 'assistant' as const, content: stream.accumulated, timestamp: Date.now() },
         ];
         sessionMessagesCacheRef.current.set(targetSessionId, finalMessages);
-        window.keel.saveChat(targetSessionId, finalMessages).catch(() => {});
+        sessionMetadataCacheRef.current.set(targetSessionId, stream.sessionMetadata);
+        window.keel.saveChat(targetSessionId, buildStoredChatSession(finalMessages, stream.sessionMetadata)).catch(() => {});
 
         if (targetSessionId === currentSessionIdRef.current) {
           justLoadedRef.current = true;
           setMessages(finalMessages);
+          setSessionMetadata(stream.sessionMetadata);
           resetStreamingUi();
         }
       }),
@@ -1092,14 +1179,16 @@ export default function Chat({
           { role: 'assistant' as const, content: error, timestamp: Date.now() },
         ];
         sessionMessagesCacheRef.current.set(targetSessionId, finalMessages);
+        sessionMetadataCacheRef.current.set(targetSessionId, stream.sessionMetadata);
         sessionStreamsRef.current.delete(targetSessionId);
         requestSessionMapRef.current.delete(requestId);
         onSessionStreamStateChange?.(targetSessionId, false);
-        window.keel.saveChat(targetSessionId, finalMessages).catch(() => {});
+        window.keel.saveChat(targetSessionId, buildStoredChatSession(finalMessages, stream.sessionMetadata)).catch(() => {});
 
         if (targetSessionId === currentSessionIdRef.current) {
           justLoadedRef.current = true;
           setMessages(finalMessages);
+          setSessionMetadata(stream.sessionMetadata);
           resetStreamingUi();
         }
       }),
@@ -1124,6 +1213,12 @@ export default function Chat({
   const startNewChat = () => {
     resetStreamingUi();
     setMessages([]);
+    setSessionMetadata({});
+    setAttachedImages([]);
+    setAttachedDocuments([]);
+    setShowActionMenu(false);
+    setShowWikiSubmenu(false);
+    setWikiSearch('');
     const nextSessionId = generateSessionId();
     setSessionId(nextSessionId);
     currentSessionIdRef.current = nextSessionId;
@@ -1162,9 +1257,9 @@ export default function Chat({
   };
 
   const getConversationTitle = (): string => {
-    const firstMeaningfulMessage = messages.find((message) => message.content.trim().length > 0);
+    const firstMeaningfulMessage = messages.find((message) => getUserVisibleMessageContent(message).trim().length > 0);
     if (!firstMeaningfulMessage) return 'New chat';
-    const singleLine = firstMeaningfulMessage.content.replace(/\s+/g, ' ').trim();
+    const singleLine = getUserVisibleMessageContent(firstMeaningfulMessage).replace(/\s+/g, ' ').trim();
     return singleLine.length > 56 ? `${singleLine.slice(0, 56)}...` : singleLine;
   };
 
@@ -1172,6 +1267,17 @@ export default function Chat({
   const isCommandMode = input.startsWith('/');
   const showHeader = messages.length > 0 || isStreaming;
   const emptyStateGreeting = getTimeOfDayGreeting(userName, userTimezone || undefined);
+  const filteredWikiBases = useMemo(() => {
+    const normalized = deferredWikiSearch.trim().toLowerCase();
+    if (!normalized) return wikiBases;
+    return wikiBases.filter((base) => {
+      const haystack = `${base.title} ${base.slug} ${base.description || ''}`.toLowerCase();
+      return haystack.includes(normalized);
+    });
+  }, [deferredWikiSearch, wikiBases]);
+  const hasComposerAttachments = attachedImages.length > 0 || attachedDocuments.length > 0;
+  const isWikiBaseLocked = !!sessionMetadata.wikiBasePath;
+  const selectedWikiBaseLabel = sessionMetadata.wikiBaseTitle || sessionMetadata.wikiBaseSlug || '';
 
   const COMMANDS = [
     { command: '/daily-brief', description: 'Morning briefing' },
@@ -1191,7 +1297,52 @@ export default function Chat({
   useEffect(() => { setCommandIndex(0); }, [input]);
 
   const handleImageAttach = () => {
+    closeActionMenu();
     fileInputRef.current?.click();
+  };
+
+  const handleDocumentAttach = async () => {
+    closeActionMenu();
+    try {
+      const documents = await window.keel.pickChatDocuments();
+      if (documents.length > 0) {
+        setAttachedDocuments((prev) => [...prev, ...documents]);
+      }
+    } catch {
+      // Ignore picker failures.
+    }
+  };
+
+  const closeActionMenu = () => {
+    setShowActionMenu(false);
+    setShowWikiSubmenu(false);
+    setWikiSearch('');
+  };
+
+  const toggleActionMenu = () => {
+    setShowModelDropdown(false);
+    setShowActionMenu((previous) => {
+      const next = !previous;
+      if (!next) {
+        setShowWikiSubmenu(false);
+        setWikiSearch('');
+      }
+      return next;
+    });
+  };
+
+  const handleSelectWikiBase = (base: WikiBaseSummary) => {
+    if (isWikiBaseLocked) return;
+    const nextMetadata: ChatSessionMetadata = {
+      wikiBasePath: base.basePath,
+      wikiBaseSlug: base.slug,
+      wikiBaseTitle: base.title,
+      digDeep: false,
+    };
+    setSessionMetadata(nextMetadata);
+    sessionMetadataCacheRef.current.set(sessionId, nextMetadata);
+    onSessionChange(sessionId);
+    closeActionMenu();
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1216,16 +1367,25 @@ export default function Chat({
     setAttachedImages((prev) => prev.filter((_, i) => i !== index));
   };
 
+  const removeDocument = (index: number) => {
+    setAttachedDocuments((prev) => prev.filter((_, i) => i !== index));
+  };
+
   const sendMessage = async (overrideText?: string) => {
     const trimmed = (overrideText || input).trim();
-    if ((!trimmed && attachedImages.length === 0) || isStreaming) return;
+    if ((!trimmed && attachedImages.length === 0 && attachedDocuments.length === 0) || isStreaming) return;
 
     onSessionChange(sessionId);
 
+    const visibleContent = trimmed || (attachedDocuments.length > 0 ? `Attached ${attachedDocuments.length} document${attachedDocuments.length === 1 ? '' : 's'}.` : '');
+    const messageContent = `${trimmed}${buildDocumentContext(attachedDocuments)}`;
+
     const userMessage: MessageType = {
       role: 'user',
-      content: trimmed,
+      content: messageContent,
+      displayContent: visibleContent,
       images: attachedImages.length > 0 ? [...attachedImages] : undefined,
+      documents: attachedDocuments.length > 0 ? attachedDocuments.map(({ name, mimeType, warning }) => ({ name, mimeType, warning })) : undefined,
       timestamp: Date.now(),
     };
 
@@ -1233,6 +1393,8 @@ export default function Chat({
     setMessages(updatedMessages);
     setInput('');
     setAttachedImages([]);
+    setAttachedDocuments([]);
+    closeActionMenu();
     setIsStreaming(true);
     setStreamingContent('');
 
@@ -1456,10 +1618,12 @@ export default function Chat({
     sessionStreamsRef.current.set(targetSessionId, {
       requestId,
       baseMessages: updatedMessages,
+      sessionMetadata,
       accumulated,
       steps: [],
     });
     sessionMessagesCacheRef.current.set(targetSessionId, updatedMessages);
+    sessionMetadataCacheRef.current.set(targetSessionId, sessionMetadata);
     onSessionStreamStateChange?.(targetSessionId, true);
 
     // Strip hidden gdoc markers from messages before sending to LLM
@@ -1471,7 +1635,11 @@ export default function Chat({
     });
 
     try {
-      await window.keel.chatStream(llmMessages, requestId);
+      const request: ChatRequest = {
+        messages: llmMessages,
+        sessionMetadata,
+      };
+      await window.keel.chatStream(request, requestId);
     } catch (error) {
       const msg =
         error instanceof Error
@@ -1485,11 +1653,13 @@ export default function Chat({
         { role: 'assistant' as const, content: msg, timestamp: Date.now() },
       ];
       sessionMessagesCacheRef.current.set(targetSessionId, finalMessages);
-      window.keel.saveChat(targetSessionId, finalMessages).catch(() => {});
+      sessionMetadataCacheRef.current.set(targetSessionId, sessionMetadata);
+      window.keel.saveChat(targetSessionId, buildStoredChatSession(finalMessages, sessionMetadata)).catch(() => {});
 
       if (targetSessionId === currentSessionIdRef.current) {
         justLoadedRef.current = true;
         setMessages(finalMessages);
+        setSessionMetadata(sessionMetadata);
         resetStreamingUi();
 
         // Clear pending Google Doc export on error
@@ -1619,41 +1789,51 @@ export default function Chat({
             style={{ display: 'none' }}
           />
 
-          {attachedImages.length > 0 && (
-            <div style={{ display: 'flex', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
+          {sessionMetadata.wikiBasePath && (
+            <div className="chat-composer__session-bar">
+              <div className="chat-composer__session-chip">
+                <span className="chat-composer__session-label">Wiki Base</span>
+                <span>{selectedWikiBaseLabel}</span>
+              </div>
+              <label className="chat-composer__toggle">
+                <input
+                  type="checkbox"
+                  checked={!!sessionMetadata.digDeep}
+                  onChange={(event) => setSessionMetadata((prev) => ({ ...prev, digDeep: event.target.checked }))}
+                  disabled={isStreaming}
+                />
+                <span>Dig Deep</span>
+              </label>
+            </div>
+          )}
+
+          {hasComposerAttachments && (
+            <div className="chat-composer__attachments">
               {attachedImages.map((img, i) => (
-                <div key={i} style={{ position: 'relative' }}>
+                <div key={`img-${i}`} className="chat-composer__attachment-image">
                   <img
                     src={`data:${img.mediaType};base64,${img.data}`}
                     alt=""
-                    style={{
-                      width: 58,
-                      height: 58,
-                      borderRadius: 12,
-                      objectFit: 'cover',
-                      border: '1px solid var(--border-emphasis)',
-                    }}
+                    className="chat-composer__attachment-image-preview"
                   />
                   <button
                     onClick={() => removeImage(i)}
-                    style={{
-                      position: 'absolute',
-                      top: -6,
-                      right: -6,
-                      width: 18,
-                      height: 18,
-                      borderRadius: '50%',
-                      background: 'var(--accent)',
-                      border: 'none',
-                      color: 'var(--button-primary-text)',
-                      fontSize: 11,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      lineHeight: 1,
-                      padding: 0,
-                    }}
+                    className="chat-composer__attachment-remove"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+              {attachedDocuments.map((document, index) => (
+                <div key={`${document.name}-${index}`} className="chat-composer__document-chip">
+                  <div className="chat-composer__document-chip-text">
+                    <span className="chat-composer__document-chip-title">{document.name}</span>
+                    <span className="chat-composer__document-chip-meta">{document.warning || document.mimeType}</span>
+                  </div>
+                  <button
+                    onClick={() => removeDocument(index)}
+                    className="chat-composer__document-chip-remove"
+                    aria-label={`Remove ${document.name}`}
                   >
                     ×
                   </button>
@@ -1701,19 +1881,89 @@ export default function Chat({
 
           <div className="chat-composer__footer">
             <div className="chat-composer__meta">
-	              <button
-	                onClick={handleImageAttach}
-	                disabled={isStreaming}
-	                title="Attach image"
-	                aria-label="Attach image"
-	                className="chat-composer__icon-button"
-	              >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-                  <circle cx="8.5" cy="8.5" r="1.5"/>
-                  <polyline points="21 15 16 10 5 21"/>
-                </svg>
-              </button>
+              <div className="chat-composer__menu-wrap">
+                <button
+                  ref={actionButtonRef}
+                  onClick={toggleActionMenu}
+                  disabled={isStreaming}
+                  title="Open composer actions"
+                  aria-label="Open composer actions"
+                  className="chat-composer__icon-button chat-composer__icon-button--primary"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 5v14" />
+                    <path d="M5 12h14" />
+                  </svg>
+                </button>
+
+                {showActionMenu && (
+                  <>
+                    <div
+                      onClick={closeActionMenu}
+                      style={{ position: 'fixed', inset: 0, zIndex: 99 }}
+                    />
+                    <div className={`chat-composer__menu chat-composer__menu--${actionMenuDirection}`}>
+                      <button className="chat-composer__menu-item" onClick={handleImageAttach}>
+                        <span>Attach Images</span>
+                      </button>
+                      <button className="chat-composer__menu-item" onClick={handleDocumentAttach}>
+                        <span>Attach Document</span>
+                      </button>
+                      <div className="chat-composer__menu-divider" />
+                      <button
+                        className="chat-composer__menu-item"
+                        onClick={() => {
+                          if (!showWikiSubmenu && wikiBases.length === 0) {
+                            loadWikiBases().catch(() => {});
+                          }
+                          setShowWikiSubmenu((value) => !value);
+                        }}
+                        disabled={isWikiBaseLocked}
+                      >
+                        <span>Add Wiki Base</span>
+                        <span>{showWikiSubmenu ? '▾' : '▸'}</span>
+                      </button>
+                      {isWikiBaseLocked && (
+                        <div className="chat-composer__menu-note">
+                          This chat is already scoped to {selectedWikiBaseLabel}.
+                        </div>
+                      )}
+
+                      {showWikiSubmenu && (
+                        <div className={`chat-composer__submenu chat-composer__submenu--${actionMenuDirection}`}>
+                          <input
+                            value={wikiSearch}
+                            onChange={(event) => setWikiSearch(event.target.value)}
+                            placeholder="Search wiki bases..."
+                            className="chat-composer__submenu-search"
+                            autoFocus
+                          />
+                          <div className="chat-composer__submenu-list">
+                            {wikiBasesLoading && (
+                              <div className="chat-composer__menu-empty">Loading wiki bases...</div>
+                            )}
+                            {!wikiBasesLoading && filteredWikiBases.length === 0 && (
+                              <div className="chat-composer__menu-empty">No wiki bases match that search.</div>
+                            )}
+                            {!wikiBasesLoading && filteredWikiBases.map((base) => (
+                              <button
+                                key={base.basePath}
+                                className="chat-composer__submenu-item"
+                                onClick={() => handleSelectWikiBase(base)}
+                              >
+                                <span className="chat-composer__submenu-title">{base.title}</span>
+                                <span className="chat-composer__submenu-description">
+                                  {base.description || base.slug}
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
               <span className="chat-composer__hint">
                 {isCommandMode ? 'Slash command ready' : 'Shift+Enter for a new line'}
               </span>
@@ -1722,7 +1972,10 @@ export default function Chat({
             <div className="chat-composer__actions">
               <div style={{ position: 'relative' }}>
 	                <button
-	                  onClick={() => setShowModelDropdown(!showModelDropdown)}
+	                  onClick={() => {
+                      closeActionMenu();
+                      setShowModelDropdown(!showModelDropdown);
+                    }}
 	                  aria-label="Choose model"
 	                  className="chat-composer__model-button"
 	                >
@@ -1827,7 +2080,7 @@ export default function Chat({
               ) : (
                 <button
                   onClick={() => sendMessage()}
-                  disabled={!input.trim() && attachedImages.length === 0}
+                  disabled={!input.trim() && attachedImages.length === 0 && attachedDocuments.length === 0}
                   className="chat-composer__send"
                 >
                   Send

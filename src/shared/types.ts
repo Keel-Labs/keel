@@ -3,11 +3,40 @@ export interface MessageImage {
   mediaType: 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp';
 }
 
+export interface MessageDocument {
+  name: string;
+  mimeType: string;
+  warning?: string;
+}
+
+export interface ChatDocumentAttachment extends MessageDocument {
+  content: string;
+}
+
 export interface Message {
   role: 'user' | 'assistant';
   content: string;
+  displayContent?: string;
   images?: MessageImage[];
+  documents?: MessageDocument[];
   timestamp: number;
+}
+
+export interface ChatSessionMetadata {
+  wikiBasePath?: string;
+  wikiBaseTitle?: string;
+  wikiBaseSlug?: string;
+  digDeep?: boolean;
+}
+
+export interface StoredChatSession {
+  messages: Message[];
+  metadata?: ChatSessionMetadata;
+}
+
+export interface ChatRequest {
+  messages: Message[];
+  sessionMetadata?: ChatSessionMetadata;
 }
 
 export interface Settings {
@@ -96,6 +125,14 @@ export interface WikiBaseCreateResult {
   message: string;
 }
 
+export interface WikiBaseSummary {
+  basePath: string;
+  slug: string;
+  title: string;
+  description?: string;
+  updatedAt: number;
+}
+
 export type WikiJobType = 'compile' | 'health';
 export type WikiJobStatus = 'queued' | 'running' | 'completed' | 'failed';
 
@@ -178,12 +215,14 @@ export type IpcChannels =
   | 'keel:read-file'
   | 'keel:write-file'
   | 'keel:pick-folder'
+  | 'keel:pick-chat-documents'
   | 'keel:pick-wiki-files'
   | 'keel:create-wiki-base'
   | 'keel:wiki-ingest-source'
   | 'keel:start-wiki-compile'
   | 'keel:start-wiki-health-check'
   | 'keel:list-wiki-jobs'
+  | 'keel:list-wiki-bases'
   | 'keel:open-utility-window'
   | 'keel:close-window'
   | 'keel:scheduled-notification'
@@ -203,9 +242,9 @@ export type IpcChannels =
 
 // Preload API exposed to renderer
 export interface KeelAPI {
-  chat: (messages: Message[]) => Promise<string>;
-  chatStream: (messages: Message[], requestId: string) => Promise<void>;
   cancelStream: (requestId: string) => Promise<void>;
+  chat: (request: ChatRequest) => Promise<string>;
+  chatStream: (request: ChatRequest, requestId: string) => Promise<void>;
   onStreamChunk: (callback: (event: { requestId: string; chunk: string }) => void) => () => void;
   onStreamDone: (callback: (event: { requestId: string }) => void) => () => void;
   onStreamError: (callback: (event: { requestId: string; error: string }) => void) => () => void;
@@ -219,11 +258,12 @@ export interface KeelAPI {
   eod: (chatHistory: Message[]) => Promise<string>;
   exportPdf: (markdownContent: string, title?: string) => Promise<string>;
   resetProfile: () => Promise<void>;
-  saveChat: (sessionId: string, messages: Message[]) => Promise<void>;
-  loadChat: (sessionId: string) => Promise<Message[] | null>;
+  saveChat: (sessionId: string, session: StoredChatSession) => Promise<void>;
+  loadChat: (sessionId: string) => Promise<StoredChatSession | null>;
   getLatestSession: () => Promise<string | null>;
   listSessions: () => Promise<Array<{ id: string; title: string; updatedAt: number }>>;
   pickFolder: (defaultPath?: string) => Promise<string | null>;
+  pickChatDocuments: () => Promise<ChatDocumentAttachment[]>;
   pickWikiFiles: () => Promise<WikiFileImport[]>;
   createWikiBase: (title: string, description?: string) => Promise<WikiBaseCreateResult>;
   openUtilityWindow: (kind: UtilityWindowKind, query?: Record<string, string>) => Promise<void>;
@@ -235,6 +275,7 @@ export interface KeelAPI {
   startWikiCompile: (basePath: string) => Promise<WikiJob>;
   startWikiHealthCheck: (basePath: string) => Promise<WikiJob>;
   listWikiJobs: (basePath?: string) => Promise<WikiJob[]>;
+  listWikiBases: () => Promise<WikiBaseSummary[]>;
   onScheduledNotification: (callback: (notification: ScheduledNotification) => void) => void;
   removeScheduledNotificationListener: () => void;
   onAutoCaptureDone: (callback: (event: { requestId: string; summary: string }) => void) => () => void;
