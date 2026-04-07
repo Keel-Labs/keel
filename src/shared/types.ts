@@ -150,7 +150,7 @@ export interface WikiJob {
   error?: string;
 }
 
-export type UtilityWindowKind = 'settings' | 'wiki-ingest';
+export type UtilityWindowKind = 'wiki-ingest';
 
 export interface ActivityLogEntry {
   id: number;

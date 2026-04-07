@@ -3,6 +3,7 @@ import { marked } from 'marked';
 import { useIsMobile } from '../../lib/useIsMobile';
 import type { WikiJob } from '../../shared/types';
 import type { WikiNavId, WikiSidebarBranch, WikiSidebarState } from './Sidebar';
+import type { SettingsNavigationState } from './Settings';
 
 type WikiPageSection = 'home' | 'sources' | 'concepts' | 'open-questions' | 'outputs' | 'health' | 'activity-log';
 
@@ -44,6 +45,7 @@ export interface WikiCommand {
 
 interface Props {
   onBack?: () => void;
+  onOpenSettings?: (navigation?: SettingsNavigationState) => void;
   showBack?: boolean;
   contextOpen?: boolean;
   command?: WikiCommand | null;
@@ -331,6 +333,7 @@ function getCollectionPrefixForPage(relativePath: string, nav: WikiNavId): strin
 
 export default function WikiWorkspace({
   onBack,
+  onOpenSettings,
   showBack = true,
   contextOpen = false,
   command,
@@ -885,10 +888,10 @@ export default function WikiWorkspace({
                     className="wiki-base-menu__option"
                     onClick={() => {
                       setBaseMenuOpen(false);
-                      window.keel.openUtilityWindow('settings', {
+                      onOpenSettings?.({
                         section: 'knowledge-sources',
-                        createBase: '1',
-                      }).catch(() => undefined);
+                        createBase: true,
+                      });
                     }}
                   >
                     <span className="wiki-base-menu__option-title">Create New Base</span>
@@ -901,9 +904,10 @@ export default function WikiWorkspace({
               type="button"
               className="wiki-shell__action"
               onClick={() => {
-                const query: Record<string, string> = { section: 'knowledge-sources' };
-                if (currentBasePath) query.basePath = currentBasePath;
-                window.keel.openUtilityWindow('settings', query).catch(() => undefined);
+                onOpenSettings?.({
+                  section: 'knowledge-sources',
+                  basePath: currentBasePath || undefined,
+                });
               }}
             >
               Sources

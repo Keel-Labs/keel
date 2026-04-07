@@ -211,11 +211,11 @@ function createUtilityWindow(kind: UtilityWindowKind, query?: Record<string, str
   }
 
   const windowOptions: Electron.BrowserWindowConstructorOptions = {
-    width: kind === 'settings' ? 1120 : 780,
-    height: kind === 'settings' ? 820 : 720,
-    minWidth: kind === 'settings' ? 960 : 680,
-    minHeight: kind === 'settings' ? 720 : 620,
-    title: kind === 'settings' ? 'Settings' : 'Add Source',
+    width: 780,
+    height: 720,
+    minWidth: 680,
+    minHeight: 620,
+    title: 'Add Source',
     backgroundColor: '#1a1a1a',
     parent: mainWindow ?? undefined,
     modal: false,

@@ -42,7 +42,7 @@ const PROVIDERS = [
   { value: 'ollama', label: 'Ollama', description: 'Local models running on your machine.' },
 ] as const;
 
-type SettingsSectionId =
+export type SettingsSectionId =
   | 'general-personal'
   | 'general-workspace'
   | 'general-notifications'
@@ -183,22 +183,29 @@ function isSettingsSectionId(value: string | null): value is SettingsSectionId {
   return !!value && SETTINGS_SECTION_IDS.includes(value as SettingsSectionId);
 }
 
-function getUtilityWindowSearchParam(name: string): string | null {
+function getSettingsSearchParam(name: string): string | null {
   if (typeof window === 'undefined') return null;
   return new URLSearchParams(window.location.search).get(name);
 }
 
-function getInitialSettingsSection(): SettingsSectionId {
-  const section = getUtilityWindowSearchParam('section');
-  return isSettingsSectionId(section) ? section : 'general-personal';
+function resolveSettingsSection(section?: SettingsSectionId): SettingsSectionId {
+  if (section) return section;
+  const searchSection = getSettingsSearchParam('section');
+  return isSettingsSectionId(searchSection) ? searchSection : 'general-personal';
 }
 
-function getInitialSourcesBasePath(): string {
-  return getUtilityWindowSearchParam('basePath') || '';
+function resolveSourcesBasePath(basePath?: string): string {
+  return basePath ?? getSettingsSearchParam('basePath') ?? '';
 }
 
-function shouldOpenCreateBaseModalInitially(): boolean {
-  return getUtilityWindowSearchParam('createBase') === '1';
+function resolveCreateBaseModal(createBase?: boolean): boolean {
+  return createBase ?? getSettingsSearchParam('createBase') === '1';
+}
+
+export interface SettingsNavigationState {
+  section?: SettingsSectionId;
+  basePath?: string;
+  createBase?: boolean;
 }
 
 function statusTone(
@@ -220,11 +227,12 @@ function statusTone(
 
 interface Props {
   onBack: () => void;
+  navigation?: SettingsNavigationState;
 }
 
-export default function Settings({ onBack }: Props) {
+export default function Settings({ onBack, navigation }: Props) {
   const [settings, setSettings] = useState<SettingsType | null>(null);
-  const [selectedSection, setSelectedSection] = useState<SettingsSectionId>(getInitialSettingsSection);
+  const [selectedSection, setSelectedSection] = useState<SettingsSectionId>(() => resolveSettingsSection(navigation?.section));
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [showApiKey, setShowApiKey] = useState<Record<string, boolean>>({});
@@ -313,6 +321,10 @@ export default function Settings({ onBack }: Props) {
   useEffect(() => () => {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
   }, []);
+
+  useEffect(() => {
+    setSelectedSection(resolveSettingsSection(navigation?.section));
+  }, [navigation?.section]);
 
   if (!settings) return null;
 
@@ -891,7 +903,8 @@ export default function Settings({ onBack }: Props) {
       case 'knowledge-sources':
         return (
           <WikiSourcesSection
-            initialBasePath={getInitialSourcesBasePath()}
+            initialBasePath={resolveSourcesBasePath(navigation?.basePath)}
+            initialCreateBaseModal={resolveCreateBaseModal(navigation?.createBase)}
             isCompactLayout={isCompactLayout}
           />
         );
@@ -1515,9 +1528,11 @@ interface SettingsWikiSourceSummary {
 
 function WikiSourcesSection({
   initialBasePath,
+  initialCreateBaseModal,
   isCompactLayout,
 }: {
   initialBasePath: string;
+  initialCreateBaseModal: boolean;
   isCompactLayout: boolean;
 }) {
   const [loading, setLoading] = useState(true);
@@ -1530,7 +1545,7 @@ function WikiSourcesSection({
   const [newBaseError, setNewBaseError] = useState('');
   const [newBaseNotice, setNewBaseNotice] = useState('');
   const [isCreatingBase, setIsCreatingBase] = useState(false);
-  const [showCreateBaseModal, setShowCreateBaseModal] = useState(() => shouldOpenCreateBaseModalInitially());
+  const [showCreateBaseModal, setShowCreateBaseModal] = useState(initialCreateBaseModal);
   const [ingestMode, setIngestMode] = useState<WikiSourceType>('url');
   const [ingestTitle, setIngestTitle] = useState('');
   const [ingestUrl, setIngestUrl] = useState('');
@@ -1660,6 +1675,10 @@ function WikiSourcesSection({
       cancelled = true;
     };
   }, [currentBasePath, loadSourcePages]);
+
+  useEffect(() => {
+    setShowCreateBaseModal(initialCreateBaseModal);
+  }, [initialCreateBaseModal]);
 
   const currentBase = bases.find((base) => base.path === currentBasePath) || null;
 
@@ -2102,4 +2121,3 @@ async function listSettingsMarkdownFiles(dirPath: string): Promise<Array<{ path:
 
   return files;
 }
-

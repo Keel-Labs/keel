@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Chat from './components/Chat';
 import Sidebar, { type DesktopView, type WikiNavId, type WikiSidebarState } from './components/Sidebar';
-import Settings from './components/Settings';
+import Settings, { type SettingsNavigationState } from './components/Settings';
 import WikiWorkspace, { type WikiCommand } from './components/WikiWorkspace';
 import Onboarding from './components/Onboarding';
 import DesktopTopBar from './components/DesktopTopBar';
@@ -23,11 +23,6 @@ import {
 } from './onboarding';
 
 type DesktopMode = 'chat' | 'wiki';
-
-function getUtilityWindowKind(): string | null {
-  if (typeof window === 'undefined') return null;
-  return new URLSearchParams(window.location.search).get('window');
-}
 
 function clampSidebarWidth(value: number): number {
   return Math.min(360, Math.max(228, value));
@@ -96,7 +91,6 @@ function InboxStub() {
 }
 
 export default function App() {
-  const utilityWindowKind = getUtilityWindowKind();
   const [newChatSignal, setNewChatSignal] = useState(0);
   const [loadSessionId, setLoadSessionId] = useState<string | null>(null);
   const [currentSessionId, setCurrentSessionId] = useState('');
@@ -108,6 +102,7 @@ export default function App() {
   const [wikiCommand, setWikiCommand] = useState<WikiCommand | null>(null);
   const [showOnboarding, setShowOnboarding] = useState<boolean | null>(null);
   const [initialSettings, setInitialSettings] = useState<SettingsType | null>(null);
+  const [settingsNavigation, setSettingsNavigation] = useState<SettingsNavigationState>({});
   const [autoSidebarCollapsed, setAutoSidebarCollapsed] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
     return window.innerWidth < 1120;
@@ -329,9 +324,15 @@ export default function App() {
     navigateDesktop('wiki', { mode: 'wiki' });
   };
 
+  const openSettings = useCallback((navigation: SettingsNavigationState = {}) => {
+    markCurrentSessionUnreadIfStreaming();
+    setSettingsNavigation(navigation);
+    navigateDesktop('settings');
+  }, [markCurrentSessionUnreadIfStreaming, navigateDesktop]);
+
   const handleDesktopNavigation = (view: DesktopView) => {
     if (view === 'settings') {
-      window.keel.openUtilityWindow('settings').catch(() => {});
+      openSettings();
       return;
     }
 
@@ -349,6 +350,15 @@ export default function App() {
     }
     navigateDesktop(view, { mode });
   };
+
+  const handleSettingsBack = useCallback(() => {
+    if (desktopHistoryRef.current.index > 0) {
+      stepDesktopHistory(-1);
+      return;
+    }
+
+    navigateDesktop('chat', { mode: 'chat', pushHistory: false });
+  }, [navigateDesktop, stepDesktopHistory]);
 
   const handleWikiNavigate = (nav: WikiNavId) => {
     setWikiCommand({ type: 'nav', target: nav, nonce: Date.now() });
@@ -422,6 +432,7 @@ export default function App() {
               showBack={false}
               contextOpen={wikiContextOpen}
               command={wikiCommand}
+              onOpenSettings={openSettings}
               onSidebarStateChange={setWikiSidebarState}
             />
           </div>
@@ -429,7 +440,7 @@ export default function App() {
       case 'inbox':
         return <InboxStub />;
       case 'settings':
-        return <Settings onBack={() => navigateDesktop('chat', { mode: 'chat' })} />;
+        return <Settings onBack={handleSettingsBack} navigation={settingsNavigation} />;
       default:
         return null;
     }
@@ -443,14 +454,6 @@ export default function App() {
 
   if (showOnboarding && initialSettings) {
     return <Onboarding initialSettings={initialSettings} onComplete={handleOnboardingComplete} />;
-  }
-
-  if (utilityWindowKind === 'settings') {
-    return (
-      <div style={{ height: '100vh', display: 'flex', background: 'var(--bg-base)' }}>
-        <Settings onBack={() => window.keel.closeWindow()} />
-      </div>
-    );
   }
 
   return (
