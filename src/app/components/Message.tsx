@@ -13,13 +13,25 @@ interface Props {
   message: MessageType;
 }
 
+function extractGdocUrl(content: string): { cleanContent: string; gdocUrl: string | null } {
+  const match = content.match(/<!-- gdoc:(https:\/\/docs\.google\.com\/document\/d\/[^\s]+?) -->/);
+  if (!match) return { cleanContent: content, gdocUrl: null };
+  const cleanContent = content.replace(/\n*<!-- gdoc:.+? -->/, '').trim();
+  return { cleanContent, gdocUrl: match[1] };
+}
+
 export default function Message({ message }: Props) {
   const isUser = message.role === 'user';
 
+  const { cleanContent, gdocUrl } = useMemo(
+    () => (isUser ? { cleanContent: message.content, gdocUrl: null } : extractGdocUrl(message.content)),
+    [message.content, isUser]
+  );
+
   const renderedContent = useMemo(() => {
     if (isUser) return null;
-    return marked.parse(message.content) as string;
-  }, [message.content, isUser]);
+    return marked.parse(cleanContent) as string;
+  }, [cleanContent, isUser]);
 
   if (isUser) {
     return (
@@ -56,21 +68,58 @@ export default function Message({ message }: Props) {
 
   return (
     <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 26, paddingRight: 88 }}>
-      <div
-        className="markdown-body"
-        style={{
-          background: 'var(--assistant-message-bg)',
-          border: '1px solid var(--assistant-message-border)',
-          borderRadius: 0,
-          padding: 0,
-          fontSize: 'var(--text-base)',
-          lineHeight: 1.78,
-          color: 'var(--text-primary)',
-          minWidth: 0,
-          maxWidth: 'min(760px, 100%)',
-        }}
-        dangerouslySetInnerHTML={{ __html: renderedContent || '' }}
-      />
+      <div style={{ minWidth: 0, maxWidth: 'min(760px, 100%)' }}>
+        <div
+          className="markdown-body"
+          style={{
+            background: 'var(--assistant-message-bg)',
+            border: '1px solid var(--assistant-message-border)',
+            borderRadius: 0,
+            padding: 0,
+            fontSize: 'var(--text-base)',
+            lineHeight: 1.78,
+            color: 'var(--text-primary)',
+          }}
+          dangerouslySetInnerHTML={{ __html: renderedContent || '' }}
+        />
+        {gdocUrl && (
+          <a
+            href={gdocUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              marginTop: 10,
+              padding: '7px 14px',
+              background: 'var(--accent-bg-subtle)',
+              border: '1px solid var(--accent-border-subtle)',
+              borderRadius: 'var(--radius-lg)',
+              color: 'var(--accent-link)',
+              fontSize: 13,
+              fontWeight: 500,
+              textDecoration: 'none',
+              transition: 'background 0.15s, border-color 0.15s',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'var(--accent-bg)';
+              e.currentTarget.style.borderColor = 'var(--accent)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'var(--accent-bg-subtle)';
+              e.currentTarget.style.borderColor = 'var(--accent-border-subtle)';
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+              <polyline points="15 3 21 3 21 9" />
+              <line x1="10" y1="14" x2="21" y2="3" />
+            </svg>
+            Open Google Doc
+          </a>
+        )}
+      </div>
     </div>
   );
 }
