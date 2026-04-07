@@ -4,7 +4,7 @@ import type { Settings } from '../../shared/types';
 
 function makeSettings(overrides: Partial<Settings> = {}): Settings {
   return {
-    theme: 'dark',
+    theme: 'system',
     hasCompletedOnboarding: false,
     provider: 'claude',
     anthropicApiKey: '',

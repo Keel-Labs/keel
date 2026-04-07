@@ -31,7 +31,7 @@ function getStableConfigDir(): string {
 
 export function getDefaultSettings(): Settings {
   return {
-    theme: 'dark',
+    theme: 'system',
     hasCompletedOnboarding: false,
     provider: 'claude',
     anthropicApiKey: '',

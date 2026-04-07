@@ -39,6 +39,7 @@ describe('settings persistence', () => {
     const settings = loadSettings();
 
     expect(settings.hasCompletedOnboarding).toBe(false);
+    expect(settings.theme).toBe('system');
     expect(settings.brainPath).toBe(path.join(tmpDir, 'default-brain'));
   });
 
