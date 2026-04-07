@@ -2,9 +2,9 @@ import { contextBridge, ipcRenderer } from 'electron';
 import type { KeelAPI } from '../src/shared/types';
 
 const api: KeelAPI = {
-  chat: (messages) => ipcRenderer.invoke('keel:chat', messages),
+  chat: (request) => ipcRenderer.invoke('keel:chat', request),
 
-  chatStream: (messages, requestId) => ipcRenderer.invoke('keel:chat-stream', messages, requestId),
+  chatStream: (request, requestId) => ipcRenderer.invoke('keel:chat-stream', request, requestId),
 
   cancelStream: (requestId) => ipcRenderer.invoke('keel:cancel-stream', requestId),
 
@@ -54,7 +54,7 @@ const api: KeelAPI = {
 
   resetProfile: () => ipcRenderer.invoke('keel:reset-profile'),
 
-  saveChat: (sessionId, messages) => ipcRenderer.invoke('keel:save-chat', sessionId, messages),
+  saveChat: (sessionId, session) => ipcRenderer.invoke('keel:save-chat', sessionId, session),
 
   loadChat: (sessionId) => ipcRenderer.invoke('keel:load-chat', sessionId),
 
@@ -63,6 +63,7 @@ const api: KeelAPI = {
   listSessions: () => ipcRenderer.invoke('keel:list-sessions'),
 
   pickFolder: (defaultPath?: string) => ipcRenderer.invoke('keel:pick-folder', defaultPath),
+  pickChatDocuments: () => ipcRenderer.invoke('keel:pick-chat-documents'),
   pickWikiFiles: () => ipcRenderer.invoke('keel:pick-wiki-files'),
   createWikiBase: (title, description) => ipcRenderer.invoke('keel:create-wiki-base', title, description),
   openUtilityWindow: (kind, query) => ipcRenderer.invoke('keel:open-utility-window', kind, query),
@@ -77,6 +78,7 @@ const api: KeelAPI = {
   startWikiCompile: (basePath) => ipcRenderer.invoke('keel:start-wiki-compile', basePath),
   startWikiHealthCheck: (basePath) => ipcRenderer.invoke('keel:start-wiki-health-check', basePath),
   listWikiJobs: (basePath) => ipcRenderer.invoke('keel:list-wiki-jobs', basePath),
+  listWikiBases: () => ipcRenderer.invoke('keel:list-wiki-bases'),
 
   onScheduledNotification: (callback) => {
     ipcRenderer.on('keel:scheduled-notification', (_event, notification) => callback(notification));
