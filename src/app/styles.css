@@ -1904,14 +1904,20 @@ select {
   z-index: 100;
 }
 
-.chat-composer__menu--up,
-.chat-composer__submenu--up {
+.chat-composer__menu--up {
   bottom: calc(100% + 8px);
 }
 
-.chat-composer__menu--down,
-.chat-composer__submenu--down {
+.chat-composer__submenu--up {
+  bottom: 0;
+}
+
+.chat-composer__menu--down {
   top: calc(100% + 8px);
+}
+
+.chat-composer__submenu--down {
+  bottom: 0;
 }
 
 .chat-composer__menu {
