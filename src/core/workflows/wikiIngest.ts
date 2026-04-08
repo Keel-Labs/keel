@@ -20,6 +20,7 @@ export interface ResolvedSource {
   extractor: string;
   mimeType: string;
   warning?: string;
+  metadata?: Partial<SourceMetadata>;
 }
 
 interface SourceMetadata {
@@ -33,6 +34,16 @@ interface SourceMetadata {
   warnings: string[];
   assetPaths: string[];
   status: 'ready';
+  provider?: 'x';
+  xPostUrl?: string;
+  xAuthorHandle?: string;
+  xAuthorName?: string;
+  xPostedAt?: string;
+  xReplyCount?: number;
+  xRepostCount?: number;
+  xLikeCount?: number;
+  xBookmarkCount?: number;
+  xText?: string;
 }
 
 export async function ingestWikiSource(
@@ -58,6 +69,7 @@ export async function ingestWikiSource(
     warnings: resolved.warning ? [resolved.warning] : [],
     assetPaths: [],
     status: 'ready',
+    ...(resolved.metadata || {}),
   };
 
   await fs.mkdir(path.join(fileManager.getBrainPath(), rawDir, 'assets'), { recursive: true });
@@ -95,6 +107,8 @@ async function resolveSourceInput(input: WikiSourceInput): Promise<ResolvedSourc
       return resolveUrlSource(input);
     case 'file':
       return resolveFileSource(input);
+    case 'x':
+      return resolveXSource(input);
     case 'text':
     default:
       return resolveTextSource(input);
@@ -158,6 +172,51 @@ async function resolveTextSource(input: WikiSourceInput): Promise<ResolvedSource
     sourceType: 'text',
     extractor: 'manual-input',
     mimeType: 'text/markdown',
+  };
+}
+
+async function resolveXSource(input: WikiSourceInput): Promise<ResolvedSource> {
+  const postUrl = input.xPostUrl?.trim();
+  const text = input.xText?.trim();
+  const authorHandle = normalizeHandle(input.xAuthorHandle);
+  const authorName = input.xAuthorName?.trim();
+  const postedAt = input.xPostedAt?.trim();
+
+  if (!postUrl || !URL_PATTERN.test(postUrl)) {
+    throw new Error('Enter a valid X post URL.');
+  }
+
+  if (!text) {
+    throw new Error('Paste the X post text so Keel can preserve it as source material.');
+  }
+
+  const title =
+    input.title?.trim() ||
+    (authorHandle
+      ? `X post from ${authorHandle}`
+      : authorName
+        ? `X post from ${authorName}`
+        : deriveTitle(undefined, text));
+
+  return {
+    title,
+    normalizedContent: text,
+    origin: postUrl,
+    sourceType: 'x',
+    extractor: 'manual-x-post',
+    mimeType: 'application/x-post',
+    metadata: {
+      provider: 'x',
+      xPostUrl: postUrl,
+      xAuthorHandle: authorHandle,
+      xAuthorName: authorName,
+      xPostedAt: postedAt,
+      xReplyCount: sanitizeOptionalCount(input.xReplyCount),
+      xRepostCount: sanitizeOptionalCount(input.xRepostCount),
+      xLikeCount: sanitizeOptionalCount(input.xLikeCount),
+      xBookmarkCount: sanitizeOptionalCount(input.xBookmarkCount),
+      xText: text,
+    },
   };
 }
 
@@ -317,6 +376,12 @@ function buildWikiSourcePage({
 }): string {
   const summary = summarizeContent(content);
   const excerpt = takeExcerpt(content, 1400);
+  const xMetaLines = sourceType === 'x'
+    ? [
+      `- Original post: ${origin}`,
+      `- Source format: compact social post`,
+    ]
+    : [];
 
   return `# ${title}
 
@@ -328,6 +393,7 @@ ${summary}
 - Origin: ${origin}
 - Captured: ${capturedAt}
 - Raw package: \`${rawSourcePath}\`
+${xMetaLines.length ? `${xMetaLines.join('\n')}\n` : ''}
 ${warning ? `- Warning: ${warning}\n` : ''}
 ## Excerpt
 
@@ -385,6 +451,8 @@ function deriveTitle(preferred: string | undefined, content: string): string {
 
 function formatSourceType(sourceType: WikiSourceInput['sourceType']): string {
   switch (sourceType) {
+    case 'x':
+      return 'X Post';
     case 'url':
       return 'URL Article';
     case 'file':
@@ -433,6 +501,17 @@ function normalizeExtractedText(content: string): string {
     .replace(/[ \t]+\n/g, '\n')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
+}
+
+function normalizeHandle(value?: string): string | undefined {
+  const trimmed = value?.trim().replace(/^@+/, '');
+  if (!trimmed) return undefined;
+  return `@${trimmed}`;
+}
+
+function sanitizeOptionalCount(value?: number): number | undefined {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) return undefined;
+  return Math.round(value);
 }
 
 function summarizeMammothMessages(messages: Array<{ message: string }>): string | undefined {

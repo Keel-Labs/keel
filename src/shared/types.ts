@@ -27,6 +27,12 @@ export interface ChatSessionMetadata {
   wikiBaseTitle?: string;
   wikiBaseSlug?: string;
   digDeep?: boolean;
+  xDraft?: ChatXDraftMetadata;
+}
+
+export interface ChatXDraftMetadata {
+  mode: 'post';
+  startedAt: number;
 }
 
 export interface StoredChatSession {
@@ -95,7 +101,7 @@ export interface FileEntry {
   updatedAt: number;
 }
 
-export type WikiSourceType = 'url' | 'text' | 'file';
+export type WikiSourceType = 'url' | 'text' | 'file' | 'x';
 
 export interface WikiFileImport {
   name: string;
@@ -109,6 +115,15 @@ export interface WikiSourceInput {
   text?: string;
   filePath?: string;
   fileName?: string;
+  xPostUrl?: string;
+  xAuthorHandle?: string;
+  xAuthorName?: string;
+  xPostedAt?: string;
+  xReplyCount?: number;
+  xRepostCount?: number;
+  xLikeCount?: number;
+  xBookmarkCount?: number;
+  xText?: string;
 }
 
 export interface WikiIngestResult {
