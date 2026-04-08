@@ -45,6 +45,12 @@ Keel should treat knowledge bases as living workspaces with three content layers
 
 The user should mostly operate through Keel. The LLM should do most of the writing and maintenance.
 
+Operationally, this means:
+
+- wiki creation and source ingestion happen inside the wiki workspace
+- settings configure storage and defaults, but do not act as the main knowledge-work entry point
+- the default reading experience is a simplified synthesis page, not a storage browser
+
 ## Current State In Keel
 
 Relevant existing surfaces:

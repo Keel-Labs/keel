@@ -102,14 +102,14 @@ This wiki is maintained as a sample Keel knowledge base.
       path: `${base}/wiki/log.md`,
       content: `# Wiki Log
 
-## [2026-04-05] ingest | Sample Star Wars source set
-Created sample source summaries for films, animated shows, the Mandalorian era, and reference material.
+## [2026-04-05] health | Baseline health report
+Flagged two open questions where the sample corpus stays intentionally incomplete.
 
 ## [2026-04-05] compile | Initial concept pass
 Built cross-linked concept pages for movies, plots, characters, planets, vehicles, species, Jedi, and Sith.
 
-## [2026-04-05] health | Baseline health report
-Flagged two open questions where the sample corpus stays intentionally incomplete.
+## [2026-04-05] ingest | Sample Star Wars source set
+Created sample source summaries for films, animated shows, the Mandalorian era, and reference material.
 `,
     },
     {

@@ -41,6 +41,7 @@ Use a desktop-style settings layout:
 #### Knowledge
 
 - Data Storage
+- Wiki Storage
 - Team Brain
 
 #### Integrations
@@ -124,6 +125,19 @@ Local data storage configuration.
 Current settings:
 
 - Brain path
+
+### Knowledge / Wiki Storage
+
+Knowledge-specific storage defaults and diagnostics.
+
+Current settings:
+
+- brain path visibility
+- storage diagnostics when needed
+
+Explicit non-goal:
+
+- source ingestion should not live here
 
 ### Knowledge / Team Brain
 

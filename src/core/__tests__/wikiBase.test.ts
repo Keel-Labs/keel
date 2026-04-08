@@ -28,6 +28,9 @@ describe('createWikiBase', () => {
     const overview = await fm.readFile('knowledge-bases/company-research/overview.md');
     expect(overview).toContain('# Company Research');
     expect(overview).toContain('Research base for company strategy and market notes.');
+    expect(overview).toContain('## Summary');
+    expect(overview).toContain('## Concepts');
+    expect(overview).toContain('## Sources');
 
     const agents = await fm.readFile('knowledge-bases/company-research/AGENTS.md');
     expect(agents).toContain('This wiki is maintained as a Keel knowledge base for Company Research.');

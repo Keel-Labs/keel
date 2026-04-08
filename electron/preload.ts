@@ -66,6 +66,7 @@ const api: KeelAPI = {
   pickChatDocuments: () => ipcRenderer.invoke('keel:pick-chat-documents'),
   pickWikiFiles: () => ipcRenderer.invoke('keel:pick-wiki-files'),
   createWikiBase: (title, description) => ipcRenderer.invoke('keel:create-wiki-base', title, description),
+  openPath: (filePath) => ipcRenderer.invoke('keel:open-path', filePath),
   openUtilityWindow: (kind, query) => ipcRenderer.invoke('keel:open-utility-window', kind, query),
   closeWindow: () => ipcRenderer.invoke('keel:close-window'),
 

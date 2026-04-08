@@ -1052,6 +1052,16 @@ function registerIpcHandlers() {
     return result;
   });
 
+  ipcMain.handle('keel:open-path', async (_event, filePath: string) => {
+    if (filePath.includes('..') || filePath.startsWith('.config')) {
+      throw new Error('Access denied');
+    }
+
+    const { shell } = await import('electron');
+    const fullPath = path.join(settings.brainPath, filePath);
+    return shell.openPath(fullPath);
+  });
+
   // --- Knowledge Browser file operations ---
 
   ipcMain.handle('keel:wiki-ingest-source', async (_event, basePath: string, input: WikiSourceInput) => {

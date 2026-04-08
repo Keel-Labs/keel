@@ -63,11 +63,15 @@ function buildOverviewMarkdown(title: string, description: string): string {
 
 ${description}
 
-## Key Concepts
+## Summary
+
+This base collects source material and turns it into a simplified synthesis page inside Keel.
+
+## Concepts
 
 - Add concept pages under \`wiki/concepts/\`
 
-## Key Sources
+## Sources
 
 - Add source pages under \`wiki/sources/\`
 
@@ -75,7 +79,7 @@ ${description}
 
 - Add open questions under \`wiki/open-questions/\`
 
-## Recent Outputs
+## Outputs
 
 - Add durable outputs under \`outputs/\`
 `;

@@ -9,7 +9,7 @@ interface Session {
 }
 
 export type DesktopView = 'chat' | 'search' | 'chats' | 'wiki' | 'inbox' | 'settings';
-export type WikiNavId = 'sources' | 'concepts' | 'open-questions' | 'artifacts' | 'health' | 'synthesis';
+export type WikiNavId = 'home' | 'synthesis' | 'activity-log';
 
 export interface WikiSidebarBranch {
   id: string;
@@ -120,12 +120,9 @@ const PRIMARY_ITEMS: Array<{
 ];
 
 const WIKI_ITEMS: Array<{ id: WikiNavId; label: string; icon: React.ReactNode }> = [
+  { id: 'home', label: 'All Bases', icon: <SearchIcon /> },
   { id: 'synthesis', label: 'Synthesis', icon: <ChatIcon /> },
-  { id: 'sources', label: 'Source', icon: <SearchIcon /> },
-  { id: 'concepts', label: 'Concepts', icon: <TeamIcon /> },
-  { id: 'open-questions', label: 'Open Questions', icon: <FileIcon /> },
-  { id: 'artifacts', label: 'Artifacts', icon: <InboxIcon /> },
-  { id: 'health', label: 'Health', icon: <SparkleIcon /> },
+  { id: 'activity-log', label: 'Activity Log', icon: <FileIcon /> },
 ];
 
 function NavRow({
