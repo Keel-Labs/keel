@@ -5,6 +5,7 @@ import type {
   WikiFileImport,
   WikiSourceInput,
   WikiSourceType,
+  XStatus,
 } from '../../shared/types';
 import { applyTheme } from '../theme';
 import { BUILT_IN_PERSONALITIES } from '../../core/personalities';
@@ -255,6 +256,9 @@ export default function Settings({ onBack, navigation }: Props) {
   const [googleConfigured, setGoogleConfigured] = useState(false);
   const [googleSyncing, setGoogleSyncing] = useState(false);
   const [googleMessage, setGoogleMessage] = useState('');
+  const [xStatus, setXStatus] = useState<XStatus | null>(null);
+  const [xMessage, setXMessage] = useState('');
+  const [xBusy, setXBusy] = useState(false);
   const [ollamaModels, setOllamaModels] = useState<OllamaModelInfo[]>([]);
   const [openaiModels, setOpenaiModels] = useState<string[]>([]);
   const [openaiModelsLoading, setOpenaiModelsLoading] = useState(false);
@@ -302,6 +306,15 @@ export default function Settings({ onBack, navigation }: Props) {
     setOllamaLoading(false);
   }, []);
 
+  const refreshXStatus = useCallback(async () => {
+    try {
+      const status = await window.keel.xStatus();
+      setXStatus(status);
+    } catch {
+      setXStatus(null);
+    }
+  }, []);
+
   useEffect(() => {
     window.keel.getSettings().then((s) => {
       setSettings(s);
@@ -313,7 +326,8 @@ export default function Settings({ onBack, navigation }: Props) {
       setGoogleConnected(s.connected);
       setGoogleConfigured(s.configured ?? false);
     }).catch(() => {});
-  }, [fetchOllamaModels, fetchOpenAIModels]);
+    refreshXStatus().catch(() => {});
+  }, [fetchOllamaModels, fetchOpenAIModels, refreshXStatus]);
 
   useEffect(() => {
     if (!settings?.openaiApiKey) {
@@ -431,6 +445,7 @@ export default function Settings({ onBack, navigation }: Props) {
     { label: 'Provider', value: providerLabel(settings.provider) },
     { label: 'Timezone', value: settings.timezone || 'Auto' },
     { label: 'Google', value: googleConnected ? 'Connected' : googleConfigured ? 'Ready to connect' : 'Unavailable' },
+    { label: 'X', value: xStatus?.connected ? 'Connected' : settings.xClientId ? 'Ready to connect' : 'Not configured' },
     { label: 'Team Brain', value: settings.teamBrainPath ? 'Enabled' : 'Off' },
   ];
 
@@ -1156,34 +1171,133 @@ export default function Settings({ onBack, navigation }: Props) {
         return (
           <>
             <StatusPanel
-              title="X Integration Prototype"
-              badge={{ label: 'Prototype', tone: 'accent' }}
-              description="The first local slice is live: you can draft X posts from Chat and add manual X sources from the Wiki ingest flow."
+              title="Connection Status"
+              badge={{
+                label: xStatus?.connected ? 'Connected' : settings.xClientId ? 'Ready to connect' : 'Not configured',
+                tone: xStatus?.connected ? 'success' : settings.xClientId ? 'warning' : 'neutral',
+              }}
+              description={
+                xStatus?.connected
+                  ? `Connected to ${xStatus.account?.username ? `@${xStatus.account.username}` : 'X'}. You can sync bookmarks into the dedicated wiki base.`
+                  : 'Add your X Client ID, then connect your account using OAuth 2.0 PKCE.'
+              }
+              actions={(
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  {!xStatus?.connected ? (
+                    <button
+                      onClick={async () => {
+                        setXBusy(true);
+                        setXMessage('');
+                        try {
+                          await save();
+                          const account = await window.keel.xConnect();
+                          setXMessage(`Connected to @${account.username}.`);
+                          await refreshXStatus();
+                        } catch (err) {
+                          setXMessage(err instanceof Error ? err.message : 'X connection failed');
+                          await refreshXStatus();
+                        } finally {
+                          setXBusy(false);
+                        }
+                      }}
+                      disabled={xBusy || !settings.xClientId.trim()}
+                      style={primaryButtonStyle(xBusy || !settings.xClientId.trim())}
+                    >
+                      {xBusy ? 'Connecting...' : 'Connect X Account'}
+                    </button>
+                  ) : (
+                    <>
+                      <button
+                        onClick={async () => {
+                          setXBusy(true);
+                          setXMessage('');
+                          try {
+                            const result = await window.keel.xSyncBookmarks();
+                            setXMessage(`Synced ${result.syncedCount} bookmarks into ${result.targetBaseTitle}.`);
+                            await refreshXStatus();
+                          } catch (err) {
+                            setXMessage(err instanceof Error ? err.message : 'Bookmark sync failed');
+                            await refreshXStatus();
+                          } finally {
+                            setXBusy(false);
+                          }
+                        }}
+                        disabled={xBusy}
+                        style={primaryButtonStyle(xBusy)}
+                      >
+                        {xBusy ? 'Syncing...' : 'Sync Bookmarks'}
+                      </button>
+                      <button
+                        onClick={async () => {
+                          setXBusy(true);
+                          setXMessage('');
+                          try {
+                            await window.keel.xDisconnect();
+                            setXMessage('Disconnected from X.');
+                            await refreshXStatus();
+                          } catch (err) {
+                            setXMessage(err instanceof Error ? err.message : 'Disconnect failed');
+                          } finally {
+                            setXBusy(false);
+                          }
+                        }}
+                        style={secondaryButtonStyle(xBusy)}
+                        disabled={xBusy}
+                      >
+                        Disconnect
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
             />
 
+            {xMessage && (
+              <InlineMessage
+                tone={xMessage.toLowerCase().includes('fail') || xMessage.toLowerCase().includes('error') ? 'danger' : 'success'}
+              >
+                {xMessage}
+              </InlineMessage>
+            )}
+
             <SectionCard
-              title="What You Can Test"
-              description="This slice focuses on user-facing flows that do not require X API credentials yet."
+              title="App Configuration"
+              description="Keel uses X OAuth 2.0 PKCE as a public client. You only need the App Client ID for this slice."
             >
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                <div style={{ color: 'var(--text-secondary)', lineHeight: 1.7 }}>
-                  1. Open Chat and use the composer plus menu to start an <code style={inlineCodeStyle}>X Draft</code>.
-                </div>
-                <div style={{ color: 'var(--text-secondary)', lineHeight: 1.7 }}>
-                  2. Open Wiki and add an <code style={inlineCodeStyle}>X Post</code> source from the existing ingest modal.
-                </div>
-                <div style={{ color: 'var(--text-secondary)', lineHeight: 1.7 }}>
-                  3. Open that source page to see the tweet-like presentation inside the wiki.
-                </div>
-              </div>
+              <FieldRow
+                label="X Client ID"
+                description="Find this in your X developer app under Keys and Tokens. Save it here before connecting."
+              >
+                <input
+                  type="text"
+                  value={settings.xClientId}
+                  onChange={(e) => update({ xClientId: e.target.value })}
+                  placeholder="Paste your X Client ID"
+                  style={inputStyle}
+                />
+              </FieldRow>
+              <InlineNote>
+                This slice requests <code style={inlineCodeStyle}>tweet.read</code>, <code style={inlineCodeStyle}>users.read</code>, <code style={inlineCodeStyle}>bookmark.read</code>, and <code style={inlineCodeStyle}>offline.access</code>.
+              </InlineNote>
             </SectionCard>
 
             <SectionCard
-              title="What Comes Next"
-              description="The next slice will wire in real X account connection and bookmark sync."
+              title="Bookmark Sync"
+              description="Manual sync currently imports your recent bookmarks into a dedicated wiki base."
             >
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <div style={{ color: 'var(--text-secondary)', lineHeight: 1.7 }}>
+                  Sync target: {xStatus?.targetBaseTitle || 'X Bookmarks'}
+                </div>
+                <div style={{ color: 'var(--text-secondary)', lineHeight: 1.7 }}>
+                  Last sync: {xStatus?.lastSyncAt ? new Date(xStatus.lastSyncAt).toLocaleString() : 'Not synced yet'}
+                </div>
+                <div style={{ color: 'var(--text-secondary)', lineHeight: 1.7 }}>
+                  Status: {xStatus?.status || 'idle'}
+                </div>
+              </div>
               <InlineNote>
-                Planned next: OAuth connection, bookmark backfill, incremental sync, and direct publish through the X API.
+                Bookmark sync currently lands in one dedicated base. Topic-based routing and inbox review will come in the next slice.
               </InlineNote>
             </SectionCard>
           </>
