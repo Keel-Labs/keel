@@ -224,6 +224,307 @@ Not in v1:
 - bookmark mutation after publish
 - autonomous posting without user confirmation
 
+## UX
+
+Define the X integration as a cross-surface workflow, not as a new top-level product area.
+
+Recommended rule:
+
+- do not add a dedicated top-level `X` navigation item in v1
+- place each action in the surface that already owns that kind of work
+
+### Settings: account connection and sync controls
+
+Put X account setup in Settings under a new `Integrations / X` section.
+
+That section should own:
+
+- Connect X
+- connected account identity
+- granted scopes summary
+- last successful sync time
+- sync health and error state
+- manual `Sync now` action
+- disconnect action
+
+This is the right place for connection state because it matches the existing `Integrations / Google` pattern and keeps credentials out of the wiki flow.
+
+This section should not own:
+
+- per-post review
+- base routing decisions
+- publish drafting
+
+### Wiki: source ingestion and source visibility
+
+The Wiki workspace should remain the home for source ingestion.
+
+Update the existing `Add Sources` flow so it can ingest from X in addition to URL, text, and file inputs.
+
+Recommended v1 placement:
+
+- keep `Add Sources` inside the Wiki workspace
+- add an `X` mode in the existing source-ingest modal
+- if X is not connected, show a direct CTA to `Settings / Integrations / X`
+
+The `X` mode should support:
+
+- `Bookmarked posts` as the default import source
+- `Post URL` as a direct one-off import path
+- target base selection
+- title override only when needed
+
+When a base is already selected in the Wiki workspace, that base should prefill as the target. When the user launches source ingest from the global wiki home, let them choose a base or allow `Auto-route`.
+
+Within wiki base views, X-derived source pages should look like ordinary source pages with extra provenance:
+
+- X badge
+- author handle
+- post date
+- bookmark capture date
+- external link to the original post
+
+### Inbox: routing review and structural review
+
+Inbox should own ambiguity and follow-up, not connection state.
+
+Create inbox items for:
+
+- bookmarked posts that could not be routed confidently
+- auto-created base proposals that need a rename or merge decision
+- failed syncs that need user intervention
+- publish failures that need retry or edit
+
+Do not surface every successful bookmark ingestion in Inbox. Inbox should stay reserved for decisions, exceptions, and items that need human attention.
+
+### Search: cross-base discovery
+
+Search results should include X-derived sources the same way other source pages are included.
+
+Search presentation should show:
+
+- post text excerpt
+- author handle
+- wiki base
+- original post link
+
+Do not create a separate X-only search mode in v1.
+
+### Chat: drafting, not silent posting
+
+Chat can be the drafting surface for outbound posts, but it should not publish directly from the normal message send flow.
+
+Recommended flow:
+
+1. User opens the composer plus-button menu.
+2. User chooses `Draft X Post`.
+3. Keel puts the composer into an `X Draft` mode.
+4. A persistent draft chip appears above the composer while the user is drafting.
+5. The user writes directly in the composer or asks Keel to refine the draft.
+6. The user chooses `Publish to X` from the draft chip or publish review action.
+7. Keel opens a dedicated publish review sheet or modal.
+8. User confirms publication there.
+
+This keeps normal chat separate from external side effects.
+
+Recommended composer placement:
+
+- add `Draft X Post` to the existing plus-button action menu in the composer
+- while active, show an `X Draft` session chip in the existing composer session bar
+- allow the chip to carry optional metadata such as `Reply`, `Quote`, or linked wiki base
+- include a clear `Exit Draft` action so users can leave draft mode without publishing
+
+The persistent draft chip should behave like the existing wiki-base chip:
+
+- visible above the textarea
+- durable while the draft mode is active
+- removable without clearing unrelated attachments or chat history
+
+If the user is already scoped to a wiki base, retain both chips:
+
+- wiki base chip
+- X draft chip
+
+The chips should stack cleanly in the same session bar instead of spawning a separate composer header.
+
+### No new primary nav in v1
+
+Current Keel already has strong primary surfaces:
+
+- Search
+- Inbox
+- Wiki
+- Settings
+
+That is enough for v1. Adding a top-level X area would fragment the workflow and duplicate information already better owned by Settings, Wiki, Inbox, and Chat.
+
+## Design
+
+The X integration should reuse the product’s existing visual system instead of introducing a social-media-themed sub-app.
+
+Recommended rule:
+
+- make X feel like a Keel source type, not like a separate client
+
+### Settings design
+
+In `Integrations / X`, use the same status-panel pattern already used for integrations:
+
+- title
+- connection badge
+- one-line account summary
+- primary action
+- secondary action
+
+Recommended states:
+
+- disconnected
+- connecting
+- connected and healthy
+- connected with sync issues
+
+Place disconnect inside a clear danger area, not next to normal sync controls.
+
+### Wiki ingest modal design
+
+Extend the existing wiki source-ingest modal rather than creating a new X-specific window.
+
+Recommended controls:
+
+- mode switch with `URL`, `Text`, `File`, and `X`
+- in `X` mode, a segmented choice between `Bookmarks` and `Post URL`
+- target base selector
+- optional `Auto-route` toggle when launched from global wiki home
+
+The primary action should read according to mode:
+
+- `Import Bookmarks`
+- `Import Post`
+
+If bookmark import is long-running, show progress in the existing workflow style instead of blocking the whole modal.
+
+### Source-page design
+
+X sources should render inside the existing source-page template, with a compact provenance header at the top.
+
+Recommended provenance fields:
+
+- source type badge: `X Post`
+- author
+- original post date
+- captured date
+- original URL
+
+If metrics are shown, keep them secondary and muted. Likes and repost counts can help with context, but they should not dominate a knowledge page.
+
+Add one deliberate visual touch so the source feels recognizably post-shaped:
+
+- render the top of the source page as a compact `tweet-like` card
+
+Recommended card treatment:
+
+- author handle and optional display name on the first line
+- post body in slightly larger text than normal metadata
+- timestamp and source URL below
+- a quiet engagement row for reply, repost, like, and bookmark counts when available
+
+This should still live inside Keel’s visual system:
+
+- rounded card container
+- subtle border and tinted background
+- no attempt to fully recreate the X product UI
+- no large brand-colored chrome
+
+The right goal is:
+
+- immediately legible as an X post
+
+not:
+
+- pixel-matching the real tweet layout
+
+Recommended placements for this treatment:
+
+- the full page view in `WikiWorkspace` when opening an X-derived source page
+- the source card in the synthesis `Sources` section for X-derived items only
+
+In the synthesis list, keep it lighter than the full page view:
+
+- one-line author row
+- short excerpt
+- small `X Post` badge
+- open-page action
+
+### Inbox card design
+
+Use the standard inbox-card pattern for routing and topology decisions.
+
+For ambiguous routing items, show:
+
+- post excerpt
+- author handle
+- suggested base
+- confidence
+- actions: `Accept`, `Choose Base`, `Create Base`, `Dismiss`
+
+For auto-created base review items, show:
+
+- proposed base title
+- why it was created
+- nearby similar bases
+- actions: `Keep`, `Rename`, `Merge`
+
+### Publish review design
+
+Publishing should use a focused review surface, not an inline button buried in chat output.
+
+Recommended elements:
+
+- final draft text
+- character count
+- mode label: `Post`, `Reply`, or `Quote`
+- linked target if replying or quoting
+- optional associated wiki base or output
+- clear `Publish` action
+
+If publish succeeds, show the created post URL and give the user one-click access to open it. If it fails, keep the draft intact and show the retry path in place.
+
+If the publish flow started from composer draft mode, keep the `X Draft` chip present until the user either:
+
+- dismisses the draft
+- resets the composer after successful publication
+
+This avoids the state feeling lost if publication fails or the user backs out during review.
+
+### Visual tone
+
+Do not overuse X branding.
+
+Recommended styling:
+
+- neutral Keel surfaces first
+- small X badges or glyphs only where provenance matters
+- use accent color for actions, not for branding the entire flow
+
+The interface should read as:
+
+- Keel managing external sources
+
+not:
+
+- Keel turning into an X client
+
+### Mobile and compact layouts
+
+On compact layouts:
+
+- keep connection state in Settings
+- keep ingestion inside the existing modal or stacked sheet pattern
+- collapse non-essential metadata on source pages
+- keep publish review to a single focused sheet
+
+Do not require side-by-side compare layouts for base routing decisions in v1.
+
 ## Runtime Design
 
 ### Recommended Modules
