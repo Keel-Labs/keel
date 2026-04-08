@@ -63,6 +63,8 @@ export interface Settings {
   ollamaModel: string;
   // Personality
   personality: string;       // ID of active personality template (e.g. "default", "butler").
+  // X
+  xClientId: string;
   // General
   brainPath: string;
   // Team Brain
@@ -148,6 +150,30 @@ export interface WikiBaseSummary {
   title: string;
   description?: string;
   updatedAt: number;
+}
+
+export interface XAccountProfile {
+  id: string;
+  username: string;
+  name?: string;
+}
+
+export interface XStatus {
+  configured: boolean;
+  connected: boolean;
+  clientId?: string;
+  account?: XAccountProfile;
+  lastSyncAt?: number;
+  status: 'idle' | 'connected' | 'syncing' | 'error' | 'disconnected';
+  error?: string;
+  targetBasePath?: string;
+  targetBaseTitle?: string;
+}
+
+export interface XSyncResult {
+  syncedCount: number;
+  targetBasePath: string;
+  targetBaseTitle: string;
 }
 
 export type WikiJobType = 'compile' | 'health';
@@ -287,6 +313,10 @@ export type IpcChannels =
   | 'keel:google-status'
   | 'keel:google-sync-calendar'
   | 'keel:google-export-doc'
+  | 'keel:x-connect'
+  | 'keel:x-disconnect'
+  | 'keel:x-status'
+  | 'keel:x-sync-bookmarks'
   | 'keel:openai-list-models'
   | 'keel:ollama-list-models'
   | 'keel:list-tasks'
@@ -368,6 +398,10 @@ export interface KeelAPI {
   googleSyncCalendar: () => Promise<{ eventCount: number; filesWritten: number }>;
   googleExportDoc: (markdownContent: string, title?: string) => Promise<string>;
   googleCreateEvent: (event: { summary: string; startTime: string; endTime: string; description?: string; attendees?: string[] }) => Promise<{ id: string; htmlLink: string }>;
+  xConnect: () => Promise<XAccountProfile>;
+  xDisconnect: () => Promise<void>;
+  xStatus: () => Promise<XStatus>;
+  xSyncBookmarks: () => Promise<XSyncResult>;
   openaiListModels: () => Promise<OpenAIListResult>;
   // Ollama
   ollamaListModels: () => Promise<OllamaListResult>;

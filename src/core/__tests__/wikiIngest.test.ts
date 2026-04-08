@@ -151,6 +151,30 @@ describe('ingestWikiSource', () => {
     expect(metadata).toContain('"extractor": "pptx-slide-text"');
     expect(metadata).toContain('presentationml.presentation');
   });
+
+  it('reuses the same source slug for repeated X post ingests with the same status id', async () => {
+    const first = await ingestWikiSource('knowledge-bases/test-base', {
+      sourceType: 'x',
+      xPostUrl: 'https://x.com/keel/status/1234567890',
+      xText: 'First version of the post text',
+      xAuthorHandle: '@keel',
+      xAuthorName: 'Keel',
+    }, fm);
+
+    const second = await ingestWikiSource('knowledge-bases/test-base', {
+      sourceType: 'x',
+      xPostUrl: 'https://x.com/keel/status/1234567890',
+      xText: 'Updated version of the post text',
+      xAuthorHandle: '@keel',
+      xAuthorName: 'Keel',
+    }, fm);
+
+    expect(first.sourceSlug).toBe('x-post-1234567890');
+    expect(second.sourceSlug).toBe('x-post-1234567890');
+
+    const rawSource = await fm.readFile('knowledge-bases/test-base/raw/x-post-1234567890/source.md');
+    expect(rawSource).toContain('Updated version of the post text');
+  });
 });
 
 async function buildDocxBuffer(text: string): Promise<Buffer> {

@@ -35,6 +35,7 @@ interface SourceMetadata {
   assetPaths: string[];
   status: 'ready';
   provider?: 'x';
+  xPostId?: string;
   xPostUrl?: string;
   xAuthorHandle?: string;
   xAuthorName?: string;
@@ -53,7 +54,7 @@ export async function ingestWikiSource(
 ): Promise<WikiIngestResult> {
   const capturedAt = new Date().toISOString();
   const resolved = await resolveSourceInput(input);
-  const sourceSlug = await getUniqueSourceSlug(basePath, resolved.title, fileManager);
+  const sourceSlug = await resolveSourceSlug(basePath, resolved, fileManager);
   const rawDir = `${basePath}/raw/${sourceSlug}`;
   const rawSourcePath = `${rawDir}/source.md`;
   const metadataPath = `${rawDir}/metadata.json`;
@@ -207,6 +208,7 @@ async function resolveXSource(input: WikiSourceInput): Promise<ResolvedSource> {
     mimeType: 'application/x-post',
     metadata: {
       provider: 'x',
+      xPostId: extractXPostId(postUrl),
       xPostUrl: postUrl,
       xAuthorHandle: authorHandle,
       xAuthorName: authorName,
@@ -292,6 +294,14 @@ export async function extractFileSource(
     mimeType,
     warning,
   };
+}
+
+async function resolveSourceSlug(basePath: string, resolved: ResolvedSource, fileManager: FileManager): Promise<string> {
+  const xPostId = resolved.metadata?.xPostId;
+  if (resolved.sourceType === 'x' && xPostId) {
+    return `x-post-${xPostId}`;
+  }
+  return getUniqueSourceSlug(basePath, resolved.title, fileManager);
 }
 
 async function getUniqueSourceSlug(basePath: string, title: string, fileManager: FileManager): Promise<string> {
@@ -512,6 +522,11 @@ function normalizeHandle(value?: string): string | undefined {
 function sanitizeOptionalCount(value?: number): number | undefined {
   if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) return undefined;
   return Math.round(value);
+}
+
+function extractXPostId(postUrl: string): string | undefined {
+  const match = postUrl.match(/\/status\/(\d+)/);
+  return match?.[1];
 }
 
 function summarizeMammothMessages(messages: Array<{ message: string }>): string | undefined {

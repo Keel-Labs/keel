@@ -62,6 +62,17 @@ import {
 import { GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_SCOPES } from '../src/core/connectors/googleConfig';
 import { syncCalendar, getUpcomingEventsFormatted, createCalendarEvent } from '../src/core/connectors/googleCalendar';
 import { exportToGoogleDoc, readGoogleDoc, extractDocId } from '../src/core/connectors/googleDocs';
+import {
+  startXOAuthFlow,
+  saveXTokens,
+  getXStatus,
+  disconnectX,
+  getValidXAccessToken,
+  setXSyncing,
+  recordXSyncError,
+  type XOAuthConfig,
+} from '../src/core/connectors/xAuth';
+import { syncXBookmarksToWiki } from '../src/core/connectors/xBookmarks';
 import type {
   ChatDocumentAttachment,
   ChatRequest,
@@ -71,6 +82,7 @@ import type {
   UtilityWindowKind,
   WikiJob,
   WikiSourceInput,
+  XAccountProfile,
 } from '../src/shared/types';
 import type { NewsItem, WeatherInfo } from '../src/shared/types';
 
@@ -1459,6 +1471,16 @@ function registerIpcHandlers() {
     };
   }
 
+  function getXConfig(): XOAuthConfig {
+    if (!settings.xClientId.trim()) {
+      throw new Error('Add your X Client ID in Settings before connecting.');
+    }
+
+    return {
+      clientId: settings.xClientId.trim(),
+    };
+  }
+
   ipcMain.handle('keel:google-connect', async () => {
     const config = getGoogleConfig();
     const tokens = await startOAuthFlow(config, BrowserWindow);
@@ -1481,6 +1503,50 @@ function registerIpcHandlers() {
   ipcMain.handle('keel:google-sync-calendar', async () => {
     const config = getGoogleConfig();
     return syncCalendar(fileManager, settings.brainPath, config);
+  });
+
+  // --- X Integration ---
+
+  ipcMain.handle('keel:x-connect', async (): Promise<XAccountProfile> => {
+    try {
+      const config = getXConfig();
+      const tokens = await startXOAuthFlow(config, BrowserWindow);
+      saveXTokens(settings.brainPath, tokens);
+      logActivity(settings.brainPath, 'x-connect', tokens.account?.username || 'Connected to X');
+      return tokens.account as XAccountProfile;
+    } catch (error) {
+      recordXSyncError(settings.brainPath, error instanceof Error ? error.message : 'X connection failed.');
+      throw error;
+    }
+  });
+
+  ipcMain.handle('keel:x-disconnect', async () => {
+    const config = settings.xClientId.trim() ? getXConfig() : undefined;
+    await disconnectX(settings.brainPath, config);
+    logActivity(settings.brainPath, 'x-disconnect', 'Disconnected from X');
+  });
+
+  ipcMain.handle('keel:x-status', async () => {
+    return getXStatus(settings.brainPath, settings.xClientId || '');
+  });
+
+  ipcMain.handle('keel:x-sync-bookmarks', async () => {
+    try {
+      const config = getXConfig();
+      setXSyncing(settings.brainPath);
+      const accessToken = await getValidXAccessToken(settings.brainPath, config);
+      const status = getXStatus(settings.brainPath, settings.xClientId || '');
+      if (!status.account?.id) {
+        throw new Error('The connected X account could not be resolved. Disconnect and reconnect the account.');
+      }
+
+      const result = await syncXBookmarksToWiki(settings.brainPath, accessToken, status.account.id, fileManager);
+      logActivity(settings.brainPath, 'x-sync-bookmarks', `${result.syncedCount} posts -> ${result.targetBasePath}`);
+      return result;
+    } catch (error) {
+      recordXSyncError(settings.brainPath, error instanceof Error ? error.message : 'X bookmark sync failed.');
+      throw error;
+    }
   });
 
   ipcMain.handle('keel:google-export-doc', async (_event, markdownContent: string, title?: string) => {
