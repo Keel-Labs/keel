@@ -507,7 +507,18 @@ async function appendWikiLog(basePath: string, fileManager: FileManager, title: 
     await fileManager.writeFile(logPath, `# Wiki Log${entry}`);
     return;
   }
-  await fileManager.appendToFile(logPath, entry);
+  const existing = await fileManager.readFile(logPath);
+  await fileManager.writeFile(logPath, prependLogEntry(existing, entry));
+}
+
+function prependLogEntry(content: string, entry: string): string {
+  const heading = '# Wiki Log';
+  if (!content.startsWith(heading)) {
+    return `${heading}${entry}\n${content.trimStart()}`;
+  }
+
+  const afterHeading = content.slice(heading.length).replace(/^\n*/, '');
+  return `${heading}\n${entry.trim()}\n${afterHeading ? `\n${afterHeading}` : ''}`;
 }
 
 async function buildBacklinkMap(

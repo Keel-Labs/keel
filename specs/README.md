@@ -25,6 +25,8 @@ These files are intended to help Codex and human contributors orient quickly.
   - Product direction for LLM-maintained knowledge bases.
 - [`wiki-ux.md`](./wiki-ux.md)
   - UX direction for the wiki workspace.
+- [`wiki-information-flow.md`](./wiki-information-flow.md)
+  - Canonical wiki home, ingestion, and synthesis-page flow.
 - [`wiki-implementation-plan.md`](./wiki-implementation-plan.md)
   - Staged implementation plan for wiki work.
 - [`settings-page-reorg.md`](./settings-page-reorg.md)

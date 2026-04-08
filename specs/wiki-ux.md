@@ -38,12 +38,12 @@ This should be treated as a product capability, not as a team-specific collabora
 
 ## Core UX Thesis
 
-`Wiki` should feel like opening a curated knowledge space, not browsing a folder.
+`Wiki` should feel like opening a curated knowledge space, not browsing a folder or configuring a pipeline.
 
 The user should land on:
 
 - a wiki home page first
-- a page tree second
+- a base synthesis page second
 - raw file browsing only when needed
 
 The reading experience should be primary. The storage model should stay in the background.
@@ -74,9 +74,9 @@ That means:
 
 - cleaner, more editorial page surfaces
 - stronger contrast than Notion
-- fewer collaboration controls in the top bar
-- more visibility for agent actions like `Compile`, `Ask`, and `Health Check`
-- right-rail metadata focused on sources, backlinks, and update state
+- fewer collaboration controls and fewer first-class system actions
+- source ingestion happens inside the wiki workspace, not settings
+- right-rail metadata focuses on provenance and update state when it adds value
 
 ## Information Architecture
 
@@ -97,67 +97,27 @@ Keel keeps the main shell:
 
 ### 2. Wiki-Level Navigation
 
-Inside `Wiki`, add a secondary left rail with:
+Inside `Wiki`, prioritize:
 
-- base selector
-- quick actions
-- wiki sections
-- page tree
+- a home view for all bases
+- a clear current-base synthesis page
+- lightweight support navigation only where needed
 
-Suggested structure:
-
-- `Home`
-- `Sources`
-- `Concepts`
-- `Open Questions`
-- `Outputs`
-- `Health`
-- `Activity Log`
-
-Below that:
-
-- actual page tree for `wiki/index.md`, concept pages, source pages, outputs, and log pages
-
-This separation matters:
-
-- top section is product navigation
-- bottom section is document navigation
+Avoid making `Sources`, `Concepts`, and `Open Questions` feel like equal top-level modes in V1. They should primarily live inside the synthesis page.
 
 ## Layout Model
 
-Use a three-column workspace layout.
-
-### Left Rail
-
-Purpose:
-
-- switch bases
-- trigger primary actions
-- navigate sections
-- browse page tree
-
-Contents:
-
-- wiki/base title and selector
-- quick actions row
-- grouped navigation
-- nested page tree
+Use a simpler home-plus-synthesis layout in V1.
 
 ### Center Pane
 
 Purpose:
 
-- show wiki homepage
-- show selected page content
+- show wiki home
+- show a base-level synthesis page
 - act as the primary reading surface
 
-Contents:
-
-- page header
-- page body
-- grouped links or document content
-
-### Right Rail
+### Optional Support Rail
 
 Purpose:
 
@@ -165,99 +125,73 @@ Purpose:
 
 Contents:
 
-- backlinks
 - source references
 - related pages
 - last updated
 - compile state
-- page actions
 
-The right rail can collapse on smaller widths.
+The support rail can collapse on smaller widths.
 
 ## Primary Screens
 
 ### 1. Wiki Home
 
-This should be the default landing state when a user enters a wiki/base.
+This should be the default landing state when a user enters `Wiki`.
 
 It is the most important screen in the experience.
 
 The page should include:
 
-- base icon or badge
-- large title
-- one-line thesis or description
-- quick action row
-- summary stats
-- grouped link sections
+- `Wiki` title
+- one-sentence explanation
+- primary action: `Add Sources`
+- secondary action: `Create Base`
+- a scannable list of all wiki bases
 
-Suggested sections:
+Each base should present:
 
-- `Key Concepts`
-- `Key Sources`
-- `Open Questions`
-- `Recent Outputs`
+- title
+- short summary
+- source, concept, and open-question counts
+- updated state
 
-Optional lower section:
+The visual tone should feel calm and editorial. The main job is to orient the user quickly.
 
-- `Recent Activity`
+### 2. Synthesis Page
 
-The visual inspiration here should come directly from the Notion reference:
-
-- large identity block
-- clean two-column or four-section grouped lists
-- mostly text links, not dashboard cards
-
-### 2. Page View
-
-When a user opens a page, the page should feel like a document, not a widget canvas.
+When a user opens a base, the page should feel like a synthesized brief, not a widget canvas.
 
 Structure:
 
-- breadcrumb or path
-- large page title
-- optional one-line summary or abstract
-- content body in a readable document column
+- top banner with title and short description
+- compact action row
+- sticky section nav directly below the banner
+- one continuous document flow
 
-Right rail:
+Required sections:
 
-- backlinks
-- source refs
-- related pages
-- last updated
-- actions like `Ask about this page`, `Open raw sources`, `Compile affected pages`
+- `Summary`
+- `Concepts`
+- `Sources`
+- `Open Questions`
 
-### 3. Sources View
+Actions can include:
 
-This is a wiki-specific collection view for all ingested sources.
+- `Add Sources`
+- `Compile`
+- `Health Check`
 
-It should not be only a folder tree.
+`Sources` and `Open Questions` should be visible inline, not hidden behind top-level tabs.
 
-Show:
+### 3. Raw Source Access
 
-- source title
-- source type
-- ingest status
-- compile status
-- last updated
+Raw source files remain important, but they should appear as provenance links inside the synthesis experience rather than as a primary navigation mode.
 
-Views:
+Each source item should expose:
 
-- default list view
-- optional grouped-by-type view later
-
-Actions:
-
-- add source
-- retry ingest
-- open raw package
-- compile now
-
-### 4. Concepts View
-
-This is a curated list of synthesized concept pages.
-
-Show:
+- the visible wiki source page
+- the raw normalized source file
+- origin metadata when useful
 
 - concept title
 - one-line summary

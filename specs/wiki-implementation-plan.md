@@ -39,10 +39,11 @@ Recommended sequence:
 
 1. shell rename and placeholder wiki surface
 2. local wiki workspace model
-3. wiki home and page navigation
-4. ingest pipeline and source packages
-5. compile and health actions
-6. richer views and polish
+3. wiki home and base discovery
+4. in-context ingest flow inside wiki
+5. synthesis page and sticky section navigation
+6. compile and health actions
+7. richer views and polish
 
 ## Phase 0: Internal Alignment
 
@@ -120,20 +121,18 @@ Definition of done:
 - each base gets the expected starter structure
 - wiki files are readable through the existing local app boundary
 
-## Phase 3: Wiki Navigation And Reading UX
+## Phase 3: Wiki Home And Base Discovery
 
 Goal:
 
-Make the `Wiki` surface feel like a real wiki, not a raw file browser.
+Make the `Wiki` surface feel like a real product entry point, not a raw file browser or a single preselected base.
 
 Primary changes:
 
 - add wiki home page
-- add internal wiki left rail
-- add base selector
-- add grouped wiki sections
-- add page tree
-- add right rail for page context
+- list all wiki bases with summary counts
+- make wiki home the default landing view
+- allow entering a base synthesis page from the home view
 
 Likely files:
 
@@ -143,28 +142,28 @@ Likely files:
 
 Suggested approach:
 
-- evolve `KnowledgeBrowser` into a `WikiWorkspace`-style surface instead of building a second competing reader
-- keep markdown display simple in V1
-- defer rich inline editing
+- evolve `WikiWorkspace` into a home-plus-synthesis surface instead of a many-mode dashboard
+- keep the home view simple and stats-driven
+- defer richer collection browsing to later phases
 
 Definition of done:
 
 - opening `Wiki` lands on a wiki home page
-- user can switch between major sections
-- user can open and read wiki pages with contextual metadata
+- user can open a base from that page
+- the visual model is simpler than the current settings-plus-tabs flow
 
-## Phase 4: Ingest Infrastructure
+## Phase 4: In-Context Ingest Flow
 
 Goal:
 
-Build the normalization pipeline that turns disparate source types into source packages.
+Move source ingestion into the wiki workspace and keep the existing normalization pipeline behind a simpler UI.
 
 Primary changes:
 
-- implement canonical source package model
-- implement ingest job model
-- implement connectors and extractors for V1 formats
-- store raw artifacts plus normalized markdown
+- add `Add Sources` to wiki home
+- add `Add Sources` to the base synthesis page
+- allow selecting an existing base or creating one inline
+- keep existing source package and normalization behavior
 
 V1 formats:
 
@@ -177,27 +176,38 @@ V1 formats:
 - `.pptx`
 - screenshots
 
+Definition of done:
+
+- user can add a V1 source without leaving `Wiki`
+- source becomes a normalized package under `raw/`
+- failures and warnings are visible inline
+- source is ready for compile without manual file surgery
+
+## Phase 5: Synthesis Page
+
+Goal:
+
+Make each base readable as one continuous synthesis page with simple section jumping.
+
+Primary changes:
+
+- add base banner and summary framing
+- render `Concepts`, `Sources`, and `Open Questions` as sections in one scrolling page
+- add sticky section navigation below the banner
+- expose links to raw normalized source files from the `Sources` section
+
 Likely modules:
 
-- new workflow modules under `src/core/workflows/`
-- file helpers under `src/core/`
-- new IPC handlers in [electron/main.ts](/Users/djsam/.codex/worktrees/e0cb/Keel/electron/main.ts)
-
-Recommended new workflow boundaries:
-
-- `ingestSource`
-- `extractSource`
-- `normalizeSource`
-- `queueCompile`
+- [src/app/components/WikiWorkspace.tsx](/Users/djsam/.codex/worktrees/e0cb/Keel/src/app/components/WikiWorkspace.tsx)
+- [src/app/styles.css](/Users/djsam/.codex/worktrees/e0cb/Keel/src/app/styles.css)
 
 Definition of done:
 
-- user can add a V1 source
-- source becomes a normalized package under `raw/`
-- failures and warnings are visible
-- source is ready for compile without manual file surgery
+- a base opens into a synthesis page rather than a section grid
+- section jumps are always available near the top of the page
+- source provenance is visible without opening a separate mode
 
-## Phase 5: Compile And Health Workflows
+## Phase 6: Compile And Health Workflows
 
 Goal:
 
@@ -212,11 +222,6 @@ Primary changes:
 - `wiki/log.md` append behavior
 - health check report generation
 
-Likely modules:
-
-- new compile and health workflows under `src/core/workflows/`
-- prompt and orchestration logic in existing LLM integration layers
-
 Definition of done:
 
 - compile updates multiple pages when needed
@@ -224,7 +229,7 @@ Definition of done:
 - health check writes a usable report
 - log tracks ingest, compile, and health runs
 
-## Phase 6: Collection Views
+## Phase 7: Collection Views
 
 Goal:
 
@@ -244,7 +249,7 @@ Definition of done:
 - users can browse wiki content by intent, not only by folder path
 - the left rail and center pane feel coherent
 
-## Phase 7: Search And Metadata Improvements
+## Phase 8: Search And Metadata Improvements
 
 Goal:
 

@@ -218,6 +218,7 @@ export type IpcChannels =
   | 'keel:pick-chat-documents'
   | 'keel:pick-wiki-files'
   | 'keel:create-wiki-base'
+  | 'keel:open-path'
   | 'keel:wiki-ingest-source'
   | 'keel:start-wiki-compile'
   | 'keel:start-wiki-health-check'
@@ -266,6 +267,7 @@ export interface KeelAPI {
   pickChatDocuments: () => Promise<ChatDocumentAttachment[]>;
   pickWikiFiles: () => Promise<WikiFileImport[]>;
   createWikiBase: (title: string, description?: string) => Promise<WikiBaseCreateResult>;
+  openPath: (filePath: string) => Promise<string>;
   openUtilityWindow: (kind: UtilityWindowKind, query?: Record<string, string>) => Promise<void>;
   closeWindow: () => Promise<void>;
   listFiles: (dirPath: string) => Promise<FileEntry[]>;
