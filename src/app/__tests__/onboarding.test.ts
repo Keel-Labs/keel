@@ -16,6 +16,7 @@ function makeSettings(overrides: Partial<Settings> = {}): Settings {
     openrouterBaseUrl: 'https://openrouter.ai/api/v1',
     ollamaModel: 'llama3.2',
     personality: 'default',
+    xClientId: '',
     brainPath: '/tmp/keel',
     teamBrainPath: '',
     userName: '',

@@ -134,6 +134,10 @@ const api: KeelAPI = {
 
   googleExportDoc: (markdownContent: string, title?: string) => ipcRenderer.invoke('keel:google-export-doc', markdownContent, title),
   googleCreateEvent: (event) => ipcRenderer.invoke('keel:google-create-event', event),
+  xConnect: () => ipcRenderer.invoke('keel:x-connect'),
+  xDisconnect: () => ipcRenderer.invoke('keel:x-disconnect'),
+  xStatus: () => ipcRenderer.invoke('keel:x-status'),
+  xSyncBookmarks: () => ipcRenderer.invoke('keel:x-sync-bookmarks'),
   openaiListModels: () => ipcRenderer.invoke('keel:openai-list-models'),
   ollamaListModels: () => ipcRenderer.invoke('keel:ollama-list-models'),
   getRecentActivity: (limit?: number) => ipcRenderer.invoke('keel:get-recent-activity', limit),
