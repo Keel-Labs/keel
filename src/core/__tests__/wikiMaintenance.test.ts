@@ -106,4 +106,29 @@ describe('wikiMaintenance workflows', () => {
     const log = await fm.readFile('knowledge-bases/research-base/wiki/log.md');
     expect(log).toContain('health | Wiki health check');
   });
+
+  it('prepends newer maintenance events to the top of the wiki log', async () => {
+    await ingestWikiSource('knowledge-bases/research-base', {
+      sourceType: 'text',
+      title: 'Signal',
+      text: 'Signal text.',
+    }, fm);
+
+    const fakeLlm = {
+      chat: async () => JSON.stringify({
+        overviewSummary: 'Summary.',
+        keyThemes: ['Theme'],
+        synthesisMarkdown: 'Synthesis.',
+        concepts: [],
+        openQuestions: [],
+      }),
+    };
+
+    await compileWikiBase('knowledge-bases/research-base', fm, fakeLlm);
+    await runWikiHealthCheck('knowledge-bases/research-base', fm);
+
+    const log = await fm.readFile('knowledge-bases/research-base/wiki/log.md');
+    expect(log.indexOf('health | Wiki health check')).toBeLessThan(log.indexOf('compile | Research Base'));
+    expect(log.indexOf('compile | Research Base')).toBeLessThan(log.indexOf('ingest | Signal'));
+  });
 });

@@ -100,7 +100,7 @@ const SECTION_META: Record<SettingsSectionId, { title: string; description: stri
   },
   'knowledge-sources': {
     title: 'Sources',
-    description: 'Ingest source material into a wiki base and inspect the current source library.',
+    description: 'Source ingestion now happens inside the Wiki workspace.',
   },
   'knowledge-team': {
     title: 'Team Brain',
@@ -920,11 +920,33 @@ export default function Settings({ onBack, navigation }: Props) {
 
       case 'knowledge-sources':
         return (
-          <WikiSourcesSection
-            initialBasePath={resolveSourcesBasePath(navigation?.basePath)}
-            initialCreateBaseModal={resolveCreateBaseModal(navigation?.createBase)}
-            isCompactLayout={isCompactLayout}
-          />
+          <>
+            <StatusPanel
+              title="Wiki Sources"
+              badge={{ label: 'Moved', tone: 'accent' }}
+              description="Add sources from the Wiki workspace so the ingest flow, base list, and synthesis page stay in one place."
+            />
+
+            <SectionCard
+              title="Where To Go Now"
+              description="Source ingestion is no longer a settings workflow."
+            >
+              <InlineNote>
+                Open <code style={inlineCodeStyle}>Wiki</code> to:
+              </InlineNote>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 14 }}>
+                <div style={{ color: 'var(--text-secondary)', lineHeight: 1.7 }}>
+                  1. See every wiki base Keel has already indexed and learned.
+                </div>
+                <div style={{ color: 'var(--text-secondary)', lineHeight: 1.7 }}>
+                  2. Create a new base if the topic does not exist yet.
+                </div>
+                <div style={{ color: 'var(--text-secondary)', lineHeight: 1.7 }}>
+                  3. Add URLs, pasted text, or files directly into the target base.
+                </div>
+              </div>
+            </SectionCard>
+          </>
         );
 
       case 'knowledge-team':

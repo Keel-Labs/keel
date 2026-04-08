@@ -332,7 +332,7 @@ export default function App() {
   }, [markCurrentSessionUnreadIfStreaming]);
 
   const openWikiLanding = useCallback(() => {
-    setWikiCommand({ type: 'nav', target: 'synthesis', nonce: Date.now() });
+    setWikiCommand({ type: 'nav', target: 'home', nonce: Date.now() });
   }, []);
 
   const handleDesktopModeChange = (mode: DesktopMode) => {
@@ -459,7 +459,6 @@ export default function App() {
               showBack={false}
               contextOpen={wikiContextOpen}
               command={wikiCommand}
-              onOpenSettings={openSettings}
               onSidebarStateChange={setWikiSidebarState}
             />
           </div>

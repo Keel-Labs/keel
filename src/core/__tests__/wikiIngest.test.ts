@@ -49,6 +49,23 @@ describe('ingestWikiSource', () => {
     expect(wikiLog).toContain('ingest | Research Notes');
   });
 
+  it('prepends newer ingest entries to the top of the wiki log', async () => {
+    await ingestWikiSource('knowledge-bases/test-base', {
+      sourceType: 'text',
+      title: 'First Source',
+      text: 'First body.',
+    }, fm);
+
+    await ingestWikiSource('knowledge-bases/test-base', {
+      sourceType: 'text',
+      title: 'Second Source',
+      text: 'Second body.',
+    }, fm);
+
+    const wikiLog = await fm.readFile('knowledge-bases/test-base/wiki/log.md');
+    expect(wikiLog.indexOf('ingest | Second Source')).toBeLessThan(wikiLog.indexOf('ingest | First Source'));
+  });
+
   it('imports markdown files and generates unique source slugs', async () => {
     const importedPath = path.join(tmpDir, 'outside-notes.md');
     await fs.writeFile(importedPath, '# Imported Notes\n\nA markdown file from outside the brain.\n', 'utf-8');
