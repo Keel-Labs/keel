@@ -54,6 +54,7 @@ export type SettingsSectionId =
   | 'knowledge-storage'
   | 'knowledge-sources'
   | 'knowledge-team'
+  | 'integrations-x'
   | 'integrations-google'
   | 'advanced-developer';
 
@@ -68,6 +69,7 @@ const SETTINGS_SECTION_IDS: SettingsSectionId[] = [
   'knowledge-storage',
   'knowledge-sources',
   'knowledge-team',
+  'integrations-x',
   'integrations-google',
   'advanced-developer',
 ];
@@ -113,6 +115,10 @@ const SECTION_META: Record<SettingsSectionId, { title: string; description: stri
     title: 'Team Brain',
     description: 'Configure shared team context and collaboration settings.',
   },
+  'integrations-x': {
+    title: 'X',
+    description: 'Draft and ingest X posts while the live account connection is still being built.',
+  },
   'integrations-google': {
     title: 'Google',
     description: 'Manage Google account connection and sync behavior.',
@@ -155,6 +161,7 @@ const NAV_GROUPS: Array<{
   {
     label: 'Integrations',
     items: [
+      { id: 'integrations-x', label: 'X' },
       { id: 'integrations-google', label: 'Google' },
     ],
   },
@@ -1142,6 +1149,43 @@ export default function Settings({ onBack, navigation }: Props) {
                 )}
               </>
             )}
+          </>
+        );
+
+      case 'integrations-x':
+        return (
+          <>
+            <StatusPanel
+              title="X Integration Prototype"
+              badge={{ label: 'Prototype', tone: 'accent' }}
+              description="The first local slice is live: you can draft X posts from Chat and add manual X sources from the Wiki ingest flow."
+            />
+
+            <SectionCard
+              title="What You Can Test"
+              description="This slice focuses on user-facing flows that do not require X API credentials yet."
+            >
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <div style={{ color: 'var(--text-secondary)', lineHeight: 1.7 }}>
+                  1. Open Chat and use the composer plus menu to start an <code style={inlineCodeStyle}>X Draft</code>.
+                </div>
+                <div style={{ color: 'var(--text-secondary)', lineHeight: 1.7 }}>
+                  2. Open Wiki and add an <code style={inlineCodeStyle}>X Post</code> source from the existing ingest modal.
+                </div>
+                <div style={{ color: 'var(--text-secondary)', lineHeight: 1.7 }}>
+                  3. Open that source page to see the tweet-like presentation inside the wiki.
+                </div>
+              </div>
+            </SectionCard>
+
+            <SectionCard
+              title="What Comes Next"
+              description="The next slice will wire in real X account connection and bookmark sync."
+            >
+              <InlineNote>
+                Planned next: OAuth connection, bookmark backfill, incremental sync, and direct publish through the X API.
+              </InlineNote>
+            </SectionCard>
           </>
         );
 

@@ -1157,6 +1157,13 @@ select {
   transform: none;
 }
 
+.wiki-synthesis__card--x {
+  background:
+    radial-gradient(circle at top left, rgba(207, 122, 92, 0.12), transparent 42%),
+    var(--surface-panel);
+  border-color: color-mix(in srgb, var(--accent-border) 54%, var(--panel-border));
+}
+
 .wiki-synthesis__card-header {
   display: flex;
   justify-content: space-between;
@@ -1183,6 +1190,55 @@ select {
   margin-top: 10px;
   color: var(--text-muted);
   line-height: 1.65;
+}
+
+.wiki-synthesis__x-preview {
+  margin-top: 12px;
+  border-radius: 16px;
+  border: 1px solid color-mix(in srgb, var(--accent-border) 45%, var(--panel-border));
+  background: color-mix(in srgb, var(--accent-bg) 52%, var(--surface-panel));
+  padding: 14px 16px;
+}
+
+.wiki-synthesis__x-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 4px 9px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  color: var(--accent-link);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.wiki-synthesis__x-text {
+  margin-top: 12px;
+  color: var(--text-primary);
+  line-height: 1.6;
+}
+
+.wiki-synthesis__x-metrics,
+.wiki-x-post__metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.wiki-x-metric {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 999px;
+  padding: 6px 10px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.07);
+  color: var(--text-subtle);
+  font-size: 11px;
+  font-weight: 600;
 }
 
 .wiki-synthesis__source-links {
@@ -1287,6 +1343,72 @@ select {
   font-family: var(--font-serif);
   font-weight: 600;
   letter-spacing: -0.01em;
+}
+
+.wiki-x-post {
+  max-width: 760px;
+  margin-bottom: 24px;
+  padding: 20px 22px;
+  border-radius: 24px;
+  border: 1px solid color-mix(in srgb, var(--accent-border) 60%, var(--panel-border));
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.03), transparent),
+    color-mix(in srgb, var(--accent-bg) 48%, var(--surface-panel));
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.16);
+}
+
+.wiki-x-post__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.wiki-x-post__author {
+  color: var(--text-primary);
+  font-size: 18px;
+  font-weight: 650;
+}
+
+.wiki-x-post__handle {
+  margin-top: 4px;
+  color: var(--text-subtle);
+  font-size: 13px;
+}
+
+.wiki-x-post__badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 6px 11px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.09);
+  color: var(--accent-link);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.wiki-x-post__text {
+  margin-top: 16px;
+  white-space: pre-wrap;
+  color: var(--text-primary);
+  font-size: 18px;
+  line-height: 1.72;
+}
+
+.wiki-x-post__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 16px;
+  color: var(--text-subtle);
+  font-size: 12px;
+}
+
+.wiki-x-post__meta a {
+  color: var(--accent-link);
 }
 
 .wiki-collection {
@@ -1431,6 +1553,12 @@ select {
   gap: 8px;
   flex-wrap: wrap;
   margin-top: 18px;
+}
+
+.wiki-modal__field-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
 }
 
 .wiki-modal__mode {
@@ -1997,7 +2125,15 @@ select {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  flex-wrap: wrap;
   margin-bottom: 10px;
+}
+
+.chat-composer__session-chips {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .chat-composer__session-chip {
@@ -2012,12 +2148,39 @@ select {
   font-size: 12px;
 }
 
+.chat-composer__session-chip--x {
+  background: color-mix(in srgb, rgba(255,255,255,0.06) 42%, var(--surface-elevated));
+  border-color: color-mix(in srgb, var(--accent-border) 56%, var(--panel-border));
+}
+
 .chat-composer__session-label {
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--accent-link);
+}
+
+.chat-composer__session-meta {
+  color: var(--text-subtle);
+  font-size: 11px;
+}
+
+.chat-composer__chip-action,
+.chat-composer__chip-dismiss {
+  border: none;
+  background: transparent;
+  color: var(--accent-link);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0;
+}
+
+.chat-composer__chip-dismiss {
+  color: var(--text-subtle);
+  font-size: 14px;
+  line-height: 1;
 }
 
 .chat-composer__toggle {
@@ -2049,6 +2212,125 @@ select {
   border-radius: 12px;
   object-fit: cover;
   border: 1px solid var(--border-emphasis);
+}
+
+.chat-modal__backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 140;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(7, 10, 16, 0.54);
+  backdrop-filter: blur(8px);
+}
+
+.chat-modal {
+  width: min(560px, 100%);
+  border-radius: 24px;
+  border: 1px solid var(--panel-border-strong);
+  background: var(--surface-elevated);
+  box-shadow: 0 28px 90px rgba(0, 0, 0, 0.3);
+  padding: 22px;
+}
+
+.chat-modal__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.chat-modal__eyebrow {
+  color: var(--text-disabled);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.chat-modal__title {
+  margin-top: 6px;
+  color: var(--text-primary);
+  font-family: var(--font-serif);
+  font-size: 28px;
+  line-height: 1.08;
+}
+
+.chat-modal__close {
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.chat-modal__card {
+  margin-top: 18px;
+  padding: 18px;
+  border-radius: 18px;
+  border: 1px solid color-mix(in srgb, var(--accent-border) 45%, var(--panel-border));
+  background: color-mix(in srgb, var(--accent-bg) 46%, var(--surface-panel));
+}
+
+.chat-modal__card-label {
+  color: var(--text-disabled);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.chat-modal__draft-text {
+  margin-top: 12px;
+  color: var(--text-primary);
+  white-space: pre-wrap;
+  line-height: 1.7;
+  min-height: 72px;
+}
+
+.chat-modal__draft-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+  color: var(--text-subtle);
+  font-size: 12px;
+}
+
+.chat-modal__footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.chat-modal__secondary,
+.chat-modal__primary {
+  border: 1px solid var(--panel-border);
+  border-radius: 999px;
+  padding: 10px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.chat-modal__secondary {
+  background: transparent;
+  color: var(--text-secondary);
+}
+
+.chat-modal__primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+}
+
+.chat-modal__primary:disabled {
+  opacity: 0.45;
+  cursor: default;
 }
 
 .chat-composer__attachment-remove,
@@ -3425,4 +3707,14 @@ select {
 .inbox-dialog__btn--cancel:hover {
   background: var(--hover-bg);
   opacity: 1;
+}
+
+@media (max-width: 900px) {
+  .wiki-modal__field-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .chat-modal {
+    padding: 18px;
+  }
 }

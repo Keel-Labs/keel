@@ -45,11 +45,21 @@ interface SourceDetail {
   rawSourcePath: string;
   metadataPath: string;
   sourceType?: string;
+  provider?: string;
   origin?: string;
   capturedAt?: string;
   extractor?: string;
   mimeType?: string;
   warning?: string;
+  xPostUrl?: string;
+  xAuthorHandle?: string;
+  xAuthorName?: string;
+  xPostedAt?: string;
+  xReplyCount?: number;
+  xRepostCount?: number;
+  xLikeCount?: number;
+  xBookmarkCount?: number;
+  xText?: string;
 }
 
 interface BreadcrumbItem {
@@ -192,6 +202,47 @@ function formatCapturedAt(value?: string): string {
   }).format(timestamp);
 }
 
+function formatMetricCount(value?: number): string | null {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) return null;
+  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`;
+  if (value >= 1_000) return `${(value / 1_000).toFixed(1).replace(/\.0$/, '')}K`;
+  return String(value);
+}
+
+function normalizeXHandle(value: string): string {
+  const trimmed = value.trim().replace(/^@+/, '');
+  return trimmed ? `@${trimmed}` : '';
+}
+
+function parseOptionalCount(value: string): number | undefined {
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+  const parsed = Number(trimmed);
+  if (!Number.isFinite(parsed) || parsed < 0) return undefined;
+  return Math.round(parsed);
+}
+
+function buildXSourceTitle(detail?: SourceDetail): string {
+  if (!detail) return 'X Post';
+  return detail.xAuthorName || detail.xAuthorHandle || 'X Post';
+}
+
+function takePreviewText(value: string, maxLength: number): string {
+  const trimmed = value.trim();
+  if (trimmed.length <= maxLength) return trimmed;
+  return `${trimmed.slice(0, maxLength).trimEnd()}...`;
+}
+
+function renderMetricPill(label: string, value?: number): React.ReactNode {
+  const formatted = formatMetricCount(value);
+  if (!formatted) return null;
+  return (
+    <span className="wiki-x-metric" key={label}>
+      {label} {formatted}
+    </span>
+  );
+}
+
 function getLeadMarkdown(content: string): string {
   const withoutTitle = content.replace(/^#\s+.+\n+/, '');
   const lines = withoutTitle.split('\n');
@@ -271,6 +322,14 @@ export default function WikiWorkspace({
   const [ingestUrl, setIngestUrl] = useState('');
   const [ingestText, setIngestText] = useState('');
   const [ingestFile, setIngestFile] = useState<WikiFileImport | null>(null);
+  const [ingestXPostUrl, setIngestXPostUrl] = useState('');
+  const [ingestXAuthorHandle, setIngestXAuthorHandle] = useState('');
+  const [ingestXAuthorName, setIngestXAuthorName] = useState('');
+  const [ingestXPostedAt, setIngestXPostedAt] = useState('');
+  const [ingestXReplyCount, setIngestXReplyCount] = useState('');
+  const [ingestXRepostCount, setIngestXRepostCount] = useState('');
+  const [ingestXLikeCount, setIngestXLikeCount] = useState('');
+  const [ingestXBookmarkCount, setIngestXBookmarkCount] = useState('');
   const [ingestError, setIngestError] = useState('');
   const [isIngesting, setIsIngesting] = useState(false);
   const lastTerminalJobRef = useRef<string | null>(null);
@@ -359,11 +418,21 @@ export default function WikiWorkspace({
             const metadataText = await window.keel.readFile(metadataPath);
             const metadata = JSON.parse(metadataText) as {
               sourceType?: string;
+              provider?: string;
               origin?: string;
               capturedAt?: string;
               extractor?: string;
               mimeType?: string;
               warnings?: string[];
+              xPostUrl?: string;
+              xAuthorHandle?: string;
+              xAuthorName?: string;
+              xPostedAt?: string;
+              xReplyCount?: number;
+              xRepostCount?: number;
+              xLikeCount?: number;
+              xBookmarkCount?: number;
+              xText?: string;
             };
 
             return [
@@ -372,11 +441,21 @@ export default function WikiWorkspace({
                 metadataPath,
                 rawSourcePath,
                 sourceType: metadata.sourceType,
+                provider: metadata.provider,
                 origin: metadata.origin,
                 capturedAt: metadata.capturedAt,
                 extractor: metadata.extractor,
                 mimeType: metadata.mimeType,
                 warning: metadata.warnings?.[0],
+                xPostUrl: metadata.xPostUrl,
+                xAuthorHandle: metadata.xAuthorHandle,
+                xAuthorName: metadata.xAuthorName,
+                xPostedAt: metadata.xPostedAt,
+                xReplyCount: metadata.xReplyCount,
+                xRepostCount: metadata.xRepostCount,
+                xLikeCount: metadata.xLikeCount,
+                xBookmarkCount: metadata.xBookmarkCount,
+                xText: metadata.xText,
               } satisfies SourceDetail,
             ] as const;
           } catch {
@@ -514,6 +593,9 @@ export default function WikiWorkspace({
     if (activeNav === 'activity-log') return activityLogPage;
     return null;
   }, [activeNav, activityLogPage, selectedPage]);
+
+  const displayedSourceDetail = displayedPage ? sourceDetails[displayedPage.path] : undefined;
+  const isDisplayedXSource = displayedPage?.section === 'sources' && displayedSourceDetail?.sourceType === 'x';
 
   const sourcePages = useMemo(() => sortPages(pages.filter((page) => page.section === 'sources')), [pages]);
   const conceptPages = useMemo(() => sortPages(pages.filter((page) => page.section === 'concepts')), [pages]);
@@ -741,6 +823,14 @@ export default function WikiWorkspace({
     setIngestUrl('');
     setIngestText('');
     setIngestFile(null);
+    setIngestXPostUrl('');
+    setIngestXAuthorHandle('');
+    setIngestXAuthorName('');
+    setIngestXPostedAt('');
+    setIngestXReplyCount('');
+    setIngestXRepostCount('');
+    setIngestXLikeCount('');
+    setIngestXBookmarkCount('');
     setIngestBasePath(basePath || currentBasePath || bases[0]?.basePath || '');
     setShowIngestModal(true);
   }, [bases, currentBasePath]);
@@ -789,6 +879,16 @@ export default function WikiWorkspace({
       payload.url = ingestUrl.trim();
     } else if (ingestMode === 'text') {
       payload.text = ingestText.trim();
+    } else if (ingestMode === 'x') {
+      payload.xPostUrl = ingestXPostUrl.trim();
+      payload.xText = ingestText.trim();
+      payload.xAuthorHandle = normalizeXHandle(ingestXAuthorHandle);
+      payload.xAuthorName = ingestXAuthorName.trim() || undefined;
+      payload.xPostedAt = ingestXPostedAt || undefined;
+      payload.xReplyCount = parseOptionalCount(ingestXReplyCount);
+      payload.xRepostCount = parseOptionalCount(ingestXRepostCount);
+      payload.xLikeCount = parseOptionalCount(ingestXLikeCount);
+      payload.xBookmarkCount = parseOptionalCount(ingestXBookmarkCount);
     } else if (ingestFile) {
       payload.filePath = ingestFile.path;
       payload.fileName = ingestFile.name;
@@ -814,6 +914,14 @@ export default function WikiWorkspace({
   }, [
     ingestBasePath,
     ingestFile,
+    ingestXAuthorHandle,
+    ingestXAuthorName,
+    ingestXBookmarkCount,
+    ingestXLikeCount,
+    ingestXPostUrl,
+    ingestXPostedAt,
+    ingestXReplyCount,
+    ingestXRepostCount,
     ingestMode,
     ingestText,
     ingestTitle,
@@ -858,6 +966,7 @@ export default function WikiWorkspace({
     (
       (ingestMode === 'url' && ingestUrl.trim()) ||
       (ingestMode === 'text' && ingestText.trim()) ||
+      (ingestMode === 'x' && ingestXPostUrl.trim() && ingestText.trim()) ||
       (ingestMode === 'file' && ingestFile)
     );
 
@@ -1084,13 +1193,24 @@ export default function WikiWorkspace({
                 <div className="wiki-synthesis__list">
                   {sourcePages.map((page) => {
                     const detail = sourceDetails[page.path];
+                    const isXSource = detail?.sourceType === 'x';
+                    const sourceExcerpt = detail?.xText || page.summary || 'Open the source page to inspect the extracted content and metadata.';
                     return (
-                      <div key={page.path} className="wiki-synthesis__card wiki-synthesis__card--source">
+                      <div
+                        key={page.path}
+                        className={isXSource
+                          ? 'wiki-synthesis__card wiki-synthesis__card--source wiki-synthesis__card--x'
+                          : 'wiki-synthesis__card wiki-synthesis__card--source'}
+                      >
                         <div className="wiki-synthesis__card-header">
                           <div>
-                            <div className="wiki-synthesis__card-title">{page.title}</div>
+                            <div className="wiki-synthesis__card-title">
+                              {isXSource ? buildXSourceTitle(detail) : page.title}
+                            </div>
                             <div className="wiki-synthesis__card-meta">
                               <span>{detail?.sourceType ? formatTitle(detail.sourceType) : 'Source'}</span>
+                              {isXSource && detail?.xAuthorHandle && <span>{detail.xAuthorHandle}</span>}
+                              {isXSource && detail?.xPostedAt && <span>Posted {formatCapturedAt(detail.xPostedAt)}</span>}
                               <span>Captured {formatCapturedAt(detail?.capturedAt)}</span>
                             </div>
                           </div>
@@ -1098,9 +1218,22 @@ export default function WikiWorkspace({
                             Open page
                           </button>
                         </div>
-                        <div className="wiki-synthesis__card-text">
-                          {page.summary || 'Open the source page to inspect the extracted content and metadata.'}
-                        </div>
+                        {isXSource ? (
+                          <div className="wiki-synthesis__x-preview">
+                            <div className="wiki-synthesis__x-badge">X Post</div>
+                            <div className="wiki-synthesis__x-text">{takePreviewText(sourceExcerpt, 220)}</div>
+                            <div className="wiki-synthesis__x-metrics">
+                              {renderMetricPill('Reply', detail?.xReplyCount)}
+                              {renderMetricPill('Repost', detail?.xRepostCount)}
+                              {renderMetricPill('Like', detail?.xLikeCount)}
+                              {renderMetricPill('Bookmark', detail?.xBookmarkCount)}
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="wiki-synthesis__card-text">
+                            {sourceExcerpt}
+                          </div>
+                        )}
                         <div className="wiki-synthesis__source-links">
                           {detail?.origin && (
                             <div className="wiki-synthesis__source-origin">
@@ -1168,7 +1301,38 @@ export default function WikiWorkspace({
                 ))}
               </div>
               <h2 className="wiki-page__title">{displayedPage.title}</h2>
-              {displayedPage.summary && <p className="wiki-page__summary">{displayedPage.summary}</p>}
+              {displayedPage.summary && !isDisplayedXSource && <p className="wiki-page__summary">{displayedPage.summary}</p>}
+              {isDisplayedXSource && (
+                <div className="wiki-x-post">
+                  <div className="wiki-x-post__header">
+                    <div>
+                      <div className="wiki-x-post__author">{buildXSourceTitle(displayedSourceDetail)}</div>
+                      {displayedSourceDetail?.xAuthorHandle && (
+                        <div className="wiki-x-post__handle">{displayedSourceDetail.xAuthorHandle}</div>
+                      )}
+                    </div>
+                    <div className="wiki-x-post__badge">X Post</div>
+                  </div>
+                  <div className="wiki-x-post__text">
+                    {displayedSourceDetail?.xText || displayedPage.summary}
+                  </div>
+                  <div className="wiki-x-post__meta">
+                    {displayedSourceDetail?.xPostedAt && <span>Posted {formatCapturedAt(displayedSourceDetail.xPostedAt)}</span>}
+                    {displayedSourceDetail?.capturedAt && <span>Captured {formatCapturedAt(displayedSourceDetail.capturedAt)}</span>}
+                    {displayedSourceDetail?.xPostUrl && (
+                      <a href={displayedSourceDetail.xPostUrl} target="_blank" rel="noopener noreferrer">
+                        Open original
+                      </a>
+                    )}
+                  </div>
+                  <div className="wiki-x-post__metrics">
+                    {renderMetricPill('Reply', displayedSourceDetail?.xReplyCount)}
+                    {renderMetricPill('Repost', displayedSourceDetail?.xRepostCount)}
+                    {renderMetricPill('Like', displayedSourceDetail?.xLikeCount)}
+                    {renderMetricPill('Bookmark', displayedSourceDetail?.xBookmarkCount)}
+                  </div>
+                </div>
+              )}
               <div
                 className="markdown-body wiki-page__body"
                 onClick={handleRenderedPageClick}
@@ -1358,14 +1522,20 @@ export default function WikiWorkspace({
             )}
 
             <div className="wiki-modal__mode-switch">
-              {(['url', 'text', 'file'] as WikiSourceType[]).map((mode) => (
+              {(['url', 'text', 'file', 'x'] as WikiSourceType[]).map((mode) => (
                 <button
                   type="button"
                   key={mode}
                   className={ingestMode === mode ? 'wiki-modal__mode is-active' : 'wiki-modal__mode'}
                   onClick={() => setIngestMode(mode)}
                 >
-                  {mode === 'url' ? 'URL Article' : mode === 'text' ? 'Pasted Text' : 'Document File'}
+                  {mode === 'url'
+                    ? 'URL Article'
+                    : mode === 'text'
+                      ? 'Pasted Text'
+                      : mode === 'file'
+                        ? 'Document File'
+                        : 'X Post'}
                 </button>
               ))}
             </div>
@@ -1402,6 +1572,104 @@ export default function WikiWorkspace({
                   placeholder="Paste notes, article text, or raw source material."
                 />
               </div>
+            )}
+
+            {ingestMode === 'x' && (
+              <>
+                <div className="wiki-modal__field">
+                  <label className="wiki-modal__label">Post URL</label>
+                  <input
+                    className="wiki-modal__input"
+                    value={ingestXPostUrl}
+                    onChange={(event) => setIngestXPostUrl(event.target.value)}
+                    placeholder="https://x.com/handle/status/1234567890"
+                  />
+                </div>
+
+                <div className="wiki-modal__field">
+                  <label className="wiki-modal__label">Post Text</label>
+                  <textarea
+                    className="wiki-modal__textarea"
+                    value={ingestText}
+                    onChange={(event) => setIngestText(event.target.value)}
+                    placeholder="Paste the post text so Keel can preserve it even if the source changes later."
+                  />
+                </div>
+
+                <div className="wiki-modal__field-grid">
+                  <div className="wiki-modal__field">
+                    <label className="wiki-modal__label">Author Handle</label>
+                    <input
+                      className="wiki-modal__input"
+                      value={ingestXAuthorHandle}
+                      onChange={(event) => setIngestXAuthorHandle(event.target.value)}
+                      placeholder="@handle"
+                    />
+                  </div>
+                  <div className="wiki-modal__field">
+                    <label className="wiki-modal__label">Author Name</label>
+                    <input
+                      className="wiki-modal__input"
+                      value={ingestXAuthorName}
+                      onChange={(event) => setIngestXAuthorName(event.target.value)}
+                      placeholder="Optional display name"
+                    />
+                  </div>
+                </div>
+
+                <div className="wiki-modal__field">
+                  <label className="wiki-modal__label">Posted At</label>
+                  <input
+                    className="wiki-modal__input"
+                    type="datetime-local"
+                    value={ingestXPostedAt}
+                    onChange={(event) => setIngestXPostedAt(event.target.value)}
+                  />
+                </div>
+
+                <div className="wiki-modal__field-grid">
+                  <div className="wiki-modal__field">
+                    <label className="wiki-modal__label">Reply Count</label>
+                    <input
+                      className="wiki-modal__input"
+                      value={ingestXReplyCount}
+                      onChange={(event) => setIngestXReplyCount(event.target.value)}
+                      inputMode="numeric"
+                      placeholder="Optional"
+                    />
+                  </div>
+                  <div className="wiki-modal__field">
+                    <label className="wiki-modal__label">Repost Count</label>
+                    <input
+                      className="wiki-modal__input"
+                      value={ingestXRepostCount}
+                      onChange={(event) => setIngestXRepostCount(event.target.value)}
+                      inputMode="numeric"
+                      placeholder="Optional"
+                    />
+                  </div>
+                  <div className="wiki-modal__field">
+                    <label className="wiki-modal__label">Like Count</label>
+                    <input
+                      className="wiki-modal__input"
+                      value={ingestXLikeCount}
+                      onChange={(event) => setIngestXLikeCount(event.target.value)}
+                      inputMode="numeric"
+                      placeholder="Optional"
+                    />
+                  </div>
+                  <div className="wiki-modal__field">
+                    <label className="wiki-modal__label">Bookmark Count</label>
+                    <input
+                      className="wiki-modal__input"
+                      value={ingestXBookmarkCount}
+                      onChange={(event) => setIngestXBookmarkCount(event.target.value)}
+                      inputMode="numeric"
+                      placeholder="Optional"
+                    />
+                  </div>
+                </div>
+              </>
             )}
 
             {ingestMode === 'file' && (

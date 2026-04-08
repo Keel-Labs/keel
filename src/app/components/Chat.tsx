@@ -716,11 +716,19 @@ function getUserVisibleMessageContent(message: MessageType): string {
 }
 
 function buildStoredChatSession(messages: MessageType[], metadata: ChatSessionMetadata): StoredChatSession {
-  const normalizedMetadata = metadata.wikiBasePath ? metadata : undefined;
+  const normalizedMetadata = hasSessionMetadata(metadata) ? metadata : undefined;
   return {
     messages,
     metadata: normalizedMetadata,
   };
+}
+
+function hasSessionMetadata(metadata: ChatSessionMetadata): boolean {
+  return !!metadata.wikiBasePath || !!metadata.xDraft;
+}
+
+function buildXIntentUrl(text: string): string {
+  return `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`;
 }
 
 type SessionStreamState = {
@@ -775,6 +783,7 @@ export default function Chat({
   const [showModelDropdown, setShowModelDropdown] = useState(false);
   const [showActionMenu, setShowActionMenu] = useState(false);
   const [showWikiSubmenu, setShowWikiSubmenu] = useState(false);
+  const [showXPublishReview, setShowXPublishReview] = useState(false);
   const [actionMenuDirection, setActionMenuDirection] = useState<'up' | 'down'>('up');
   const [composerExpanded, setComposerExpanded] = useState(false);
   const justLoadedRef = useRef(false);
@@ -1003,7 +1012,7 @@ export default function Chat({
 
   // Auto-save chat session whenever messages or session-scoped metadata change.
   useEffect(() => {
-    const hasSessionState = messages.length > 0 || !!sessionMetadata.wikiBasePath;
+    const hasSessionState = messages.length > 0 || hasSessionMetadata(sessionMetadata);
     if (!hasSessionState) return;
 
     sessionMessagesCacheRef.current.set(sessionId, messages);
@@ -1032,9 +1041,9 @@ export default function Chat({
       textareaRef.current.style.height = 'auto';
       const nextHeight = Math.min(textareaRef.current.scrollHeight, 160);
       textareaRef.current.style.height = `${nextHeight}px`;
-      setComposerExpanded(nextHeight > 66 || attachedImages.length > 0 || attachedDocuments.length > 0 || !!sessionMetadata.wikiBasePath);
+      setComposerExpanded(nextHeight > 66 || attachedImages.length > 0 || attachedDocuments.length > 0 || hasSessionMetadata(sessionMetadata));
     }
-  }, [input, attachedDocuments.length, attachedImages.length, sessionMetadata.wikiBasePath]);
+  }, [input, attachedDocuments.length, attachedImages.length, sessionMetadata]);
 
   useEffect(() => {
     if (!showActionMenu || !actionButtonRef.current) return;
@@ -1223,6 +1232,7 @@ export default function Chat({
     setAttachedDocuments([]);
     setShowActionMenu(false);
     setShowWikiSubmenu(false);
+    setShowXPublishReview(false);
     setWikiSearch('');
     const nextSessionId = generateSessionId();
     setSessionId(nextSessionId);
@@ -1278,6 +1288,9 @@ export default function Chat({
   const hasComposerAttachments = attachedImages.length > 0 || attachedDocuments.length > 0;
   const isWikiBaseLocked = !!sessionMetadata.wikiBasePath;
   const selectedWikiBaseLabel = sessionMetadata.wikiBaseTitle || sessionMetadata.wikiBaseSlug || '';
+  const xDraft = sessionMetadata.xDraft;
+  const hasSessionBar = !!sessionMetadata.wikiBasePath || !!xDraft;
+  const xDraftText = input.trim();
 
   const COMMANDS = [
     { command: '/daily-brief', description: 'Morning briefing' },
@@ -1299,6 +1312,41 @@ export default function Chat({
   const handleImageAttach = () => {
     closeActionMenu();
     fileInputRef.current?.click();
+  };
+
+  const handleStartXDraft = () => {
+    const nextMetadata: ChatSessionMetadata = {
+      ...sessionMetadata,
+      xDraft: sessionMetadata.xDraft || {
+        mode: 'post',
+        startedAt: Date.now(),
+      },
+    };
+    setSessionMetadata(nextMetadata);
+    sessionMetadataCacheRef.current.set(sessionId, nextMetadata);
+    onSessionChange(sessionId);
+    closeActionMenu();
+    textareaRef.current?.focus();
+  };
+
+  const handleClearXDraft = () => {
+    const nextMetadata: ChatSessionMetadata = { ...sessionMetadata };
+    delete nextMetadata.xDraft;
+    setSessionMetadata(nextMetadata);
+    sessionMetadataCacheRef.current.set(sessionId, nextMetadata);
+    onSessionChange(sessionId);
+    setShowXPublishReview(false);
+  };
+
+  const handleOpenXPublishReview = () => {
+    closeActionMenu();
+    setShowXPublishReview(true);
+  };
+
+  const handlePublishXDraft = () => {
+    if (!xDraftText) return;
+    window.open(buildXIntentUrl(xDraftText), '_blank', 'noopener,noreferrer');
+    setShowXPublishReview(false);
   };
 
   const handleDocumentAttach = async () => {
@@ -1334,6 +1382,7 @@ export default function Chat({
   const handleSelectWikiBase = (base: WikiBaseSummary) => {
     if (isWikiBaseLocked) return;
     const nextMetadata: ChatSessionMetadata = {
+      ...sessionMetadata,
       wikiBasePath: base.basePath,
       wikiBaseSlug: base.slug,
       wikiBaseTitle: base.title,
@@ -1807,21 +1856,49 @@ export default function Chat({
             style={{ display: 'none' }}
           />
 
-          {sessionMetadata.wikiBasePath && (
+          {hasSessionBar && (
             <div className="chat-composer__session-bar">
-              <div className="chat-composer__session-chip">
-                <span className="chat-composer__session-label">Wiki Base</span>
-                <span>{selectedWikiBaseLabel}</span>
+              <div className="chat-composer__session-chips">
+                {sessionMetadata.wikiBasePath && (
+                  <div className="chat-composer__session-chip">
+                    <span className="chat-composer__session-label">Wiki Base</span>
+                    <span>{selectedWikiBaseLabel}</span>
+                  </div>
+                )}
+                {xDraft && (
+                  <div className="chat-composer__session-chip chat-composer__session-chip--x">
+                    <span className="chat-composer__session-label">X Draft</span>
+                    <span>{xDraft.mode === 'post' ? 'Post' : xDraft.mode}</span>
+                    {xDraftText && <span className="chat-composer__session-meta">{xDraftText.length} chars</span>}
+                    <button
+                      type="button"
+                      className="chat-composer__chip-action"
+                      onClick={handleOpenXPublishReview}
+                    >
+                      Publish
+                    </button>
+                    <button
+                      type="button"
+                      className="chat-composer__chip-dismiss"
+                      onClick={handleClearXDraft}
+                      aria-label="Exit X draft mode"
+                    >
+                      ×
+                    </button>
+                  </div>
+                )}
               </div>
-              <label className="chat-composer__toggle">
-                <input
-                  type="checkbox"
-                  checked={!!sessionMetadata.digDeep}
-                  onChange={(event) => setSessionMetadata((prev) => ({ ...prev, digDeep: event.target.checked }))}
-                  disabled={isStreaming}
-                />
-                <span>Dig Deep</span>
-              </label>
+              {sessionMetadata.wikiBasePath && (
+                <label className="chat-composer__toggle">
+                  <input
+                    type="checkbox"
+                    checked={!!sessionMetadata.digDeep}
+                    onChange={(event) => setSessionMetadata((prev) => ({ ...prev, digDeep: event.target.checked }))}
+                    disabled={isStreaming}
+                  />
+                  <span>Dig Deep</span>
+                </label>
+              )}
             </div>
           )}
 
@@ -1891,7 +1968,7 @@ export default function Chat({
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-	            placeholder={messages.length === 0 ? 'Ask Keel anything…' : 'Reply…'}
+            placeholder={xDraft ? 'Write your X post draft…' : messages.length === 0 ? 'Ask Keel anything…' : 'Reply…'}
             disabled={isStreaming}
             rows={1}
             className={isCommandMode ? 'chat-composer__textarea is-command' : 'chat-composer__textarea'}
@@ -1927,6 +2004,19 @@ export default function Chat({
                       <button className="chat-composer__menu-item" onClick={handleDocumentAttach}>
                         <span>Attach Document</span>
                       </button>
+                      <div className="chat-composer__menu-divider" />
+                      <button className="chat-composer__menu-item" onClick={handleStartXDraft}>
+                        <span>{xDraft ? 'Edit X Draft' : 'Draft X Post'}</span>
+                      </button>
+                      {xDraft && (
+                        <button
+                          className="chat-composer__menu-item"
+                          onClick={handleOpenXPublishReview}
+                          disabled={!xDraftText}
+                        >
+                          <span>Publish X Draft</span>
+                        </button>
+                      )}
                       <div className="chat-composer__menu-divider" />
                       <button
                         className="chat-composer__menu-item"
@@ -2102,6 +2192,52 @@ export default function Chat({
           </div>
         </div>
       </div>
+
+      {showXPublishReview && (
+        <div className="chat-modal__backdrop" onClick={() => setShowXPublishReview(false)}>
+          <div className="chat-modal" onClick={(event) => event.stopPropagation()}>
+            <div className="chat-modal__header">
+              <div>
+                <div className="chat-modal__eyebrow">X Draft</div>
+                <div className="chat-modal__title">Review Before Publish</div>
+              </div>
+              <button
+                type="button"
+                className="chat-modal__close"
+                onClick={() => setShowXPublishReview(false)}
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="chat-modal__card">
+              <div className="chat-modal__card-label">Draft Text</div>
+              <div className="chat-modal__draft-text">
+                {xDraftText || 'Write your draft in the composer first.'}
+              </div>
+              <div className="chat-modal__draft-meta">
+                <span>{xDraftText.length} characters</span>
+                {sessionMetadata.wikiBasePath && <span>Linked to {selectedWikiBaseLabel}</span>}
+                <span>Publishes through the browser composer in this slice</span>
+              </div>
+            </div>
+
+            <div className="chat-modal__footer">
+              <button type="button" className="chat-modal__secondary" onClick={() => setShowXPublishReview(false)}>
+                Close
+              </button>
+              <button
+                type="button"
+                className="chat-modal__primary"
+                disabled={!xDraftText}
+                onClick={handlePublishXDraft}
+              >
+                Open X Composer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
