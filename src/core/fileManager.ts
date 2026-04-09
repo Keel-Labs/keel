@@ -163,6 +163,23 @@ export class FileManager {
     return result.join('\n').trim();
   }
 
+  async deleteFile(relativePath: string): Promise<void> {
+    const fullPath = this.resolve(relativePath);
+    await fs.unlink(fullPath);
+  }
+
+  async deleteDir(relativePath: string): Promise<void> {
+    const fullPath = this.resolve(relativePath);
+    await fs.rm(fullPath, { recursive: true, force: true });
+  }
+
+  async renameDir(oldRelativePath: string, newRelativePath: string): Promise<void> {
+    const oldFull = this.resolve(oldRelativePath);
+    const newFull = this.resolve(newRelativePath);
+    await fs.mkdir(path.dirname(newFull), { recursive: true });
+    await fs.rename(oldFull, newFull);
+  }
+
   async fileExists(relativePath: string): Promise<boolean> {
     try {
       await fs.access(this.resolve(relativePath));

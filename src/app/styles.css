@@ -2566,3 +2566,479 @@ select {
   border-top: 1px solid var(--border-input);
   margin: 0.6em 0;
 }
+
+/* ── Inbox / Task View ── */
+
+.inbox-pane {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--bg-base);
+}
+
+.inbox-pane__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 28px 32px 16px;
+  border-bottom: 1px solid var(--panel-border);
+}
+
+.inbox-pane__title {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.inbox-pane__summary {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.inbox-pane__scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 32px 32px;
+}
+
+.inbox-pane__loading {
+  padding: 48px 32px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+.inbox-pane__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 64px 32px;
+  text-align: center;
+}
+
+.inbox-pane__empty-icon {
+  font-size: 32px;
+  color: var(--text-disabled);
+}
+
+.inbox-pane__empty-text {
+  font-size: 14px;
+  color: var(--text-muted);
+  max-width: 320px;
+  line-height: 1.5;
+}
+
+/* Sections */
+
+.inbox-section {
+  margin-bottom: 24px;
+}
+
+.inbox-section__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  border: none;
+  background: none;
+  cursor: default;
+  width: 100%;
+  text-align: left;
+}
+
+.inbox-section__header--toggle {
+  cursor: pointer;
+}
+
+.inbox-section__header--toggle:hover .inbox-section__label {
+  color: var(--text-primary);
+}
+
+.inbox-section__label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--text-muted);
+  transition: color 0.1s;
+}
+
+.inbox-section__count {
+  font-size: 11px;
+  color: var(--text-disabled);
+  font-weight: 500;
+}
+
+.inbox-section__body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* Project Groups */
+
+.inbox-project-group {
+  margin-bottom: 4px;
+}
+
+.inbox-project-group__header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 4px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--text-secondary);
+  width: 100%;
+  text-align: left;
+  border-radius: var(--radius-base);
+  transition: background 0.1s;
+}
+
+.inbox-project-group__header:hover {
+  background: var(--bg-surface-hover);
+}
+
+.inbox-project-group__name {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.inbox-project-group__count {
+  font-size: 11px;
+  color: var(--text-disabled);
+  margin-left: auto;
+}
+
+.inbox-project-group__tasks {
+  padding-left: 6px;
+}
+
+/* Task Rows */
+
+.inbox-task-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: var(--radius-base);
+  transition: background 0.1s;
+}
+
+.inbox-task-row:hover {
+  background: var(--bg-surface-hover);
+}
+
+.inbox-task-row__checkbox-label {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  cursor: pointer;
+  flex: 1;
+  min-width: 0;
+}
+
+.inbox-task-row__checkbox {
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  accent-color: var(--accent);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.inbox-task-row__text {
+  font-size: 14px;
+  color: var(--text-primary);
+  line-height: 1.45;
+}
+
+.inbox-task-row--completed .inbox-task-row__text {
+  color: var(--text-disabled);
+  text-decoration: line-through;
+}
+
+.inbox-task-row__project-badge {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 99px;
+  background: var(--accent-bg-subtle);
+  color: var(--accent-link);
+  white-space: nowrap;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+/* Incoming row actions */
+
+.inbox-task-row--incoming {
+  padding: 8px 10px;
+  background: var(--accent-bg-subtle);
+  border: 1px solid var(--accent-border-subtle);
+  border-radius: var(--radius-lg);
+  margin-bottom: 6px;
+}
+
+.inbox-task-row--incoming:hover {
+  background: var(--accent-bg);
+  border-color: var(--accent-border);
+}
+
+.inbox-task-row__actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.inbox-task-row__action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-base);
+  background: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  transition: all 0.1s;
+}
+
+.inbox-task-row__action-btn--accept:hover {
+  background: rgba(80, 180, 80, 0.15);
+  border-color: rgba(80, 180, 80, 0.3);
+  color: #6fcf6f;
+}
+
+.inbox-task-row__action-btn--dismiss:hover {
+  background: rgba(220, 80, 80, 0.12);
+  border-color: rgba(220, 80, 80, 0.25);
+  color: #e06060;
+}
+
+/* Drag and drop */
+
+.inbox-task-row[draggable] {
+  cursor: grab;
+}
+
+.inbox-task-row[draggable]:active {
+  cursor: grabbing;
+}
+
+.inbox-section--droppable {
+  border-radius: var(--radius-lg);
+  border: 2px dashed transparent;
+  padding: 4px;
+  margin: -4px;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.inbox-section--drag-over {
+  border-color: var(--accent-border);
+  background: var(--accent-bg-subtle);
+}
+
+.inbox-section__drop-hint {
+  padding: 16px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-disabled);
+  font-style: italic;
+}
+
+/* Header right group */
+
+.inbox-pane__header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.inbox-pane__add-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: var(--radius-base);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+}
+
+.inbox-pane__add-btn:hover {
+  background: var(--hover-bg);
+  color: var(--text-primary);
+}
+
+/* Project group header row with actions */
+
+.inbox-project-group__header-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.inbox-project-group__header-row .inbox-project-group__header {
+  flex: 1;
+  min-width: 0;
+}
+
+.inbox-project-group__actions {
+  display: flex;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.inbox-project-group:hover .inbox-project-group__actions {
+  opacity: 1;
+}
+
+.inbox-project-group__action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-disabled);
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+}
+
+.inbox-project-group__action-btn:hover {
+  background: var(--hover-bg);
+  color: var(--text-secondary);
+}
+
+.inbox-project-group__action-btn--danger:hover {
+  color: #d94f4f;
+}
+
+/* Inline rename input */
+
+.inbox-project-group__rename-input {
+  flex: 1;
+  padding: 4px 8px;
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  outline: none;
+}
+
+/* Project group drag-over */
+
+.inbox-project-group--drag-over {
+  background: var(--accent-bg-subtle);
+  border-radius: var(--radius-base);
+}
+
+/* Dialogs */
+
+.inbox-dialog-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.inbox-dialog {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  width: 320px;
+  max-width: 90vw;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25);
+}
+
+.inbox-dialog__title {
+  margin: 0 0 8px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.inbox-dialog__text {
+  margin: 0 0 16px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.inbox-dialog__input {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-base);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 14px;
+  margin-bottom: 16px;
+  box-sizing: border-box;
+}
+
+.inbox-dialog__input:focus {
+  outline: none;
+  border-color: var(--accent-border);
+}
+
+.inbox-dialog__actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.inbox-dialog__btn {
+  padding: 6px 14px;
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-base);
+  background: var(--accent);
+  color: white;
+  font-size: 13px;
+  cursor: pointer;
+  transition: opacity 0.1s;
+}
+
+.inbox-dialog__btn:hover {
+  opacity: 0.85;
+}
+
+.inbox-dialog__btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.inbox-dialog__btn--danger {
+  background: #d94f4f;
+  border-color: #d94f4f;
+}
+
+.inbox-dialog__btn--cancel {
+  background: transparent;
+  color: var(--text-secondary);
+  border-color: var(--border-primary);
+}
+
+.inbox-dialog__btn--cancel:hover {
+  background: var(--hover-bg);
+  opacity: 1;
+}

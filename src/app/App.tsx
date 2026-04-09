@@ -6,6 +6,7 @@ import WikiWorkspace, { type WikiCommand } from './components/WikiWorkspace';
 import Onboarding from './components/Onboarding';
 import DesktopTopBar from './components/DesktopTopBar';
 import PlaceholderPane from './components/PlaceholderPane';
+import Inbox from './components/Inbox';
 import ChatsIndex from './components/ChatsIndex';
 import type { Settings as SettingsType } from '../shared/types';
 import { applyTheme } from './theme';
@@ -57,34 +58,6 @@ function SearchStub() {
             </div>
           </div>
         </>
-      )}
-    />
-  );
-}
-
-function InboxStub() {
-  return (
-    <PlaceholderPane
-      eyebrow="Inbox"
-      title="A single queue for follow-ups and system nudges"
-      description="This surface is stubbed and ready to receive reminders, daily brief actions, pending approvals, and suggested captures."
-      secondary={(
-        <div className="stub-list">
-          <div className="stub-list__row">
-            <div>
-              <div className="stub-list__title">Reminder rollup</div>
-              <div className="stub-list__text">Upcoming reminders and overdue nudges will land here.</div>
-            </div>
-            <span className="stub-list__badge">Stub</span>
-          </div>
-          <div className="stub-list__row">
-            <div>
-              <div className="stub-list__title">Daily brief review</div>
-              <div className="stub-list__text">Surface generated summaries that need acknowledgement or edits.</div>
-            </div>
-            <span className="stub-list__badge">Stub</span>
-          </div>
-        </div>
       )}
     />
   );
@@ -464,7 +437,7 @@ export default function App() {
           </div>
         );
       case 'inbox':
-        return <InboxStub />;
+        return <Inbox />;
       case 'settings':
         return <Settings onBack={handleSettingsBack} navigation={settingsNavigation} />;
       default:

@@ -78,6 +78,15 @@ export function getDb(brainPath: string): Database.Database {
       created_at INTEGER DEFAULT (unixepoch())
     );
 
+    -- Incoming tasks (triage queue before entering markdown files)
+    CREATE TABLE IF NOT EXISTS incoming_tasks (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      text        TEXT NOT NULL,
+      project     TEXT,
+      source_file TEXT NOT NULL,
+      created_at  INTEGER DEFAULT (unixepoch())
+    );
+
     -- Connector sync state (Google Calendar, Gmail, etc.)
     CREATE TABLE IF NOT EXISTS sync_state (
       id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -514,4 +523,61 @@ export function listUpcomingReminders(brainPath: string, limit = 20): ReminderRo
 export function deleteReminder(brainPath: string, id: number): void {
   const d = getDb(brainPath);
   d.prepare('DELETE FROM reminders WHERE id = ?').run(id);
+}
+
+// ── Incoming Tasks ──────────────────────────────────────────────────
+
+export interface IncomingTaskRow {
+  id: number;
+  text: string;
+  project: string | null;
+  sourceFile: string;
+  createdAt: number;
+}
+
+export function insertIncomingTask(
+  brainPath: string,
+  text: string,
+  project: string | null,
+  sourceFile: string,
+): number {
+  const d = getDb(brainPath);
+  const result = d.prepare(
+    'INSERT INTO incoming_tasks (text, project, source_file) VALUES (?, ?, ?)'
+  ).run(text, project, sourceFile);
+  return Number(result.lastInsertRowid);
+}
+
+export function listIncomingTasksDb(brainPath: string): IncomingTaskRow[] {
+  const d = getDb(brainPath);
+  const rows = d.prepare(
+    'SELECT * FROM incoming_tasks ORDER BY created_at DESC'
+  ).all() as Array<{ id: number; text: string; project: string | null; source_file: string; created_at: number }>;
+  return rows.map((r) => ({
+    id: r.id,
+    text: r.text,
+    project: r.project,
+    sourceFile: r.source_file,
+    createdAt: r.created_at * 1000,
+  }));
+}
+
+export function getIncomingTask(brainPath: string, id: number): IncomingTaskRow | null {
+  const d = getDb(brainPath);
+  const row = d.prepare('SELECT * FROM incoming_tasks WHERE id = ?').get(id) as
+    | { id: number; text: string; project: string | null; source_file: string; created_at: number }
+    | undefined;
+  if (!row) return null;
+  return {
+    id: row.id,
+    text: row.text,
+    project: row.project,
+    sourceFile: row.source_file,
+    createdAt: row.created_at * 1000,
+  };
+}
+
+export function deleteIncomingTask(brainPath: string, id: number): void {
+  const d = getDb(brainPath);
+  d.prepare('DELETE FROM incoming_tasks WHERE id = ?').run(id);
 }
