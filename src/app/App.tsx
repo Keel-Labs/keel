@@ -67,6 +67,7 @@ function SearchStub() {
 export default function App() {
   const [newChatSignal, setNewChatSignal] = useState(0);
   const [loadSessionId, setLoadSessionId] = useState<string | null>(null);
+  const [chatDraft, setChatDraft] = useState<string | undefined>(undefined);
   const [currentSessionId, setCurrentSessionId] = useState('');
   const [refreshSidebar, setRefreshSidebar] = useState(0);
   const [desktopView, setDesktopView] = useState<DesktopView>('dashboard');
@@ -268,6 +269,17 @@ export default function App() {
     setLoadSessionId(null);
     setCurrentSessionId('');
     currentSessionIdRef.current = '';
+    setChatDraft(undefined);
+    setNewChatSignal((value) => value + 1);
+    navigateDesktop('chat', { mode: 'chat' });
+  };
+
+  const handleNewChatWithDraft = (draft: string) => {
+    markCurrentSessionUnreadIfStreaming();
+    setLoadSessionId(null);
+    setCurrentSessionId('');
+    currentSessionIdRef.current = '';
+    setChatDraft(draft);
     setNewChatSignal((value) => value + 1);
     navigateDesktop('chat', { mode: 'chat' });
   };
@@ -436,6 +448,7 @@ export default function App() {
           <Dashboard
             onNavigateToTasks={() => handleDesktopNavigation('inbox')}
             onNavigateToChat={(sessionId) => handleSelectSession(sessionId)}
+            onNewChatWithDraft={handleNewChatWithDraft}
           />
         );
       case 'chat':
@@ -526,6 +539,7 @@ export default function App() {
             <Chat
               newChatSignal={newChatSignal}
               loadSessionId={loadSessionId}
+              initialDraft={chatDraft}
               onSessionChange={handleSessionChange}
               onSessionStreamStateChange={handleSessionStreamStateChange}
               onOpenWikiPage={handleOpenWikiCitation}

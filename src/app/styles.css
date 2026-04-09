@@ -2577,13 +2577,14 @@ select {
 }
 
 .dashboard-pane__header {
-  padding: 28px 32px 24px;
+  padding: 20px 32px 12px;
 }
 
 .dashboard-pane__glyph {
-  font-size: 24px;
+  font-size: 14px;
   color: var(--accent-link);
-  margin-right: 10px;
+  opacity: 0.7;
+  margin-right: 8px;
   display: inline-block;
   vertical-align: middle;
   animation: chat-empty-state-star-drift 3.2s ease-in-out infinite;
@@ -2593,39 +2594,50 @@ select {
 
 .dashboard-pane__title {
   font-family: Georgia, Cambria, "Times New Roman", serif;
-  font-size: 32px;
+  font-size: 20px;
   font-weight: 500;
   color: var(--text-primary);
+  filter: brightness(1.15);
   margin: 0;
   line-height: 1.15;
+}
+
+.dashboard-pane__tagline {
+  font-size: 13px;
+  color: var(--text-muted);
+  font-style: italic;
 }
 
 .dashboard-pane__subtitle-row {
   display: flex;
   align-items: center;
-  gap: 20px;
-  margin-top: 10px;
+  gap: 10px;
+  margin-top: 12px;
   flex-wrap: wrap;
 }
 
-.dashboard-pane__weather-line {
+.dashboard-pane__info-item {
   font-size: 13px;
   color: var(--text-secondary);
-  display: flex;
+  filter: brightness(1.1);
+  display: inline-flex;
   align-items: center;
-  gap: 4px;
 }
 
-.dashboard-pane__date {
-  font-size: 13px;
-  color: var(--text-muted);
+.dashboard-pane__info-icon {
+  color: var(--accent);
+  margin-right: 4px;
+  flex-shrink: 0;
 }
 
-.dashboard-pane__quote {
-  font-size: 13px;
-  color: var(--text-muted);
+.dashboard-pane__quote-inline {
   font-style: italic;
-  line-height: 1.4;
+}
+
+.dashboard-pane__separator {
+  font-size: 13px;
+  color: var(--text-secondary);
+  opacity: 0.7;
 }
 
 .dashboard-pane__loading {
@@ -2640,7 +2652,7 @@ select {
 .dashboard-pane__grid {
   flex: 1;
   overflow-y: auto;
-  padding: 24px 32px 32px;
+  padding: 16px 32px 32px;
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 16px;

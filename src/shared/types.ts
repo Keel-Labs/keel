@@ -55,6 +55,8 @@ export interface Settings {
   openrouterBaseUrl: string;
   // Ollama
   ollamaModel: string;
+  // Personality
+  personality: string;       // ID of active personality template (e.g. "default", "butler").
   // General
   brainPath: string;
   // Team Brain
