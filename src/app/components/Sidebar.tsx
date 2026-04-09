@@ -116,7 +116,7 @@ const PRIMARY_ITEMS: Array<{
   icon: React.ReactNode;
 }> = [
   { id: 'search', label: 'Search', icon: <SearchIcon /> },
-  { id: 'inbox', label: 'Inbox', icon: <InboxIcon /> },
+  { id: 'inbox', label: 'Tasks', icon: <InboxIcon /> },
 ];
 
 const WIKI_ITEMS: Array<{ id: WikiNavId; label: string; icon: React.ReactNode }> = [
