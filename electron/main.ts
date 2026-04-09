@@ -39,6 +39,7 @@ import {
   deleteReminder,
   listIncomingTasksDb,
   deleteIncomingTask,
+  getRecentActivity,
 } from '../src/core/db';
 import { listAllTasks, toggleTask, moveTask, acceptIncomingTask, createProject, renameProject, deleteProject } from '../src/core/tasks';
 import { capture } from '../src/core/workflows/capture';
@@ -71,6 +72,113 @@ import type {
   WikiJob,
   WikiSourceInput,
 } from '../src/shared/types';
+import type { NewsItem, WeatherInfo } from '../src/shared/types';
+
+const AI_NEWS_FEEDS = [
+  { url: 'https://techcrunch.com/category/artificial-intelligence/feed/', source: 'TechCrunch' },
+  { url: 'https://www.theverge.com/rss/ai-artificial-intelligence/index.xml', source: 'The Verge' },
+];
+
+let weatherCache: { data: WeatherInfo; fetchedAt: number } | null = null;
+const WEATHER_CACHE_TTL = 30 * 60 * 1000; // 30 minutes
+
+async function fetchWeather(): Promise<WeatherInfo | null> {
+  if (weatherCache && Date.now() - weatherCache.fetchedAt < WEATHER_CACHE_TTL) {
+    return weatherCache.data;
+  }
+
+  try {
+    const res = await fetch('https://wttr.in/?format=j1', {
+      headers: { 'User-Agent': 'Keel/1.0' },
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+
+    const current = data.current_condition?.[0];
+    const area = data.nearest_area?.[0];
+    if (!current) return null;
+
+    const tempF = current.temp_F;
+    const tempC = current.temp_C;
+    const condition = current.weatherDesc?.[0]?.value || '';
+    const city = area?.areaName?.[0]?.value || '';
+
+    // Map weather codes to simple emoji-like text icons
+    const code = parseInt(current.weatherCode, 10);
+    let icon = '☀';
+    if (code === 113) icon = '☀';
+    else if (code === 116) icon = '⛅';
+    else if (code === 119 || code === 122) icon = '☁';
+    else if ([176, 263, 266, 293, 296, 299, 302, 305, 308, 311, 314, 353, 356, 359].includes(code)) icon = '🌧';
+    else if ([200, 386, 389, 392, 395].includes(code)) icon = '⛈';
+    else if ([179, 182, 185, 227, 230, 317, 320, 323, 326, 329, 332, 335, 338, 350, 362, 365, 368, 371, 374, 377].includes(code)) icon = '❄';
+    else if ([143, 248, 260].includes(code)) icon = '🌫';
+
+    const info: WeatherInfo = {
+      temp: `${tempF}°F / ${tempC}°C`,
+      condition,
+      icon,
+      location: city,
+    };
+
+    weatherCache = { data: info, fetchedAt: Date.now() };
+    return info;
+  } catch {
+    return null;
+  }
+}
+
+let newsCache: { items: NewsItem[]; fetchedAt: number } | null = null;
+const NEWS_CACHE_TTL = 15 * 60 * 1000; // 15 minutes
+
+async function fetchAiNewsRss(): Promise<NewsItem[]> {
+  if (newsCache && Date.now() - newsCache.fetchedAt < NEWS_CACHE_TTL) {
+    return newsCache.items;
+  }
+
+  const allItems: NewsItem[] = [];
+
+  for (const feed of AI_NEWS_FEEDS) {
+    try {
+      const res = await fetch(feed.url, {
+        headers: { 'User-Agent': 'Keel/1.0' },
+        signal: AbortSignal.timeout(5000),
+      });
+      if (!res.ok) continue;
+      const xml = await res.text();
+
+      // Simple RSS/Atom XML parsing — extract <item> or <entry> elements
+      const itemRegex = /<(?:item|entry)>([\s\S]*?)<\/(?:item|entry)>/g;
+      let match;
+      while ((match = itemRegex.exec(xml)) !== null) {
+        const block = match[1];
+        const title = block.match(/<title[^>]*>(?:<!\[CDATA\[)?(.*?)(?:\]\]>)?<\/title>/)?.[1]?.trim();
+        const link = block.match(/<link[^>]*href="([^"]+)"/)?.[1]
+          || block.match(/<link[^>]*>(.*?)<\/link>/)?.[1]?.trim();
+        const pubDate = block.match(/<(?:pubDate|published|updated)>(.*?)<\/(?:pubDate|published|updated)>/)?.[1];
+
+        if (title && link) {
+          allItems.push({
+            title: title.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&#039;/g, "'").replace(/&quot;/g, '"'),
+            url: link,
+            source: feed.source,
+            publishedAt: pubDate ? new Date(pubDate).getTime() : Date.now(),
+          });
+        }
+      }
+    } catch {
+      // Feed unavailable — skip
+    }
+  }
+
+  // Sort by date descending, take top 8
+  allItems.sort((a, b) => b.publishedAt - a.publishedAt);
+  const items = allItems.slice(0, 8);
+
+  newsCache = { items, fetchedAt: Date.now() };
+  return items;
+}
 
 let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
@@ -1056,11 +1164,18 @@ function registerIpcHandlers() {
   });
 
   ipcMain.handle('keel:open-path', async (_event, filePath: string) => {
+    const { shell } = await import('electron');
+
+    // URLs → open in default browser
+    if (filePath.startsWith('http://') || filePath.startsWith('https://')) {
+      await shell.openExternal(filePath);
+      return '';
+    }
+
     if (filePath.includes('..') || filePath.startsWith('.config')) {
       throw new Error('Access denied');
     }
 
-    const { shell } = await import('electron');
     const fullPath = path.join(settings.brainPath, filePath);
     return shell.openPath(fullPath);
   });
@@ -1307,6 +1422,20 @@ function registerIpcHandlers() {
 
   ipcMain.handle('keel:delete-reminder', async (_event, id: number) => {
     deleteReminder(settings.brainPath, id);
+  });
+
+  // --- Activity ---
+
+  ipcMain.handle('keel:get-recent-activity', async (_event, limit?: number) => {
+    return getRecentActivity(settings.brainPath, limit ?? 20);
+  });
+
+  ipcMain.handle('keel:fetch-weather', async () => {
+    return fetchWeather();
+  });
+
+  ipcMain.handle('keel:fetch-ai-news', async () => {
+    return fetchAiNewsRss();
   });
 
   // --- Google Integration ---

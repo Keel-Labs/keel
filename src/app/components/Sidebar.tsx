@@ -8,7 +8,8 @@ interface Session {
   updatedAt: number;
 }
 
-export type DesktopView = 'chat' | 'search' | 'chats' | 'wiki' | 'inbox' | 'settings';
+export type DesktopView = 'dashboard' | 'chat' | 'search' | 'chats' | 'wiki' | 'inbox' | 'settings';
+// Note: 'dashboard' is routed via the top mode-switcher, not the sidebar nav
 export type WikiNavId = 'home' | 'synthesis' | 'activity-log';
 
 export interface WikiSidebarBranch {
@@ -62,6 +63,15 @@ function TeamIcon() {
       <circle cx="8.5" cy="7" r="4" />
       <path d="M20 8v6" />
       <path d="M23 11h-6" />
+    </svg>
+  );
+}
+
+function HomeIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+      <polyline points="9 22 9 12 15 12 15 22" />
     </svg>
   );
 }

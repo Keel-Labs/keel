@@ -1,6 +1,6 @@
 import React from 'react';
 
-type DesktopMode = 'chat' | 'wiki';
+type DesktopMode = 'chat' | 'wiki' | 'home';
 
 interface Props {
   activeMode: DesktopMode;
@@ -96,6 +96,7 @@ function PanelIcon({ open }: { open: boolean }) {
 }
 
 const MODES: Array<{ id: DesktopMode; label: string }> = [
+  { id: 'home', label: 'Home' },
   { id: 'chat', label: 'Chat' },
   { id: 'wiki', label: 'Wiki' },
 ];

@@ -159,6 +159,20 @@ export interface ActivityLogEntry {
   createdAt: number;
 }
 
+export interface WeatherInfo {
+  temp: string;
+  condition: string;
+  icon: string;
+  location: string;
+}
+
+export interface NewsItem {
+  title: string;
+  url: string;
+  source: string;
+  publishedAt: number;
+}
+
 export interface OllamaModelInfo {
   name: string;
   size: number;
@@ -267,6 +281,9 @@ export type IpcChannels =
   | 'keel:create-project'
   | 'keel:rename-project'
   | 'keel:delete-project'
+  | 'keel:get-recent-activity'
+  | 'keel:fetch-weather'
+  | 'keel:fetch-ai-news'
   | 'keel:list-team-files'
   | 'keel:read-team-file'
   | 'keel:write-team-file';
@@ -337,6 +354,10 @@ export interface KeelAPI {
   openaiListModels: () => Promise<OpenAIListResult>;
   // Ollama
   ollamaListModels: () => Promise<OllamaListResult>;
+  // Activity
+  getRecentActivity: (limit?: number) => Promise<ActivityLogEntry[]>;
+  fetchWeather: () => Promise<WeatherInfo | null>;
+  fetchAiNews: () => Promise<NewsItem[]>;
   // Team Brain
   listTeamFiles: (dirPath: string) => Promise<FileEntry[]>;
   readTeamFile: (filePath: string) => Promise<string>;
