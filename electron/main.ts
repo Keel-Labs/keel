@@ -1209,6 +1209,30 @@ function registerIpcHandlers() {
 
     const result = await ingestWikiSource(basePath, input, fileManager);
     logActivity(settings.brainPath, 'wiki-ingest', `${result.title} -> ${result.pagePath}`);
+
+    // Auto-compile after successful ingest
+    const job = createWikiJob('compile', basePath, 'Auto-compiling after new source.');
+    void (async () => {
+      updateWikiJob(job.id, { status: 'running', detail: 'Compiling wiki pages and synthesis outputs.' });
+      try {
+        const compileResult = await compileWikiBase(basePath, fileManager, llmClient);
+        updateWikiJob(job.id, {
+          status: 'completed',
+          detail: compileResult.message,
+          finishedAt: Date.now(),
+          outputPath: compileResult.synthesisPath,
+        });
+        logActivity(settings.brainPath, 'wiki-compile', `${basePath} -> ${compileResult.synthesisPath}`);
+      } catch (error) {
+        updateWikiJob(job.id, {
+          status: 'failed',
+          detail: 'Auto-compile failed.',
+          finishedAt: Date.now(),
+          error: error instanceof Error ? error.message : 'Unknown compile error',
+        });
+      }
+    })();
+
     return result;
   });
 
@@ -1807,7 +1831,16 @@ function startScheduler(): void {
 
 // --- App Lifecycle ---
 
+app.setName('Keel');
+
 app.whenReady().then(async () => {
+  // Set dock icon in dev mode
+  if (process.platform === 'darwin' && !app.isPackaged) {
+    const iconPath = path.join(__dirname, '..', 'build', 'icon.icns');
+    const dockIcon = nativeImage.createFromPath(iconPath);
+    if (!dockIcon.isEmpty()) app.dock?.setIcon(dockIcon);
+  }
+
   // Ensure brain directory structure exists
   await fileManager.ensureDirectoryStructure();
 

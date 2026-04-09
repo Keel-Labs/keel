@@ -387,6 +387,10 @@ export default function App() {
     setWikiCommand({ type: 'nav', target: nav, nonce: Date.now() });
   };
 
+  const handleWikiCreateBase = () => {
+    setWikiCommand({ type: 'create-base', target: '', nonce: Date.now() });
+  };
+
   const handleWikiOpenPage = (path: string) => {
     setWikiCommand({ type: 'page', target: path, nonce: Date.now() });
   };
@@ -525,6 +529,7 @@ export default function App() {
             wikiState={wikiSidebarState}
             onWikiNavigate={handleWikiNavigate}
             onWikiOpenPage={handleWikiOpenPage}
+            onWikiCreateBase={handleWikiCreateBase}
           />
           {!effectiveSidebarCollapsed && (
             <div
