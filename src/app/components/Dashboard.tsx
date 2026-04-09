@@ -270,7 +270,6 @@ export default function Dashboard({ onNavigateToTasks, onNavigateToChat, onNewCh
           </span>
           {weather && (
             <>
-              <span className="dashboard-pane__separator">•</span>
               <span className="dashboard-pane__info-item">
                 <svg className="dashboard-pane__info-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M17.5 19a4.5 4.5 0 1 0 0-9h-1.8A7 7 0 1 0 4 14.5" /><path d="M9 17l3 3 3-3" />
@@ -279,7 +278,6 @@ export default function Dashboard({ onNavigateToTasks, onNavigateToChat, onNewCh
               </span>
             </>
           )}
-          <span className="dashboard-pane__separator">•</span>
           <span className="dashboard-pane__info-item dashboard-pane__quote-inline">
             <svg className="dashboard-pane__info-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M3 21c3 0 7-1 7-8V5c0-1.25-.756-2.017-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V21z" />
