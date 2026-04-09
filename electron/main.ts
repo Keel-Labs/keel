@@ -160,7 +160,14 @@ async function fetchAiNewsRss(): Promise<NewsItem[]> {
 
         if (title && link) {
           allItems.push({
-            title: title.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&#039;/g, "'").replace(/&quot;/g, '"'),
+            title: title
+              .replace(/&#(\d+);/g, (_m, code) => String.fromCharCode(Number(code)))
+              .replace(/&#x([0-9a-fA-F]+);/g, (_m, hex) => String.fromCharCode(parseInt(hex, 16)))
+              .replace(/&amp;/g, '&')
+              .replace(/&lt;/g, '<')
+              .replace(/&gt;/g, '>')
+              .replace(/&quot;/g, '"')
+              .replace(/&apos;/g, "'"),
             url: link,
             source: feed.source,
             publishedAt: pubDate ? new Date(pubDate).getTime() : Date.now(),
@@ -188,7 +195,7 @@ const wikiJobs = new Map<string, WikiJob>();
 const settings = loadSettings();
 const fileManager = new FileManager(settings.brainPath);
 const llmClient = new LLMClient();
-const contextAssembler = new ContextAssembler(fileManager, false, settings.timezone || undefined);
+const contextAssembler = new ContextAssembler(fileManager, false, settings.timezone || undefined, settings.personality || 'default');
 let teamFileManager: TeamFileManager | null = settings.teamBrainPath
   ? new TeamFileManager(settings.teamBrainPath)
   : null;
@@ -789,6 +796,7 @@ function registerIpcHandlers() {
     Object.assign(settings, newSettings);
     llmClient.reload();
     contextAssembler.setTimezone(newSettings.timezone || '');
+    contextAssembler.setPersonality(newSettings.personality || 'default');
 
     // Reinitialize team brain if path changed
     if (teamPathChanged) {

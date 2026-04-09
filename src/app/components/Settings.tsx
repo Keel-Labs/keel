@@ -7,6 +7,7 @@ import type {
   WikiSourceType,
 } from '../../shared/types';
 import { applyTheme } from '../theme';
+import { BUILT_IN_PERSONALITIES } from '../../core/personalities';
 
 const isElectron = typeof window !== 'undefined' && !!(window as any).keelMigrate;
 
@@ -44,6 +45,7 @@ const PROVIDERS = [
 
 export type SettingsSectionId =
   | 'general-personal'
+  | 'general-personality'
   | 'general-workspace'
   | 'general-notifications'
   | 'ai-provider'
@@ -57,6 +59,7 @@ export type SettingsSectionId =
 
 const SETTINGS_SECTION_IDS: SettingsSectionId[] = [
   'general-personal',
+  'general-personality',
   'general-workspace',
   'general-notifications',
   'ai-provider',
@@ -73,6 +76,10 @@ const SECTION_META: Record<SettingsSectionId, { title: string; description: stri
   'general-personal': {
     title: 'Personal Settings',
     description: 'Preferences that shape how Keel works with you.',
+  },
+  'general-personality': {
+    title: 'Personality',
+    description: 'Choose how Keel sounds when it talks to you.',
   },
   'general-workspace': {
     title: 'Workspace',
@@ -124,6 +131,7 @@ const NAV_GROUPS: Array<{
     label: 'General',
     items: [
       { id: 'general-personal', label: 'Personal Settings' },
+      { id: 'general-personality', label: 'Personality' },
       { id: 'general-workspace', label: 'Workspace' },
       { id: 'general-notifications', label: 'Notifications' },
     ],
@@ -771,6 +779,45 @@ export default function Settings({ onBack, navigation }: Props) {
               <InlineNote>More personal preferences will be added here over time.</InlineNote>
             </SectionCard>
           </>
+        );
+
+      case 'general-personality':
+        return (
+          <SectionCard title="Keel's Voice" description="This adds flavor to greetings, sign-offs, and asides — it doesn't change how Keel writes documents or briefs.">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {BUILT_IN_PERSONALITIES.map((p) => (
+                <label
+                  key={p.id}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: 12,
+                    padding: '14px 16px',
+                    borderRadius: 'var(--radius-xl)',
+                    background: (settings.personality || 'default') === p.id ? 'var(--accent-bg)' : 'var(--surface-panel)',
+                    border: `1px solid ${(settings.personality || 'default') === p.id ? 'var(--accent-border)' : 'var(--panel-border)'}`,
+                    cursor: 'pointer',
+                  }}
+                >
+                  <input
+                    type="radio"
+                    name="personality"
+                    checked={(settings.personality || 'default') === p.id}
+                    onChange={() => update({ personality: p.id })}
+                    style={{ accentColor: 'var(--accent)', marginTop: 2 }}
+                  />
+                  <div>
+                    <div style={{ fontSize: 'var(--text-base)', fontWeight: 600, color: 'var(--text-primary)' }}>
+                      {p.name}
+                    </div>
+                    <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>
+                      {p.description}
+                    </div>
+                  </div>
+                </label>
+              ))}
+            </div>
+          </SectionCard>
         );
 
       case 'general-workspace':

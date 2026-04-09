@@ -734,6 +734,7 @@ type SessionStreamState = {
 interface ChatProps {
   newChatSignal: number;
   loadSessionId: string | null;
+  initialDraft?: string;
   onSessionChange: (id: string) => void;
   onSessionStreamStateChange?: (sessionId: string, isStreaming: boolean) => void;
   onOpenWikiPage?: (path: string) => void;
@@ -742,6 +743,7 @@ interface ChatProps {
 export default function Chat({
   newChatSignal,
   loadSessionId,
+  initialDraft,
   onSessionChange,
   onSessionStreamStateChange,
   onOpenWikiPage,
@@ -924,6 +926,13 @@ export default function Chat({
     }
     startNewChat();
   }, [newChatSignal]);
+
+  // Consume initialDraft from external navigation (e.g. Dashboard "+" button)
+  useEffect(() => {
+    if (initialDraft) {
+      setInput(initialDraft);
+    }
+  }, [initialDraft]);
 
   // Load a specific session when selected from sidebar
   useEffect(() => {
