@@ -7,6 +7,7 @@ import Onboarding from './components/Onboarding';
 import DesktopTopBar from './components/DesktopTopBar';
 import PlaceholderPane from './components/PlaceholderPane';
 import Inbox from './components/Inbox';
+import Dashboard from './components/Dashboard';
 import ChatsIndex from './components/ChatsIndex';
 import type { Settings as SettingsType } from '../shared/types';
 import { applyTheme } from './theme';
@@ -23,7 +24,7 @@ import {
   shouldShowOnboarding,
 } from './onboarding';
 
-type DesktopMode = 'chat' | 'wiki';
+type DesktopMode = 'chat' | 'wiki' | 'home';
 
 function clampSidebarWidth(value: number): number {
   return Math.min(360, Math.max(228, value));
@@ -68,8 +69,8 @@ export default function App() {
   const [loadSessionId, setLoadSessionId] = useState<string | null>(null);
   const [currentSessionId, setCurrentSessionId] = useState('');
   const [refreshSidebar, setRefreshSidebar] = useState(0);
-  const [desktopView, setDesktopView] = useState<DesktopView>('chat');
-  const [desktopMode, setDesktopMode] = useState<DesktopMode>('chat');
+  const [desktopView, setDesktopView] = useState<DesktopView>('dashboard');
+  const [desktopMode, setDesktopMode] = useState<DesktopMode>('home');
   const [wikiContextOpen, setWikiContextOpen] = useState(false);
   const [wikiSidebarState, setWikiSidebarState] = useState<WikiSidebarState | null>(null);
   const [wikiCommand, setWikiCommand] = useState<WikiCommand | null>(null);
@@ -90,7 +91,7 @@ export default function App() {
     return Number.isFinite(stored) ? clampSidebarWidth(stored) : 272;
   });
   const [desktopHistory, setDesktopHistory] = useState<{ entries: DesktopView[]; index: number }>({
-    entries: ['chat'],
+    entries: ['dashboard'],
     index: 0,
   });
   const [unreadSessionIds, setUnreadSessionIds] = useState<string[]>(() => {
@@ -297,7 +298,9 @@ export default function App() {
     setDesktopHistory(nextHistory);
     setDesktopView(nextView);
 
-    if (nextView === 'chat' || nextView === 'chats') {
+    if (nextView === 'dashboard') {
+      setDesktopMode('home');
+    } else if (nextView === 'chat' || nextView === 'chats') {
       setDesktopMode('chat');
     } else if (nextView === 'wiki') {
       setDesktopMode('wiki');
@@ -309,6 +312,14 @@ export default function App() {
   }, []);
 
   const handleDesktopModeChange = (mode: DesktopMode) => {
+    // Always navigate to the mode's default view, even if already active.
+    // This lets users click the active tab to return from overlay views
+    // (e.g. Tasks, Search, Settings) back to the mode's main content.
+    if (mode === 'home') {
+      markCurrentSessionUnreadIfStreaming();
+      navigateDesktop('dashboard', { mode: 'home' });
+      return;
+    }
     if (mode === 'chat') {
       navigateDesktop('chat', { mode: 'chat' });
       return;
@@ -334,11 +345,17 @@ export default function App() {
       markCurrentSessionUnreadIfStreaming();
     }
 
-    const mode = view === 'wiki'
-      ? 'wiki'
-      : view === 'chat' || view === 'chats'
-        ? 'chat'
-        : undefined;
+    // Only update the top mode tab for views that belong to a mode.
+    // Sidebar-only views (inbox, search, etc.) overlay the current mode
+    // so the user can click the active top tab to return.
+    const modeViews: Record<string, DesktopMode> = {
+      wiki: 'wiki',
+      chat: 'chat',
+      chats: 'chat',
+      dashboard: 'home',
+    };
+    const mode = modeViews[view];
+
     if (view === 'wiki') {
       openWikiLanding();
     }
@@ -414,6 +431,13 @@ export default function App() {
 
   const renderDesktopView = () => {
     switch (desktopView) {
+      case 'dashboard':
+        return (
+          <Dashboard
+            onNavigateToTasks={() => handleDesktopNavigation('inbox')}
+            onNavigateToChat={(sessionId) => handleSelectSession(sessionId)}
+          />
+        );
       case 'chat':
         return null;
       case 'search':

@@ -676,14 +676,8 @@ function getGreetingName(name: string): string {
   return first || 'there';
 }
 
-function getTimeOfDayGreeting(name: string, timezone?: string): string {
-  const tz = timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
-  const hourPart = new Intl.DateTimeFormat('en-US', {
-    hour: 'numeric',
-    hour12: false,
-    timeZone: tz,
-  }).formatToParts(new Date()).find((part) => part.type === 'hour');
-  const hour = Number(hourPart?.value ?? 12);
+function getTimeOfDayGreeting(name: string): string {
+  const hour = new Date().getHours();
 
   let greeting = 'Hello';
   if (hour >= 5 && hour < 12) {
@@ -1268,7 +1262,7 @@ export default function Chat({
   const conversationTitle = getConversationTitle();
   const isCommandMode = input.startsWith('/');
   const showHeader = messages.length > 0 || isStreaming;
-  const emptyStateGreeting = getTimeOfDayGreeting(userName, userTimezone || undefined);
+  const emptyStateGreeting = getTimeOfDayGreeting(userName);
   const filteredWikiBases = useMemo(() => {
     return filterWikiBases(wikiBases, wikiSearch);
   }, [wikiBases, wikiSearch]);
