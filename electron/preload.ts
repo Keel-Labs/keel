@@ -101,6 +101,22 @@ const api: KeelAPI = {
     return () => ipcRenderer.off('keel:memory-updated', handler);
   },
 
+  // Tasks
+  listTasks: () => ipcRenderer.invoke('keel:list-tasks'),
+  toggleTask: (filePath: string, taskText: string, completed: boolean) =>
+    ipcRenderer.invoke('keel:toggle-task', filePath, taskText, completed),
+  listIncomingTasks: () => ipcRenderer.invoke('keel:list-incoming-tasks'),
+  acceptIncomingTask: (id: number) => ipcRenderer.invoke('keel:accept-incoming-task', id),
+  dismissIncomingTask: (id: number) => ipcRenderer.invoke('keel:dismiss-incoming-task', id),
+  moveTask: (sourceFilePath: string, targetFilePath: string, taskText: string, completed: boolean) =>
+    ipcRenderer.invoke('keel:move-task', sourceFilePath, targetFilePath, taskText, completed),
+
+  // Projects
+  createProject: (name: string) => ipcRenderer.invoke('keel:create-project', name),
+  renameProject: (oldSlug: string, newName: string) => ipcRenderer.invoke('keel:rename-project', oldSlug, newName),
+  deleteProject: (slug: string, moveTasks: boolean) => ipcRenderer.invoke('keel:delete-project', slug, moveTasks),
+
+  // Reminders
   createReminder: (message: string, dueAt: number, recurring?: string) =>
     ipcRenderer.invoke('keel:create-reminder', message, dueAt, recurring),
 

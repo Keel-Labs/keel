@@ -37,7 +37,10 @@ import {
   rescheduleRecurring,
   listUpcomingReminders,
   deleteReminder,
+  listIncomingTasksDb,
+  deleteIncomingTask,
 } from '../src/core/db';
+import { listAllTasks, toggleTask, moveTask, acceptIncomingTask, createProject, renameProject, deleteProject } from '../src/core/tasks';
 import { capture } from '../src/core/workflows/capture';
 import { autoCapture } from '../src/core/workflows/autoCapture';
 import { dailyBrief } from '../src/core/workflows/dailyBrief';
@@ -1239,6 +1242,55 @@ function registerIpcHandlers() {
       throw new Error('Access denied');
     }
     await teamFileManager.writeFile(filePath, content);
+  });
+
+  // --- Tasks ---
+
+  ipcMain.handle('keel:list-tasks', async () => {
+    return listAllTasks(fileManager);
+  });
+
+  ipcMain.handle('keel:toggle-task', async (_event, filePath: string, taskText: string, completed: boolean) => {
+    await toggleTask(fileManager, filePath, taskText, completed);
+    logActivity(settings.brainPath, 'task-toggled', `${completed ? 'Completed' : 'Reopened'}: ${taskText}`);
+  });
+
+  ipcMain.handle('keel:move-task', async (_event, sourceFilePath: string, targetFilePath: string, taskText: string, completed: boolean) => {
+    await moveTask(fileManager, sourceFilePath, targetFilePath, taskText, completed);
+    logActivity(settings.brainPath, 'task-moved', `Moved "${taskText}" from ${sourceFilePath} to ${targetFilePath}`);
+  });
+
+  ipcMain.handle('keel:list-incoming-tasks', async () => {
+    return listIncomingTasksDb(settings.brainPath);
+  });
+
+  ipcMain.handle('keel:accept-incoming-task', async (_event, id: number) => {
+    await acceptIncomingTask(fileManager, settings.brainPath, id);
+    logActivity(settings.brainPath, 'task-accepted', `Accepted incoming task #${id}`);
+  });
+
+  ipcMain.handle('keel:dismiss-incoming-task', async (_event, id: number) => {
+    deleteIncomingTask(settings.brainPath, id);
+    logActivity(settings.brainPath, 'task-dismissed', `Dismissed incoming task #${id}`);
+  });
+
+  // --- Projects ---
+
+  ipcMain.handle('keel:create-project', async (_event, name: string) => {
+    const slug = await createProject(fileManager, name);
+    logActivity(settings.brainPath, 'project-created', name);
+    return slug;
+  });
+
+  ipcMain.handle('keel:rename-project', async (_event, oldSlug: string, newName: string) => {
+    const newSlug = await renameProject(fileManager, oldSlug, newName);
+    logActivity(settings.brainPath, 'project-renamed', `${oldSlug} → ${newName}`);
+    return newSlug;
+  });
+
+  ipcMain.handle('keel:delete-project', async (_event, slug: string, moveTasks: boolean) => {
+    await deleteProject(fileManager, slug, moveTasks);
+    logActivity(settings.brainPath, 'project-deleted', slug);
   });
 
   // --- Reminders ---

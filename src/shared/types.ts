@@ -192,6 +192,27 @@ export interface Reminder {
   createdAt: number;
 }
 
+export interface Task {
+  filePath: string;
+  text: string;
+  completed: boolean;
+  project: string | null;
+}
+
+export interface IncomingTask {
+  id: number;
+  text: string;
+  project: string | null;
+  sourceFile: string;
+  createdAt: number;
+}
+
+export interface TaskGroup {
+  project: string;
+  slug: string | null;
+  tasks: Task[];
+}
+
 export type IpcChannels =
   | 'keel:chat'
   | 'keel:chat-stream'
@@ -237,6 +258,15 @@ export type IpcChannels =
   | 'keel:google-export-doc'
   | 'keel:openai-list-models'
   | 'keel:ollama-list-models'
+  | 'keel:list-tasks'
+  | 'keel:toggle-task'
+  | 'keel:move-task'
+  | 'keel:list-incoming-tasks'
+  | 'keel:accept-incoming-task'
+  | 'keel:dismiss-incoming-task'
+  | 'keel:create-project'
+  | 'keel:rename-project'
+  | 'keel:delete-project'
   | 'keel:list-team-files'
   | 'keel:read-team-file'
   | 'keel:write-team-file';
@@ -282,6 +312,17 @@ export interface KeelAPI {
   removeScheduledNotificationListener: () => void;
   onAutoCaptureDone: (callback: (event: { requestId: string; summary: string }) => void) => () => void;
   onMemoryUpdated: (callback: (event: { requestId: string; summary: string }) => void) => () => void;
+  // Tasks
+  listTasks: () => Promise<TaskGroup[]>;
+  toggleTask: (filePath: string, taskText: string, completed: boolean) => Promise<void>;
+  moveTask: (sourceFilePath: string, targetFilePath: string, taskText: string, completed: boolean) => Promise<void>;
+  listIncomingTasks: () => Promise<IncomingTask[]>;
+  acceptIncomingTask: (id: number) => Promise<void>;
+  dismissIncomingTask: (id: number) => Promise<void>;
+  // Projects
+  createProject: (name: string) => Promise<string>;
+  renameProject: (oldSlug: string, newName: string) => Promise<string>;
+  deleteProject: (slug: string, moveTasks: boolean) => Promise<void>;
   // Reminders
   createReminder: (message: string, dueAt: number, recurring?: string) => Promise<number>;
   listReminders: () => Promise<Reminder[]>;

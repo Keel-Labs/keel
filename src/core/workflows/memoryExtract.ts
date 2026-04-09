@@ -1,6 +1,6 @@
 import { FileManager, KEEL_MD_TEMPLATE } from '../fileManager';
 import { LLMClient } from '../llmClient';
-import { logActivity } from '../db';
+import { logActivity, insertIncomingTask } from '../db';
 import type { Message } from '../../shared/types';
 
 const EXTRACT_PROMPT = `You are a memory extraction system. Analyze the conversation and extract ONLY facts the user explicitly stated.
@@ -253,6 +253,9 @@ export async function extractAndSaveMemory(
         tasksByProject.get(projectKey)!.push(t.task);
       }
 
+      // Insert new tasks into incoming_tasks table for triage
+      const brainPath = fileManager.getBrainPath();
+      let incomingCount = 0;
       for (const [projectName, tasks] of tasksByProject) {
         if (projectName) {
           const slug = projectName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
@@ -265,49 +268,19 @@ export async function extractAndSaveMemory(
             console.log(`[memory-extract] Created project context: ${contextPath}`);
           }
 
-          // Append tasks to project tasks file (flatten old format if needed)
-          try {
-            const raw = await fileManager.readFile(tasksPath);
-            const existing = flattenTaskSections(raw);
-            if (existing !== raw) {
-              await fileManager.writeFile(tasksPath, existing);
-              console.log(`[memory-extract] Flattened old task sections in ${tasksPath}`);
-            }
-            const tasksToAdd = tasks.filter(t => !existing.includes(t));
-            if (tasksToAdd.length > 0) {
-              const newContent = tasksToAdd.map(t => `- [ ] ${t}`).join('\n');
-              await fileManager.writeFile(tasksPath, existing.trimEnd() + '\n' + newContent + '\n');
-              console.log(`[memory-extract] Added ${tasksToAdd.length} task(s) to ${tasksPath}`);
-            }
-          } catch {
-            const newTasks = tasks.map(t => `- [ ] ${t}`).join('\n');
-            await fileManager.writeFile(tasksPath, `# ${projectName} — Tasks\n\n${newTasks}\n`);
-            console.log(`[memory-extract] Created ${tasksPath} with ${tasks.length} task(s)`);
+          for (const task of tasks) {
+            insertIncomingTask(brainPath, task, slug, tasksPath);
+            incomingCount++;
           }
         } else {
-          // Tasks without a project go to general tasks file (flatten old format if needed)
-          const tasksPath = 'tasks.md';
-          const newTasks = tasks.map(t => `- [ ] ${t}`).join('\n');
-          try {
-            const raw = await fileManager.readFile(tasksPath);
-            const existing = flattenTaskSections(raw);
-            if (existing !== raw) {
-              await fileManager.writeFile(tasksPath, existing);
-              console.log('[memory-extract] Flattened old task sections in tasks.md');
-            }
-            const tasksToAdd = tasks.filter(t => !existing.includes(t));
-            if (tasksToAdd.length > 0) {
-              const newContent = tasksToAdd.map(t => `- [ ] ${t}`).join('\n');
-              await fileManager.writeFile(tasksPath, existing.trimEnd() + '\n' + newContent + '\n');
-            }
-          } catch {
-            await fileManager.writeFile(tasksPath, `# Tasks\n\n${newTasks}\n`);
+          for (const task of tasks) {
+            insertIncomingTask(brainPath, task, null, 'tasks.md');
+            incomingCount++;
           }
         }
       }
 
-      const brainPath = fileManager.getBrainPath();
-      logActivity(brainPath, 'memory-update', `Saved ${update.tasks.length} task(s) from conversation`);
+      logActivity(brainPath, 'memory-update', `Queued ${incomingCount} task(s) for triage`);
     }
 
     // Mark completed tasks
