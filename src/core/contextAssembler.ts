@@ -3,22 +3,15 @@ import { embedText } from './embeddings';
 import * as vectorStore from './vectorStore';
 import { logActivity, searchChunksFts, type ChunkRow } from './db';
 import { rerank, type RankableChunk } from './reranker';
+import { getPersonality } from './personalities';
 
 const MAX_CONTEXT_CHARS_V1 = 80_000;
 const MAX_CONTEXT_CHARS_V2 = 60_000;
 const TOP_K = 8;
 
-const SYSTEM_PROMPT_PREFIX = `You are Keel, the user's personal AI chief of staff. You are not a generic assistant — you are a trusted colleague who has read every document, note, and project file the user has written.
+const IDENTITY = `You are Keel, the user's personal AI chief of staff. You are not a generic assistant — you are a trusted colleague who has read every document, note, and project file the user has written.`;
 
-Your personality:
-- Warm but efficient. Like a great executive assistant who anticipates needs.
-- Speak directly. No filler phrases like "Great question!" or "I'd be happy to help."
-- When you know something from the user's files, state it confidently and cite the source.
-- When you don't have enough context, say so honestly rather than guessing.
-- Use the user's name if you know it from their profile.
-- Format responses with markdown when helpful (headers, lists, tables, code blocks).
-
-CRITICAL RULES — FOLLOW THESE STRICTLY:
+const BASE_RULES = `CRITICAL RULES — FOLLOW THESE STRICTLY:
 - When the user tells you about themselves, their projects, or priorities: acknowledge in 1-2 sentences. Confirm what you noted. STOP. Do NOT add action items, suggestions, resource links, or next steps unless explicitly asked.
 - When the user asks "what are my projects" or similar: list them concisely with only the details they gave you. No elaboration, no action items, no suggested resources.
 - NEVER generate URLs, links, or resource recommendations unless the user explicitly asks for them.
@@ -62,19 +55,23 @@ TASK RULES:
 - Do not invent categories like "To Do", "In Progress", "Done" — just show the checkboxes.
 - Capture files (projects/captures/*.md) are reference material only. Their action items have already been extracted into the appropriate task files. Do NOT list captures as a separate task section — only show tasks from tasks.md and projects/*/tasks.md files.
 
-Here is everything you know about the user:
+Here is everything you know about the user:`;
 
-`;
-
-function buildSystemPrompt(timezone?: string): string {
+function buildSystemPrompt(personalityId: string, timezone?: string): string {
+  const personality = getPersonality(personalityId);
   const now = new Date();
   const tz = timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
   const dateStr = now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: tz });
   const timeStr = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: tz });
-  return SYSTEM_PROMPT_PREFIX.replace(
-    'Here is everything you know about the user:',
-    `Current date and time: ${dateStr}, ${timeStr} (${tz})\n\nHere is everything you know about the user:`
-  );
+
+  return [
+    IDENTITY,
+    personality.prompt,
+    BASE_RULES.replace(
+      'Here is everything you know about the user:',
+      `Current date and time: ${dateStr}, ${timeStr} (${tz})\n\nHere is everything you know about the user:\n`,
+    ),
+  ].join('\n\n');
 }
 
 export class ContextAssembler {
@@ -82,15 +79,21 @@ export class ContextAssembler {
   private teamFileManager: FileManager | null = null;
   private useSemanticSearch: boolean;
   private timezone?: string;
+  private personality: string;
 
-  constructor(fileManager: FileManager, useSemanticSearch: boolean = false, timezone?: string) {
+  constructor(fileManager: FileManager, useSemanticSearch: boolean = false, timezone?: string, personality: string = 'default') {
     this.fileManager = fileManager;
     this.useSemanticSearch = useSemanticSearch;
     this.timezone = timezone;
+    this.personality = personality;
   }
 
   setTimezone(tz: string): void {
     this.timezone = tz || undefined;
+  }
+
+  setPersonality(id: string): void {
+    this.personality = id;
   }
 
   setTeamFileManager(tfm: FileManager | null): void {
@@ -114,7 +117,7 @@ export class ContextAssembler {
   }
 
   private async assembleV1(onStep?: (step: string) => void): Promise<string> {
-    const systemPrompt = buildSystemPrompt(this.timezone);
+    const systemPrompt = buildSystemPrompt(this.personality, this.timezone);
     const sections: string[] = [];
     let totalChars = systemPrompt.length;
 
@@ -267,7 +270,7 @@ export class ContextAssembler {
   }
 
   private async assembleV2(userMessage: string, onStep?: (step: string) => void): Promise<string> {
-    const systemPrompt = buildSystemPrompt(this.timezone);
+    const systemPrompt = buildSystemPrompt(this.personality, this.timezone);
     const brainPath = this.fileManager.getBrainPath();
     const sections: string[] = [];
     let totalChars = systemPrompt.length;

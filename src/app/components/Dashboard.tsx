@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import type { TaskGroup, Reminder, ActivityLogEntry, NewsItem, WeatherInfo, Settings } from '../../shared/types';
+import { getPersonalityGreeting } from '../../core/personalities';
 
 interface DashboardProps {
   onNavigateToTasks: () => void;
   onNavigateToChat: (sessionId: string) => void;
+  onNewChatWithDraft?: (draft: string) => void;
 }
 
 // ── Helpers ──
@@ -113,11 +115,11 @@ function getDailyQuote() {
   return QUOTES[dayOfYear % QUOTES.length];
 }
 
-function getGreetingWord(): string {
+function getTimeOfDay(): 'morning' | 'afternoon' | 'evening' {
   const hour = new Date().getHours();
-  if (hour >= 5 && hour < 12) return 'Good morning';
-  if (hour >= 12 && hour < 17) return 'Good afternoon';
-  return 'Good evening';
+  if (hour >= 5 && hour < 12) return 'morning';
+  if (hour >= 12 && hour < 17) return 'afternoon';
+  return 'evening';
 }
 
 // ── Icons ──
@@ -156,6 +158,23 @@ function BellIcon() {
   );
 }
 
+function ChecklistIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9 11l3 3L22 4" />
+      <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" />
+    </svg>
+  );
+}
+
+function PlusIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+    </svg>
+  );
+}
+
 function ClockIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -167,13 +186,14 @@ function ClockIcon() {
 
 // ── Component ──
 
-export default function Dashboard({ onNavigateToTasks, onNavigateToChat }: DashboardProps) {
+export default function Dashboard({ onNavigateToTasks, onNavigateToChat, onNewChatWithDraft }: DashboardProps) {
   const [taskGroups, setTaskGroups] = useState<TaskGroup[]>([]);
   const [reminders, setReminders] = useState<Reminder[]>([]);
   const [activity, setActivity] = useState<ActivityLogEntry[]>([]);
   const [eodItems, setEodItems] = useState<string[]>([]);
   const [weather, setWeather] = useState<WeatherInfo | null>(null);
   const [userName, setUserName] = useState<string>('');
+  const [personalityId, setPersonalityId] = useState<string>('default');
   const [loading, setLoading] = useState(true);
 
   const fetchAll = useCallback(async () => {
@@ -191,6 +211,7 @@ export default function Dashboard({ onNavigateToTasks, onNavigateToChat }: Dashb
       setActivity(acts);
       setWeather(weatherInfo);
       setUserName(settings.userName || '');
+      setPersonalityId(settings.personality || 'default');
 
       // Parse EOD "Tomorrow" items
       const items = await loadEodItems();
@@ -232,24 +253,39 @@ export default function Dashboard({ onNavigateToTasks, onNavigateToChat }: Dashb
     .sort((a, b) => a.dueAt - b.dueAt)
     .slice(0, 5);
 
-  const quote = getDailyQuote();
 
   return (
     <div className="dashboard-pane">
       <div className="dashboard-pane__header">
         <h1 className="dashboard-pane__title">
           <span className="dashboard-pane__glyph">✦</span>
-          {getGreetingWord()}{userName ? `, ${userName}` : ''}.
+          {getPersonalityGreeting(personalityId, userName, getTimeOfDay())}
         </h1>
         <div className="dashboard-pane__subtitle-row">
-          <span className="dashboard-pane__date">{formatDate(new Date())}</span>
+          <span className="dashboard-pane__info-item">
+            <svg className="dashboard-pane__info-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
+            </svg>
+            {formatDate(new Date())}
+          </span>
           {weather && (
-            <span className="dashboard-pane__weather-line">
-              {weather.icon} {weather.temp} in {weather.location || 'your area'}
-            </span>
+            <>
+              <span className="dashboard-pane__separator">•</span>
+              <span className="dashboard-pane__info-item">
+                <svg className="dashboard-pane__info-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M17.5 19a4.5 4.5 0 1 0 0-9h-1.8A7 7 0 1 0 4 14.5" /><path d="M9 17l3 3 3-3" />
+                </svg>
+                {weather.temp} in {weather.location || 'your area'}
+              </span>
+            </>
           )}
-          <span className="dashboard-pane__quote">
-            "{quote.text}"{quote.author && ` — ${quote.author}`}
+          <span className="dashboard-pane__separator">•</span>
+          <span className="dashboard-pane__info-item dashboard-pane__quote-inline">
+            <svg className="dashboard-pane__info-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 21c3 0 7-1 7-8V5c0-1.25-.756-2.017-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V21z" />
+              <path d="M15 21c3 0 7-1 7-8V5c0-1.25-.756-2.017-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V21z" />
+            </svg>
+            "{getDailyQuote().text}"{getDailyQuote().author ? ` — ${getDailyQuote().author}` : ''}
           </span>
         </div>
       </div>
@@ -273,6 +309,7 @@ export default function Dashboard({ onNavigateToTasks, onNavigateToChat }: Dashb
         {/* Tasks — left column */}
         <DashboardSection
           title="Tasks"
+          icon={<ChecklistIcon />}
           badge={totalOpen > 0 ? `${totalOpen} open` : undefined}
           action={totalOpen > 0 ? { label: 'View all', onClick: onNavigateToTasks } : undefined}
         >
@@ -301,7 +338,11 @@ export default function Dashboard({ onNavigateToTasks, onNavigateToChat }: Dashb
         </DashboardSection>
 
         {/* Upcoming Reminders — right column */}
-        <DashboardSection title="Reminders" icon={<BellIcon />}>
+        <DashboardSection
+          title="Reminders"
+          icon={<BellIcon />}
+          action={onNewChatWithDraft ? { label: '+', onClick: () => onNewChatWithDraft('/remind '), icon: <PlusIcon /> } : undefined}
+        >
           {upcomingReminders.length > 0 ? (
             <div className="dashboard-reminders">
               {upcomingReminders.map((r) => (
@@ -355,7 +396,7 @@ function DashboardSection({
   title: string;
   icon?: React.ReactNode;
   badge?: string;
-  action?: { label: string; onClick: () => void };
+  action?: { label: string; onClick: () => void; icon?: React.ReactNode };
   wide?: boolean;
   children: React.ReactNode;
 }) {
@@ -369,7 +410,7 @@ function DashboardSection({
         </div>
         {action && (
           <button className="dashboard-section__action" onClick={action.onClick}>
-            {action.label} <ArrowRightIcon />
+            {action.icon || <>{action.label} <ArrowRightIcon /></>}
           </button>
         )}
       </div>

@@ -42,6 +42,7 @@ export function getDefaultSettings(): Settings {
     openrouterModel: '',
     openrouterBaseUrl: 'https://openrouter.ai/api/v1',
     ollamaModel: 'llama3.2',
+    personality: 'default',
     brainPath: getDefaultBrainPath(),
     teamBrainPath: '',
     userName: '',
