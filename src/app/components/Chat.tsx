@@ -9,6 +9,7 @@ import type {
   Settings as SettingsType,
   StoredChatSession,
   WikiBaseSummary,
+  XPublishResult,
 } from '../../shared/types';
 import { filterWikiBases } from './chatWikiBaseMenu';
 import Message from './Message';
@@ -727,10 +728,6 @@ function hasSessionMetadata(metadata: ChatSessionMetadata): boolean {
   return !!metadata.wikiBasePath || !!metadata.xDraft;
 }
 
-function buildXIntentUrl(text: string): string {
-  return `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`;
-}
-
 type SessionStreamState = {
   requestId: string;
   baseMessages: MessageType[];
@@ -784,6 +781,9 @@ export default function Chat({
   const [showActionMenu, setShowActionMenu] = useState(false);
   const [showWikiSubmenu, setShowWikiSubmenu] = useState(false);
   const [showXPublishReview, setShowXPublishReview] = useState(false);
+  const [xPublishBusy, setXPublishBusy] = useState(false);
+  const [xPublishError, setXPublishError] = useState('');
+  const [xPublishResult, setXPublishResult] = useState<XPublishResult | null>(null);
   const [actionMenuDirection, setActionMenuDirection] = useState<'up' | 'down'>('up');
   const [composerExpanded, setComposerExpanded] = useState(false);
   const justLoadedRef = useRef(false);
@@ -1291,6 +1291,7 @@ export default function Chat({
   const xDraft = sessionMetadata.xDraft;
   const hasSessionBar = !!sessionMetadata.wikiBasePath || !!xDraft;
   const xDraftText = input.trim();
+  const draftAlreadyPublished = !!xDraft?.publishedPostId && xDraft.lastPublishedText === xDraftText;
 
   const COMMANDS = [
     { command: '/daily-brief', description: 'Morning briefing' },
@@ -1317,14 +1318,20 @@ export default function Chat({
   const handleStartXDraft = () => {
     const nextMetadata: ChatSessionMetadata = {
       ...sessionMetadata,
-      xDraft: sessionMetadata.xDraft || {
-        mode: 'post',
-        startedAt: Date.now(),
-      },
+      xDraft: sessionMetadata.xDraft
+        ? {
+          ...sessionMetadata.xDraft,
+          lastError: undefined,
+        }
+        : {
+          mode: 'post',
+          startedAt: Date.now(),
+        },
     };
     setSessionMetadata(nextMetadata);
     sessionMetadataCacheRef.current.set(sessionId, nextMetadata);
     onSessionChange(sessionId);
+    setXPublishError('');
     closeActionMenu();
     textareaRef.current?.focus();
   };
@@ -1336,17 +1343,66 @@ export default function Chat({
     sessionMetadataCacheRef.current.set(sessionId, nextMetadata);
     onSessionChange(sessionId);
     setShowXPublishReview(false);
+    setXPublishBusy(false);
+    setXPublishError('');
+    setXPublishResult(null);
   };
 
   const handleOpenXPublishReview = () => {
     closeActionMenu();
+    setXPublishError(sessionMetadata.xDraft?.lastError || '');
+    if (sessionMetadata.xDraft?.publishedPostId && sessionMetadata.xDraft.publishedUrl && sessionMetadata.xDraft.lastPublishedText === xDraftText) {
+      setXPublishResult({
+        id: sessionMetadata.xDraft.publishedPostId,
+        url: sessionMetadata.xDraft.publishedUrl,
+        text: sessionMetadata.xDraft.lastPublishedText || xDraftText,
+        publishedAt: sessionMetadata.xDraft.publishedAt || Date.now(),
+      });
+    }
     setShowXPublishReview(true);
   };
 
-  const handlePublishXDraft = () => {
+  const handlePublishXDraft = async () => {
     if (!xDraftText) return;
-    window.open(buildXIntentUrl(xDraftText), '_blank', 'noopener,noreferrer');
-    setShowXPublishReview(false);
+    setXPublishBusy(true);
+    setXPublishError('');
+    try {
+      const result = await window.keel.xPublishPost({ text: xDraftText });
+      setXPublishResult(result);
+      if (sessionMetadata.xDraft) {
+        const nextMetadata: ChatSessionMetadata = {
+          ...sessionMetadata,
+          xDraft: {
+            ...sessionMetadata.xDraft,
+            publishedPostId: result.id,
+            publishedUrl: result.url,
+            publishedAt: result.publishedAt,
+            lastPublishedText: xDraftText,
+            lastError: undefined,
+          },
+        };
+        setSessionMetadata(nextMetadata);
+        sessionMetadataCacheRef.current.set(sessionId, nextMetadata);
+        onSessionChange(sessionId);
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'X publish failed.';
+      setXPublishError(message);
+      if (sessionMetadata.xDraft) {
+        const nextMetadata: ChatSessionMetadata = {
+          ...sessionMetadata,
+          xDraft: {
+            ...sessionMetadata.xDraft,
+            lastError: message,
+          },
+        };
+        setSessionMetadata(nextMetadata);
+        sessionMetadataCacheRef.current.set(sessionId, nextMetadata);
+        onSessionChange(sessionId);
+      }
+    } finally {
+      setXPublishBusy(false);
+    }
   };
 
   const handleDocumentAttach = async () => {
@@ -1870,13 +1926,23 @@ export default function Chat({
                     <span className="chat-composer__session-label">X Draft</span>
                     <span>{xDraft.mode === 'post' ? 'Post' : xDraft.mode}</span>
                     {xDraftText && <span className="chat-composer__session-meta">{xDraftText.length} chars</span>}
+                    {draftAlreadyPublished && <span className="chat-composer__session-meta">Published</span>}
                     <button
                       type="button"
                       className="chat-composer__chip-action"
                       onClick={handleOpenXPublishReview}
                     >
-                      Publish
+                      {draftAlreadyPublished ? 'View' : 'Publish'}
                     </button>
+                    {xDraft.publishedUrl && draftAlreadyPublished && (
+                      <button
+                        type="button"
+                        className="chat-composer__chip-action"
+                        onClick={() => window.open(xDraft.publishedUrl, '_blank', 'noopener,noreferrer')}
+                      >
+                        Open
+                      </button>
+                    )}
                     <button
                       type="button"
                       className="chat-composer__chip-dismiss"
@@ -1966,7 +2032,31 @@ export default function Chat({
           <textarea
             ref={textareaRef}
             value={input}
-            onChange={(e) => setInput(e.target.value)}
+            onChange={(e) => {
+              const nextValue = e.target.value;
+              setInput(nextValue);
+              if (sessionMetadata.xDraft && (
+                sessionMetadata.xDraft.lastError
+                || (sessionMetadata.xDraft.publishedPostId && sessionMetadata.xDraft.lastPublishedText !== nextValue.trim())
+              )) {
+                const nextMetadata: ChatSessionMetadata = {
+                  ...sessionMetadata,
+                  xDraft: {
+                    ...sessionMetadata.xDraft,
+                    publishedPostId: undefined,
+                    publishedUrl: undefined,
+                    publishedAt: undefined,
+                    lastPublishedText: undefined,
+                    lastError: undefined,
+                  },
+                };
+                setSessionMetadata(nextMetadata);
+                sessionMetadataCacheRef.current.set(sessionId, nextMetadata);
+                onSessionChange(sessionId);
+                setXPublishError('');
+                setXPublishResult(null);
+              }
+            }}
             onKeyDown={handleKeyDown}
             placeholder={xDraft ? 'Write your X post draft…' : messages.length === 0 ? 'Ask Keel anything…' : 'Reply…'}
             disabled={isStreaming}
@@ -2218,21 +2308,52 @@ export default function Chat({
               <div className="chat-modal__draft-meta">
                 <span>{xDraftText.length} characters</span>
                 {sessionMetadata.wikiBasePath && <span>Linked to {selectedWikiBaseLabel}</span>}
-                <span>Publishes through the browser composer in this slice</span>
+                <span>Publishes directly to X in this slice</span>
               </div>
             </div>
+
+            {xPublishError && (
+              <div className="chat-modal__card" style={{ borderColor: 'rgba(248, 113, 113, 0.32)', background: 'rgba(248, 113, 113, 0.08)' }}>
+                <div className="chat-modal__card-label">Publish Error</div>
+                <div className="chat-modal__draft-text">{xPublishError}</div>
+              </div>
+            )}
+
+            {xPublishResult && draftAlreadyPublished && (
+              <div className="chat-modal__card" style={{ borderColor: 'rgba(52, 211, 153, 0.28)', background: 'rgba(52, 211, 153, 0.08)' }}>
+                <div className="chat-modal__card-label">Published</div>
+                <div className="chat-modal__draft-text">
+                  Your draft is live on X.
+                </div>
+                <div className="chat-modal__draft-meta">
+                  <span>{new Date(xPublishResult.publishedAt).toLocaleString()}</span>
+                  <a href={xPublishResult.url} target="_blank" rel="noopener noreferrer">
+                    Open published post
+                  </a>
+                </div>
+              </div>
+            )}
 
             <div className="chat-modal__footer">
               <button type="button" className="chat-modal__secondary" onClick={() => setShowXPublishReview(false)}>
                 Close
               </button>
+              {xPublishResult && draftAlreadyPublished && (
+                <button
+                  type="button"
+                  className="chat-modal__secondary"
+                  onClick={() => window.open(xPublishResult.url, '_blank', 'noopener,noreferrer')}
+                >
+                  Open Post
+                </button>
+              )}
               <button
                 type="button"
                 className="chat-modal__primary"
-                disabled={!xDraftText}
+                disabled={!xDraftText || xPublishBusy || draftAlreadyPublished}
                 onClick={handlePublishXDraft}
               >
-                Open X Composer
+                {xPublishBusy ? 'Publishing...' : draftAlreadyPublished ? 'Published' : 'Publish to X'}
               </button>
             </div>
           </div>

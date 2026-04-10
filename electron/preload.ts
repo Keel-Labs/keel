@@ -138,6 +138,7 @@ const api: KeelAPI = {
   xDisconnect: () => ipcRenderer.invoke('keel:x-disconnect'),
   xStatus: () => ipcRenderer.invoke('keel:x-status'),
   xSyncBookmarks: () => ipcRenderer.invoke('keel:x-sync-bookmarks'),
+  xPublishPost: (request) => ipcRenderer.invoke('keel:x-publish-post', request),
   openaiListModels: () => ipcRenderer.invoke('keel:openai-list-models'),
   ollamaListModels: () => ipcRenderer.invoke('keel:ollama-list-models'),
   getRecentActivity: (limit?: number) => ipcRenderer.invoke('keel:get-recent-activity', limit),
