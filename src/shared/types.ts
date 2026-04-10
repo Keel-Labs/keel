@@ -171,6 +171,9 @@ export interface XStatus {
   scopes?: string[];
   account?: XAccountProfile;
   lastSyncAt?: number;
+  lastSyncFetchedCount?: number;
+  lastSyncNewCount?: number;
+  lastSyncSkippedCount?: number;
   lastPublishAt?: number;
   lastPublishedUrl?: string;
   lastPublishError?: string;
@@ -181,7 +184,10 @@ export interface XStatus {
 }
 
 export interface XSyncResult {
+  fetchedCount: number;
   syncedCount: number;
+  skippedCount: number;
+  stoppedEarly: boolean;
   targetBasePath: string;
   targetBaseTitle: string;
 }

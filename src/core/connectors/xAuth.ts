@@ -32,6 +32,10 @@ interface XConnectorMeta {
   lastError?: string;
   targetBasePath?: string;
   targetBaseTitle?: string;
+  recentBookmarkPostIds?: string[];
+  lastSyncFetchedCount?: number;
+  lastSyncNewCount?: number;
+  lastSyncSkippedCount?: number;
   lastPublishAt?: number;
   lastPublishedUrl?: string;
   lastPublishError?: string;
@@ -312,7 +316,15 @@ export function setXSyncing(brainPath: string): void {
   });
 }
 
-export function recordXSyncSuccess(brainPath: string): void {
+export function recordXSyncSuccess(
+  brainPath: string,
+  details?: {
+    recentBookmarkPostIds?: string[];
+    fetchedCount?: number;
+    newCount?: number;
+    skippedCount?: number;
+  },
+): void {
   const state = getSyncState(brainPath, CONNECTOR_KEY);
   const meta = loadConnectorMeta(brainPath);
   upsertSyncState(brainPath, CONNECTOR_KEY, {
@@ -321,6 +333,10 @@ export function recordXSyncSuccess(brainPath: string): void {
     meta: JSON.stringify({
       ...meta,
       lastError: undefined,
+      recentBookmarkPostIds: details?.recentBookmarkPostIds ?? meta.recentBookmarkPostIds,
+      lastSyncFetchedCount: details?.fetchedCount ?? meta.lastSyncFetchedCount,
+      lastSyncNewCount: details?.newCount ?? meta.lastSyncNewCount,
+      lastSyncSkippedCount: details?.skippedCount ?? meta.lastSyncSkippedCount,
     }),
   });
 }
@@ -366,6 +382,9 @@ export function getXStatus(brainPath: string, clientId: string): XStatus {
     scopes: meta.tokens?.scope?.split(/\s+/).filter(Boolean) || X_SCOPES,
     account: meta.tokens?.account,
     lastSyncAt: state?.lastSync ?? undefined,
+    lastSyncFetchedCount: meta.lastSyncFetchedCount,
+    lastSyncNewCount: meta.lastSyncNewCount,
+    lastSyncSkippedCount: meta.lastSyncSkippedCount,
     lastPublishAt: meta.lastPublishAt,
     lastPublishedUrl: meta.lastPublishedUrl,
     lastPublishError: meta.lastPublishError,
@@ -379,6 +398,10 @@ export function getXStatus(brainPath: string, clientId: string): XStatus {
 export function isXConnected(brainPath: string): boolean {
   const tokens = loadXTokens(brainPath);
   return !!tokens?.accessToken;
+}
+
+export function getRecentXBookmarkPostIds(brainPath: string): string[] {
+  return loadConnectorMeta(brainPath).recentBookmarkPostIds || [];
 }
 
 function loadConnectorMeta(brainPath: string): XConnectorMeta {
