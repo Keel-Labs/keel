@@ -76,6 +76,7 @@ import {
   recordXSyncError,
   type XOAuthConfig,
 } from '../src/core/connectors/xAuth';
+import { X_CLIENT_ID, X_CONFIG } from '../src/core/connectors/xConfig';
 import { syncXBookmarksToWiki } from '../src/core/connectors/xBookmarks';
 import { publishXPost } from '../src/core/connectors/xPublish';
 import type {
@@ -1503,13 +1504,11 @@ function registerIpcHandlers() {
   }
 
   function getXConfig(): XOAuthConfig {
-    if (!settings.xClientId.trim()) {
-      throw new Error('Add your X Client ID in Settings before connecting.');
+    if (!X_CLIENT_ID.trim()) {
+      throw new Error('X integration is not available yet. X OAuth credentials have not been bundled with this build.');
     }
 
-    return {
-      clientId: settings.xClientId.trim(),
-    };
+    return X_CONFIG;
   }
 
   ipcMain.handle('keel:google-connect', async () => {
@@ -1552,13 +1551,13 @@ function registerIpcHandlers() {
   });
 
   ipcMain.handle('keel:x-disconnect', async () => {
-    const config = settings.xClientId.trim() ? getXConfig() : undefined;
+    const config = X_CLIENT_ID.trim() ? getXConfig() : undefined;
     await disconnectX(settings.brainPath, config);
     logActivity(settings.brainPath, 'x-disconnect', 'Disconnected from X');
   });
 
   ipcMain.handle('keel:x-status', async () => {
-    return getXStatus(settings.brainPath, settings.xClientId || '');
+    return getXStatus(settings.brainPath, X_CLIENT_ID);
   });
 
   ipcMain.handle('keel:x-sync-bookmarks', async () => {
@@ -1566,7 +1565,7 @@ function registerIpcHandlers() {
       const config = getXConfig();
       setXSyncing(settings.brainPath);
       const accessToken = await getValidXAccessToken(settings.brainPath, config);
-      const status = getXStatus(settings.brainPath, settings.xClientId || '');
+      const status = getXStatus(settings.brainPath, X_CLIENT_ID);
       if (!status.account?.id) {
         throw new Error('The connected X account could not be resolved. Disconnect and reconnect the account.');
       }
@@ -1583,7 +1582,7 @@ function registerIpcHandlers() {
   ipcMain.handle('keel:x-publish-post', async (_event, request: XPublishRequest): Promise<XPublishResult> => {
     try {
       const config = getXConfig();
-      const status = getXStatus(settings.brainPath, settings.xClientId || '');
+      const status = getXStatus(settings.brainPath, X_CLIENT_ID);
       if (!status.account) {
         throw new Error('Connect your X account before publishing.');
       }

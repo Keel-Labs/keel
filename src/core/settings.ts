@@ -43,7 +43,6 @@ export function getDefaultSettings(): Settings {
     openrouterBaseUrl: 'https://openrouter.ai/api/v1',
     ollamaModel: 'llama3.2',
     personality: 'default',
-    xClientId: '',
     brainPath: getDefaultBrainPath(),
     teamBrainPath: '',
     userName: '',
@@ -69,7 +68,8 @@ function writeSettingsFile(configPath: string, settings: Settings): void {
 }
 
 function normalizeSettings(parsed: Partial<Settings>, defaults: Settings): Settings {
-  const settings = { ...defaults, ...parsed };
+  const { xClientId: _legacyXClientId, ...nextParsed } = parsed as Partial<Settings> & { xClientId?: string };
+  const settings = { ...defaults, ...nextParsed };
 
   if (typeof parsed.hasCompletedOnboarding !== 'boolean') {
     settings.hasCompletedOnboarding = Object.keys(parsed).length > 0;
