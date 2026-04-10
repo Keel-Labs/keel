@@ -1178,7 +1178,7 @@ export default function Settings({ onBack, navigation }: Props) {
               }}
               description={
                 xStatus?.connected
-                  ? `Connected to ${xStatus.account?.username ? `@${xStatus.account.username}` : 'X'}. You can sync bookmarks into the dedicated wiki base.`
+                  ? `Connected to ${xStatus.account?.username ? `@${xStatus.account.username}` : 'X'}. You can sync bookmarks and publish drafts from Keel.`
                   : 'Add your X Client ID, then connect your account using OAuth 2.0 PKCE.'
               }
               actions={(
@@ -1213,7 +1213,10 @@ export default function Settings({ onBack, navigation }: Props) {
                           setXMessage('');
                           try {
                             const result = await window.keel.xSyncBookmarks();
-                            setXMessage(`Synced ${result.syncedCount} bookmarks into ${result.targetBaseTitle}.`);
+                            const syncSummary = result.syncedCount === 0
+                              ? `No new bookmarks. Skipped ${result.skippedCount} already-ingested posts in ${result.targetBaseTitle}.`
+                              : `Synced ${result.syncedCount} new bookmarks into ${result.targetBaseTitle} and skipped ${result.skippedCount} already-ingested posts.`;
+                            setXMessage(result.stoppedEarly ? `${syncSummary} Sync stopped early after reaching known bookmarks.` : syncSummary);
                             await refreshXStatus();
                           } catch (err) {
                             setXMessage(err instanceof Error ? err.message : 'Bookmark sync failed');
@@ -1277,7 +1280,10 @@ export default function Settings({ onBack, navigation }: Props) {
                 />
               </FieldRow>
               <InlineNote>
-                This slice requests <code style={inlineCodeStyle}>tweet.read</code>, <code style={inlineCodeStyle}>users.read</code>, <code style={inlineCodeStyle}>bookmark.read</code>, and <code style={inlineCodeStyle}>offline.access</code>.
+                This slice requests <code style={inlineCodeStyle}>tweet.read</code>, <code style={inlineCodeStyle}>users.read</code>, <code style={inlineCodeStyle}>bookmark.read</code>, <code style={inlineCodeStyle}>tweet.write</code>, and <code style={inlineCodeStyle}>offline.access</code>.
+              </InlineNote>
+              <InlineNote>
+                Configure this exact X callback URL in your developer app: <code style={inlineCodeStyle}>{xStatus?.redirectUri || 'http://127.0.0.1:43021/callback'}</code>
               </InlineNote>
             </SectionCard>
 
@@ -1293,12 +1299,39 @@ export default function Settings({ onBack, navigation }: Props) {
                   Last sync: {xStatus?.lastSyncAt ? new Date(xStatus.lastSyncAt).toLocaleString() : 'Not synced yet'}
                 </div>
                 <div style={{ color: 'var(--text-secondary)', lineHeight: 1.7 }}>
+                  Last sync result: {xStatus?.lastSyncAt
+                    ? `${xStatus.lastSyncNewCount || 0} new, ${xStatus.lastSyncSkippedCount || 0} skipped, ${xStatus.lastSyncFetchedCount || 0} fetched`
+                    : 'No sync results yet'}
+                </div>
+                <div style={{ color: 'var(--text-secondary)', lineHeight: 1.7 }}>
                   Status: {xStatus?.status || 'idle'}
                 </div>
               </div>
               <InlineNote>
                 Bookmark sync currently lands in one dedicated base. Topic-based routing and inbox review will come in the next slice.
               </InlineNote>
+            </SectionCard>
+
+            <SectionCard
+              title="Publishing"
+              description="Composer drafts now publish directly through the X API after explicit confirmation."
+            >
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <div style={{ color: 'var(--text-secondary)', lineHeight: 1.7 }}>
+                  Granted scopes: {(xStatus?.scopes || []).join(', ')}
+                </div>
+                <div style={{ color: 'var(--text-secondary)', lineHeight: 1.7 }}>
+                  Last publish: {xStatus?.lastPublishAt ? new Date(xStatus.lastPublishAt).toLocaleString() : 'Not published yet'}
+                </div>
+                <div style={{ color: 'var(--text-secondary)', lineHeight: 1.7 }}>
+                  Latest post: {xStatus?.lastPublishedUrl ? <a href={xStatus.lastPublishedUrl} target="_blank" rel="noopener noreferrer">{xStatus.lastPublishedUrl}</a> : 'No published post yet'}
+                </div>
+              </div>
+              {xStatus?.lastPublishError && (
+                <InlineMessage tone="danger">
+                  {xStatus.lastPublishError}
+                </InlineMessage>
+              )}
             </SectionCard>
           </>
         );

@@ -33,6 +33,11 @@ export interface ChatSessionMetadata {
 export interface ChatXDraftMetadata {
   mode: 'post';
   startedAt: number;
+  publishedPostId?: string;
+  publishedUrl?: string;
+  publishedAt?: number;
+  lastPublishedText?: string;
+  lastError?: string;
 }
 
 export interface StoredChatSession {
@@ -162,8 +167,16 @@ export interface XStatus {
   configured: boolean;
   connected: boolean;
   clientId?: string;
+  redirectUri?: string;
+  scopes?: string[];
   account?: XAccountProfile;
   lastSyncAt?: number;
+  lastSyncFetchedCount?: number;
+  lastSyncNewCount?: number;
+  lastSyncSkippedCount?: number;
+  lastPublishAt?: number;
+  lastPublishedUrl?: string;
+  lastPublishError?: string;
   status: 'idle' | 'connected' | 'syncing' | 'error' | 'disconnected';
   error?: string;
   targetBasePath?: string;
@@ -171,9 +184,23 @@ export interface XStatus {
 }
 
 export interface XSyncResult {
+  fetchedCount: number;
   syncedCount: number;
+  skippedCount: number;
+  stoppedEarly: boolean;
   targetBasePath: string;
   targetBaseTitle: string;
+}
+
+export interface XPublishRequest {
+  text: string;
+}
+
+export interface XPublishResult {
+  id: string;
+  url: string;
+  text: string;
+  publishedAt: number;
 }
 
 export type WikiJobType = 'compile' | 'health';
@@ -317,6 +344,7 @@ export type IpcChannels =
   | 'keel:x-disconnect'
   | 'keel:x-status'
   | 'keel:x-sync-bookmarks'
+  | 'keel:x-publish-post'
   | 'keel:openai-list-models'
   | 'keel:ollama-list-models'
   | 'keel:list-tasks'
@@ -402,6 +430,7 @@ export interface KeelAPI {
   xDisconnect: () => Promise<void>;
   xStatus: () => Promise<XStatus>;
   xSyncBookmarks: () => Promise<XSyncResult>;
+  xPublishPost: (request: XPublishRequest) => Promise<XPublishResult>;
   openaiListModels: () => Promise<OpenAIListResult>;
   // Ollama
   ollamaListModels: () => Promise<OllamaListResult>;
