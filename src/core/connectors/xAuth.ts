@@ -385,7 +385,7 @@ export function getXStatus(brainPath: string, clientId: string): XStatus {
     connected,
     clientId: clientId || undefined,
     redirectUri: X_REDIRECT_URI,
-    scopes: meta.tokens?.scope?.split(/\s+/).filter(Boolean) || X_SCOPES,
+    scopes: meta.tokens?.scope?.split(/\s+/).filter(Boolean) || [...X_SCOPES],
     account: meta.tokens?.account,
     lastSyncAt: state?.lastSync ?? undefined,
     lastSyncFetchedCount: meta.lastSyncFetchedCount,
