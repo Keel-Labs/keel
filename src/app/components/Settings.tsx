@@ -1213,7 +1213,10 @@ export default function Settings({ onBack, navigation }: Props) {
                           setXMessage('');
                           try {
                             const result = await window.keel.xSyncBookmarks();
-                            setXMessage(`Synced ${result.syncedCount} bookmarks into ${result.targetBaseTitle}.`);
+                            const syncSummary = result.syncedCount === 0
+                              ? `No new bookmarks. Skipped ${result.skippedCount} already-ingested posts in ${result.targetBaseTitle}.`
+                              : `Synced ${result.syncedCount} new bookmarks into ${result.targetBaseTitle} and skipped ${result.skippedCount} already-ingested posts.`;
+                            setXMessage(result.stoppedEarly ? `${syncSummary} Sync stopped early after reaching known bookmarks.` : syncSummary);
                             await refreshXStatus();
                           } catch (err) {
                             setXMessage(err instanceof Error ? err.message : 'Bookmark sync failed');
@@ -1294,6 +1297,11 @@ export default function Settings({ onBack, navigation }: Props) {
                 </div>
                 <div style={{ color: 'var(--text-secondary)', lineHeight: 1.7 }}>
                   Last sync: {xStatus?.lastSyncAt ? new Date(xStatus.lastSyncAt).toLocaleString() : 'Not synced yet'}
+                </div>
+                <div style={{ color: 'var(--text-secondary)', lineHeight: 1.7 }}>
+                  Last sync result: {xStatus?.lastSyncAt
+                    ? `${xStatus.lastSyncNewCount || 0} new, ${xStatus.lastSyncSkippedCount || 0} skipped, ${xStatus.lastSyncFetchedCount || 0} fetched`
+                    : 'No sync results yet'}
                 </div>
                 <div style={{ color: 'var(--text-secondary)', lineHeight: 1.7 }}>
                   Status: {xStatus?.status || 'idle'}
