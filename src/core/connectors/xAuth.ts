@@ -9,7 +9,10 @@ const X_TOKEN_URL = 'https://api.x.com/2/oauth2/token';
 const X_REVOKE_URL = 'https://api.x.com/2/oauth2/revoke';
 const X_ME_URL = 'https://api.x.com/2/users/me';
 
-export const X_SCOPES = ['tweet.read', 'users.read', 'bookmark.read', 'offline.access'];
+const X_REDIRECT_PORT = 43021;
+
+export const X_REDIRECT_URI = `http://127.0.0.1:${X_REDIRECT_PORT}/callback`;
+export const X_SCOPES = ['tweet.read', 'users.read', 'bookmark.read', 'tweet.write', 'offline.access'];
 
 export interface XOAuthConfig {
   clientId: string;
@@ -29,6 +32,13 @@ interface XConnectorMeta {
   lastError?: string;
   targetBasePath?: string;
   targetBaseTitle?: string;
+  recentBookmarkPostIds?: string[];
+  lastSyncFetchedCount?: number;
+  lastSyncNewCount?: number;
+  lastSyncSkippedCount?: number;
+  lastPublishAt?: number;
+  lastPublishedUrl?: string;
+  lastPublishError?: string;
 }
 
 export async function startXOAuthFlow(
@@ -37,10 +47,27 @@ export async function startXOAuthFlow(
 ): Promise<XTokens> {
   return new Promise((resolve, reject) => {
     const server = http.createServer();
+    let authWindow: any | null = null;
+    let finished = false;
+    const timeout = setTimeout(() => cleanup(new Error('X authorization timed out.')), 5 * 60 * 1000);
 
-    server.listen(0, '127.0.0.1', () => {
-      const address = server.address() as { port: number };
-      const redirectUri = `http://127.0.0.1:${address.port}/callback`;
+    function cleanup(error?: Error) {
+      if (finished) return;
+      finished = true;
+      clearTimeout(timeout);
+      try { server.close(); } catch {}
+      try { if (authWindow && !authWindow.isDestroyed()) authWindow.close(); } catch {}
+      if (error) reject(error);
+    }
+
+    server.on('error', (error: NodeJS.ErrnoException) => {
+      const reason = error.code === 'EADDRINUSE'
+        ? `X auth callback port ${X_REDIRECT_PORT} is already in use. Close the other Keel/X auth session and try again.`
+        : 'Failed to start the X auth callback server.';
+      cleanup(new Error(reason));
+    });
+
+    server.listen(X_REDIRECT_PORT, '127.0.0.1', () => {
       const state = crypto.randomBytes(16).toString('hex');
       const codeVerifier = crypto.randomBytes(32).toString('base64url');
       const codeChallenge = crypto.createHash('sha256').update(codeVerifier).digest('base64url');
@@ -48,31 +75,19 @@ export async function startXOAuthFlow(
       const authUrl = new URL(X_AUTHORIZE_URL);
       authUrl.searchParams.set('response_type', 'code');
       authUrl.searchParams.set('client_id', config.clientId);
-      authUrl.searchParams.set('redirect_uri', redirectUri);
+      authUrl.searchParams.set('redirect_uri', X_REDIRECT_URI);
       authUrl.searchParams.set('scope', (config.scopes || X_SCOPES).join(' '));
       authUrl.searchParams.set('state', state);
       authUrl.searchParams.set('code_challenge', codeChallenge);
       authUrl.searchParams.set('code_challenge_method', 'S256');
 
-      const authWindow = new BrowserWindow({
+      authWindow = new BrowserWindow({
         width: 500,
         height: 720,
         title: 'Connect X',
         webPreferences: { nodeIntegration: false, contextIsolation: true },
       });
       authWindow.loadURL(authUrl.toString());
-
-      let finished = false;
-      const timeout = setTimeout(() => cleanup(new Error('X authorization timed out.')), 5 * 60 * 1000);
-
-      function cleanup(error?: Error) {
-        if (finished) return;
-        finished = true;
-        clearTimeout(timeout);
-        try { server.close(); } catch {}
-        try { if (!authWindow.isDestroyed()) authWindow.close(); } catch {}
-        if (error) reject(error);
-      }
 
       authWindow.on('closed', () => {
         cleanup(new Error('X authorization was cancelled.'));
@@ -85,7 +100,7 @@ export async function startXOAuthFlow(
           return;
         }
 
-        const callbackUrl = new URL(req.url, redirectUri);
+        const callbackUrl = new URL(req.url, X_REDIRECT_URI);
         const code = callbackUrl.searchParams.get('code');
         const returnedState = callbackUrl.searchParams.get('state');
         const error = callbackUrl.searchParams.get('error');
@@ -105,7 +120,7 @@ export async function startXOAuthFlow(
               code,
               grant_type: 'authorization_code',
               client_id: config.clientId,
-              redirect_uri: redirectUri,
+              redirect_uri: X_REDIRECT_URI,
               code_verifier: codeVerifier,
             }),
           });
@@ -301,7 +316,15 @@ export function setXSyncing(brainPath: string): void {
   });
 }
 
-export function recordXSyncSuccess(brainPath: string): void {
+export function recordXSyncSuccess(
+  brainPath: string,
+  details?: {
+    recentBookmarkPostIds?: string[];
+    fetchedCount?: number;
+    newCount?: number;
+    skippedCount?: number;
+  },
+): void {
   const state = getSyncState(brainPath, CONNECTOR_KEY);
   const meta = loadConnectorMeta(brainPath);
   upsertSyncState(brainPath, CONNECTOR_KEY, {
@@ -310,6 +333,38 @@ export function recordXSyncSuccess(brainPath: string): void {
     meta: JSON.stringify({
       ...meta,
       lastError: undefined,
+      recentBookmarkPostIds: details?.recentBookmarkPostIds ?? meta.recentBookmarkPostIds,
+      lastSyncFetchedCount: details?.fetchedCount ?? meta.lastSyncFetchedCount,
+      lastSyncNewCount: details?.newCount ?? meta.lastSyncNewCount,
+      lastSyncSkippedCount: details?.skippedCount ?? meta.lastSyncSkippedCount,
+    }),
+  });
+}
+
+export function recordXPublishSuccess(brainPath: string, url: string, publishedAt: number): void {
+  const state = getSyncState(brainPath, CONNECTOR_KEY);
+  const meta = loadConnectorMeta(brainPath);
+  upsertSyncState(brainPath, CONNECTOR_KEY, {
+    status: state?.status || 'connected',
+    lastSync: state?.lastSync ?? undefined,
+    meta: JSON.stringify({
+      ...meta,
+      lastPublishAt: publishedAt,
+      lastPublishedUrl: url,
+      lastPublishError: undefined,
+    }),
+  });
+}
+
+export function recordXPublishError(brainPath: string, message: string): void {
+  const state = getSyncState(brainPath, CONNECTOR_KEY);
+  const meta = loadConnectorMeta(brainPath);
+  upsertSyncState(brainPath, CONNECTOR_KEY, {
+    status: state?.status || 'connected',
+    lastSync: state?.lastSync ?? undefined,
+    meta: JSON.stringify({
+      ...meta,
+      lastPublishError: message,
     }),
   });
 }
@@ -323,8 +378,16 @@ export function getXStatus(brainPath: string, clientId: string): XStatus {
     configured: !!clientId.trim(),
     connected,
     clientId: clientId || undefined,
+    redirectUri: X_REDIRECT_URI,
+    scopes: meta.tokens?.scope?.split(/\s+/).filter(Boolean) || X_SCOPES,
     account: meta.tokens?.account,
     lastSyncAt: state?.lastSync ?? undefined,
+    lastSyncFetchedCount: meta.lastSyncFetchedCount,
+    lastSyncNewCount: meta.lastSyncNewCount,
+    lastSyncSkippedCount: meta.lastSyncSkippedCount,
+    lastPublishAt: meta.lastPublishAt,
+    lastPublishedUrl: meta.lastPublishedUrl,
+    lastPublishError: meta.lastPublishError,
     status: mapXStatus(state?.status, connected),
     error: meta.lastError,
     targetBasePath: meta.targetBasePath,
@@ -335,6 +398,10 @@ export function getXStatus(brainPath: string, clientId: string): XStatus {
 export function isXConnected(brainPath: string): boolean {
   const tokens = loadXTokens(brainPath);
   return !!tokens?.accessToken;
+}
+
+export function getRecentXBookmarkPostIds(brainPath: string): string[] {
+  return loadConnectorMeta(brainPath).recentBookmarkPostIds || [];
 }
 
 function loadConnectorMeta(brainPath: string): XConnectorMeta {
