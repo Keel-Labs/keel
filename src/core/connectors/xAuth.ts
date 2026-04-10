@@ -2,6 +2,8 @@ import * as http from 'http';
 import * as crypto from 'crypto';
 import { getSyncState, upsertSyncState } from '../db';
 import type { XAccountProfile, XStatus } from '../../shared/types';
+import { X_REDIRECT_URI } from './xConfig';
+import { X_SCOPES } from '../../shared/xScopes';
 
 const CONNECTOR_KEY = 'x-oauth';
 const X_AUTHORIZE_URL = 'https://x.com/i/oauth2/authorize';
@@ -9,13 +11,9 @@ const X_TOKEN_URL = 'https://api.x.com/2/oauth2/token';
 const X_REVOKE_URL = 'https://api.x.com/2/oauth2/revoke';
 const X_ME_URL = 'https://api.x.com/2/users/me';
 
-const X_REDIRECT_PORT = 43021;
-
-export const X_REDIRECT_URI = `http://127.0.0.1:${X_REDIRECT_PORT}/callback`;
-export const X_SCOPES = ['tweet.read', 'users.read', 'bookmark.read', 'tweet.write', 'offline.access'];
-
 export interface XOAuthConfig {
   clientId: string;
+  redirectUri: string;
   scopes?: string[];
 }
 
@@ -61,13 +59,22 @@ export async function startXOAuthFlow(
     }
 
     server.on('error', (error: NodeJS.ErrnoException) => {
+      const redirectPort = new URL(config.redirectUri).port || 'unknown';
       const reason = error.code === 'EADDRINUSE'
-        ? `X auth callback port ${X_REDIRECT_PORT} is already in use. Close the other Keel/X auth session and try again.`
+        ? `X auth callback port ${redirectPort} is already in use. Close the other Keel/X auth session and try again.`
         : 'Failed to start the X auth callback server.';
       cleanup(new Error(reason));
     });
 
-    server.listen(X_REDIRECT_PORT, '127.0.0.1', () => {
+    const redirectUrl = new URL(config.redirectUri);
+    const redirectHost = redirectUrl.hostname;
+    const redirectPort = Number(redirectUrl.port);
+    if (!redirectPort) {
+      reject(new Error('X OAuth redirect URI must include an explicit localhost port.'));
+      return;
+    }
+
+    server.listen(redirectPort, redirectHost, () => {
       const state = crypto.randomBytes(16).toString('hex');
       const codeVerifier = crypto.randomBytes(32).toString('base64url');
       const codeChallenge = crypto.createHash('sha256').update(codeVerifier).digest('base64url');
@@ -75,7 +82,7 @@ export async function startXOAuthFlow(
       const authUrl = new URL(X_AUTHORIZE_URL);
       authUrl.searchParams.set('response_type', 'code');
       authUrl.searchParams.set('client_id', config.clientId);
-      authUrl.searchParams.set('redirect_uri', X_REDIRECT_URI);
+      authUrl.searchParams.set('redirect_uri', config.redirectUri);
       authUrl.searchParams.set('scope', (config.scopes || X_SCOPES).join(' '));
       authUrl.searchParams.set('state', state);
       authUrl.searchParams.set('code_challenge', codeChallenge);
@@ -88,7 +95,6 @@ export async function startXOAuthFlow(
         webPreferences: { nodeIntegration: false, contextIsolation: true },
       });
       authWindow.loadURL(authUrl.toString());
-
       authWindow.on('closed', () => {
         cleanup(new Error('X authorization was cancelled.'));
       });
@@ -100,7 +106,7 @@ export async function startXOAuthFlow(
           return;
         }
 
-        const callbackUrl = new URL(req.url, X_REDIRECT_URI);
+        const callbackUrl = new URL(req.url, config.redirectUri);
         const code = callbackUrl.searchParams.get('code');
         const returnedState = callbackUrl.searchParams.get('state');
         const error = callbackUrl.searchParams.get('error');
@@ -120,7 +126,7 @@ export async function startXOAuthFlow(
               code,
               grant_type: 'authorization_code',
               client_id: config.clientId,
-              redirect_uri: X_REDIRECT_URI,
+              redirect_uri: config.redirectUri,
               code_verifier: codeVerifier,
             }),
           });
@@ -226,7 +232,7 @@ export function loadXTokens(brainPath: string): XTokens | null {
 export async function getValidXAccessToken(brainPath: string, config: XOAuthConfig): Promise<string> {
   const tokens = loadXTokens(brainPath);
   if (!tokens) {
-    throw new Error('Not connected to X. Add a Client ID and connect the account first.');
+    throw new Error('Not connected to X. Connect your account first.');
   }
 
   if (Date.now() < tokens.expiresAt - 60_000) {

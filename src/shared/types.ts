@@ -68,8 +68,6 @@ export interface Settings {
   ollamaModel: string;
   // Personality
   personality: string;       // ID of active personality template (e.g. "default", "butler").
-  // X
-  xClientId: string;
   // General
   brainPath: string;
   // Team Brain

@@ -7,6 +7,8 @@ import type {
   WikiSourceType,
   XStatus,
 } from '../../shared/types';
+import { X_SCOPES } from '../../shared/xScopes';
+import { X_REDIRECT_URI } from '../../core/connectors/xConfig';
 import { applyTheme } from '../theme';
 import { BUILT_IN_PERSONALITIES } from '../../core/personalities';
 
@@ -23,6 +25,15 @@ const OPENAI_MODELS = [
   { value: 'gpt-4.1', label: 'GPT-4.1' },
   { value: 'gpt-4.1-mini', label: 'GPT-4.1 Mini' },
 ];
+
+function renderCodeList(items: readonly string[]) {
+  return items.map((item, index) => (
+    <React.Fragment key={item}>
+      <code style={inlineCodeStyle}>{item}</code>
+      {index < items.length - 1 ? ', ' : '.'}
+    </React.Fragment>
+  ));
+}
 
 function formatOpenAIModelLabel(modelId: string): string {
   const known = OPENAI_MODELS.find((model) => model.value === modelId);
@@ -445,7 +456,7 @@ export default function Settings({ onBack, navigation }: Props) {
     { label: 'Provider', value: providerLabel(settings.provider) },
     { label: 'Timezone', value: settings.timezone || 'Auto' },
     { label: 'Google', value: googleConnected ? 'Connected' : googleConfigured ? 'Ready to connect' : 'Unavailable' },
-    { label: 'X', value: xStatus?.connected ? 'Connected' : settings.xClientId ? 'Ready to connect' : 'Not configured' },
+    { label: 'X', value: xStatus?.connected ? 'Connected' : xStatus?.configured ? 'Ready to connect' : 'Unavailable' },
     { label: 'Team Brain', value: settings.teamBrainPath ? 'Enabled' : 'Off' },
   ];
 
@@ -1173,13 +1184,13 @@ export default function Settings({ onBack, navigation }: Props) {
             <StatusPanel
               title="Connection Status"
               badge={{
-                label: xStatus?.connected ? 'Connected' : settings.xClientId ? 'Ready to connect' : 'Not configured',
-                tone: xStatus?.connected ? 'success' : settings.xClientId ? 'warning' : 'neutral',
+                label: xStatus?.connected ? 'Connected' : xStatus?.configured ? 'Ready to connect' : 'Unavailable',
+                tone: xStatus?.connected ? 'success' : xStatus?.configured ? 'warning' : 'neutral',
               }}
               description={
                 xStatus?.connected
-                  ? `Connected to ${xStatus.account?.username ? `@${xStatus.account.username}` : 'X'}. You can sync bookmarks and publish drafts from Keel.`
-                  : 'Add your X Client ID, then connect your account using OAuth 2.0 PKCE.'
+                  ? `Connected to ${xStatus.account?.username ? `@${xStatus.account.username}` : 'X'}. You can sync bookmarks into the dedicated wiki base.`
+                  : 'Authorize your X account in an in-app window. Keel bundles the public client configuration and completes the callback locally.'
               }
               actions={(
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -1189,7 +1200,6 @@ export default function Settings({ onBack, navigation }: Props) {
                         setXBusy(true);
                         setXMessage('');
                         try {
-                          await save();
                           const account = await window.keel.xConnect();
                           setXMessage(`Connected to @${account.username}.`);
                           await refreshXStatus();
@@ -1200,8 +1210,8 @@ export default function Settings({ onBack, navigation }: Props) {
                           setXBusy(false);
                         }
                       }}
-                      disabled={xBusy || !settings.xClientId.trim()}
-                      style={primaryButtonStyle(xBusy || !settings.xClientId.trim())}
+                      disabled={xBusy || !xStatus?.configured}
+                      style={primaryButtonStyle(xBusy || !xStatus?.configured)}
                     >
                       {xBusy ? 'Connecting...' : 'Connect X Account'}
                     </button>
@@ -1264,26 +1274,14 @@ export default function Settings({ onBack, navigation }: Props) {
             )}
 
             <SectionCard
-              title="App Configuration"
-              description="Keel uses X OAuth 2.0 PKCE as a public client. You only need the App Client ID for this slice."
+              title="App Authorization"
+              description="Keel bundles the X OAuth public client ID, so no manual app setup is required before you connect."
             >
-              <FieldRow
-                label="X Client ID"
-                description="Find this in your X developer app under Keys and Tokens. Save it here before connecting."
-              >
-                <input
-                  type="text"
-                  value={settings.xClientId}
-                  onChange={(e) => update({ xClientId: e.target.value })}
-                  placeholder="Paste your X Client ID"
-                  style={inputStyle}
-                />
-              </FieldRow>
               <InlineNote>
-                This slice requests <code style={inlineCodeStyle}>tweet.read</code>, <code style={inlineCodeStyle}>users.read</code>, <code style={inlineCodeStyle}>bookmark.read</code>, <code style={inlineCodeStyle}>tweet.write</code>, and <code style={inlineCodeStyle}>offline.access</code>.
+                This slice requests {renderCodeList(X_SCOPES)}
               </InlineNote>
               <InlineNote>
-                Configure this exact X callback URL in your developer app: <code style={inlineCodeStyle}>{xStatus?.redirectUri || 'http://127.0.0.1:43021/callback'}</code>
+                Callback URL: <code style={inlineCodeStyle}>{X_REDIRECT_URI}</code>
               </InlineNote>
             </SectionCard>
 
