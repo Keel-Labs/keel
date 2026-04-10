@@ -96,6 +96,17 @@ export function getDb(brainPath: string): Database.Database {
       status     TEXT DEFAULT 'idle',
       meta       TEXT
     );
+
+    CREATE TABLE IF NOT EXISTS x_publish_history (
+      id               INTEGER PRIMARY KEY AUTOINCREMENT,
+      external_post_id TEXT,
+      text             TEXT NOT NULL,
+      url              TEXT,
+      status           TEXT NOT NULL,
+      error            TEXT,
+      created_at       INTEGER NOT NULL,
+      updated_at       INTEGER NOT NULL
+    );
   `);
 
   // Migrate file_index: add hash column if missing
@@ -446,6 +457,31 @@ export function upsertSyncState(
       d.prepare(`UPDATE sync_state SET ${sets.join(', ')} WHERE connector = ?`).run(...vals);
     }
   }
+}
+
+// --- X Publish History ---
+
+export function recordXPublishSuccess(
+  brainPath: string,
+  payload: { externalPostId: string; text: string; url: string; publishedAt: number }
+): void {
+  const d = getDb(brainPath);
+  d.prepare(
+    `INSERT INTO x_publish_history (external_post_id, text, url, status, error, created_at, updated_at)
+     VALUES (?, ?, ?, 'success', NULL, ?, ?)`
+  ).run(payload.externalPostId, payload.text, payload.url, payload.publishedAt, payload.publishedAt);
+}
+
+export function recordXPublishFailure(
+  brainPath: string,
+  payload: { text: string; error: string; occurredAt?: number }
+): void {
+  const d = getDb(brainPath);
+  const occurredAt = payload.occurredAt ?? Date.now();
+  d.prepare(
+    `INSERT INTO x_publish_history (external_post_id, text, url, status, error, created_at, updated_at)
+     VALUES (NULL, ?, NULL, 'error', ?, ?, ?)`
+  ).run(payload.text, payload.error, occurredAt, occurredAt);
 }
 
 // --- Reminders ---

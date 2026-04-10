@@ -40,6 +40,8 @@ import {
   listIncomingTasksDb,
   deleteIncomingTask,
   getRecentActivity,
+  recordXPublishFailure as recordXPublishFailureHistory,
+  recordXPublishSuccess as recordXPublishSuccessHistory,
 } from '../src/core/db';
 import { listAllTasks, toggleTask, moveTask, acceptIncomingTask, createProject, renameProject, deleteProject } from '../src/core/tasks';
 import { capture } from '../src/core/workflows/capture';
@@ -68,11 +70,14 @@ import {
   getXStatus,
   disconnectX,
   getValidXAccessToken,
+  recordXPublishError,
+  recordXPublishSuccess,
   setXSyncing,
   recordXSyncError,
   type XOAuthConfig,
 } from '../src/core/connectors/xAuth';
 import { syncXBookmarksToWiki } from '../src/core/connectors/xBookmarks';
+import { publishXPost } from '../src/core/connectors/xPublish';
 import type {
   ChatDocumentAttachment,
   ChatRequest,
@@ -83,6 +88,8 @@ import type {
   WikiJob,
   WikiSourceInput,
   XAccountProfile,
+  XPublishRequest,
+  XPublishResult,
 } from '../src/shared/types';
 import type { NewsItem, WeatherInfo } from '../src/shared/types';
 
@@ -1569,6 +1576,36 @@ function registerIpcHandlers() {
       return result;
     } catch (error) {
       recordXSyncError(settings.brainPath, error instanceof Error ? error.message : 'X bookmark sync failed.');
+      throw error;
+    }
+  });
+
+  ipcMain.handle('keel:x-publish-post', async (_event, request: XPublishRequest): Promise<XPublishResult> => {
+    try {
+      const config = getXConfig();
+      const status = getXStatus(settings.brainPath, settings.xClientId || '');
+      if (!status.account) {
+        throw new Error('Connect your X account before publishing.');
+      }
+
+      const accessToken = await getValidXAccessToken(settings.brainPath, config);
+      const result = await publishXPost(accessToken, status.account, request);
+      recordXPublishSuccessHistory(settings.brainPath, {
+        externalPostId: result.id,
+        text: result.text,
+        url: result.url,
+        publishedAt: result.publishedAt,
+      });
+      recordXPublishSuccess(settings.brainPath, result.url, result.publishedAt);
+      logActivity(settings.brainPath, 'x-publish-post', result.url);
+      return result;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'X publish failed.';
+      recordXPublishFailureHistory(settings.brainPath, {
+        text: typeof request?.text === 'string' ? request.text : '',
+        error: message,
+      });
+      recordXPublishError(settings.brainPath, message);
       throw error;
     }
   });
