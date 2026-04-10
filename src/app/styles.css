@@ -500,6 +500,7 @@ select {
 }
 
 .desktop-sidebar__footer {
+  margin-top: auto;
   padding: 8px;
   border-top: 1px solid var(--border-subtle);
   flex-shrink: 0;
