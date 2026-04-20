@@ -242,6 +242,23 @@ function renderMetricPill(label: string, value?: number): React.ReactNode {
 }
 
 function getLeadMarkdown(content: string): string {
+  // Prefer the "Latest Compile" section as the summary (contains actual synthesis)
+  const lastIdx = content.lastIndexOf('## Latest Compile');
+  if (lastIdx !== -1) {
+    const afterHeading = content.substring(lastIdx + '## Latest Compile'.length + 1);
+    // Take content until next ## heading or end of string
+    const nextHeading = afterHeading.search(/\n##\s+/);
+    const sectionBody = nextHeading === -1 ? afterHeading : afterHeading.substring(0, nextHeading);
+    // Strip sub-sections like "### Current Synthesis" and compile stats
+    const body = sectionBody
+      .split('\n')
+      .filter((line) => !line.startsWith('### Current Synthesis') && !line.startsWith('- [Latest synthesis]') && !line.startsWith('- Compiled ') && !line.startsWith('- Generated '))
+      .join('\n')
+      .trim();
+    if (body) return body;
+  }
+
+  // Fallback: extract intro paragraph before first ## heading
   const withoutTitle = content.replace(/^#\s+.+\n+/, '');
   const lines = withoutTitle.split('\n');
   const leadLines: string[] = [];
@@ -1265,6 +1282,22 @@ export default function WikiWorkspace({
                               Open source
                             </button>
                           ) : null}
+                          <button
+                            type="button"
+                            className="wiki-synthesis__mini-link wiki-synthesis__mini-link--danger"
+                            onClick={async () => {
+                              const slug = page.relativePath.replace(/^wiki\/sources\//, '').replace(/\.md$/, '');
+                              if (!slug || !currentBasePath) return;
+                              try {
+                                await window.keel.deleteWikiSource(currentBasePath, slug);
+                                setPages((prev) => prev.filter((p) => p.path !== page.path));
+                              } catch (err) {
+                                console.error('Failed to delete source:', err);
+                              }
+                            }}
+                          >
+                            Remove
+                          </button>
                         </div>
                       </div>
                     );

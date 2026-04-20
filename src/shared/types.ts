@@ -394,6 +394,7 @@ export interface KeelAPI {
   readFile: (filePath: string) => Promise<string>;
   writeFile: (filePath: string, content: string) => Promise<void>;
   ingestWikiSource: (basePath: string, input: WikiSourceInput) => Promise<WikiIngestResult>;
+  deleteWikiSource: (basePath: string, sourceSlug: string) => Promise<{ deleted: string }>;
   startWikiCompile: (basePath: string) => Promise<WikiJob>;
   startWikiHealthCheck: (basePath: string) => Promise<WikiJob>;
   listWikiJobs: (basePath?: string) => Promise<WikiJob[]>;
