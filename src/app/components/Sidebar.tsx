@@ -292,6 +292,20 @@ export default function Sidebar({
           ))}
       </div>
 
+      {!collapsed && isWikiMode && wikiState?.branches && wikiState.branches.length > 0 && (
+        <div className="desktop-sidebar__history">
+          <div className="desktop-sidebar__label">Bases</div>
+          {wikiState.branches.map((branch) => (
+            <WikiBranch
+              key={branch.id}
+              branch={branch}
+              selectedPagePath={wikiState.selectedPagePath}
+              onOpenPage={onWikiOpenPage}
+            />
+          ))}
+        </div>
+      )}
+
       {!collapsed && !isWikiMode && (
         <div className="desktop-sidebar__history">
           <div className="desktop-sidebar__label">Recents</div>

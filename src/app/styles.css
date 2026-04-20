@@ -1465,6 +1465,14 @@ select {
   cursor: pointer;
 }
 
+.wiki-synthesis__mini-link--danger {
+  color: var(--text-disabled);
+}
+
+.wiki-synthesis__mini-link--danger:hover {
+  color: var(--error, #e55);
+}
+
 .wiki-synthesis__empty {
   color: var(--text-muted);
   line-height: 1.7;

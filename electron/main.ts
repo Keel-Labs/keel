@@ -1244,6 +1244,32 @@ function registerIpcHandlers() {
     return result;
   });
 
+  ipcMain.handle('keel:delete-wiki-source', async (_event, basePath: string, sourceSlug: string) => {
+    if (basePath.includes('..') || basePath.startsWith('.config') || sourceSlug.includes('..') || sourceSlug.includes('/')) {
+      throw new Error('Access denied');
+    }
+
+    const wikiSourcePath = path.join(settings.brainPath, basePath, 'wiki', 'sources', `${sourceSlug}.md`);
+    const rawSourceDir = path.join(settings.brainPath, basePath, 'raw', sourceSlug);
+
+    // Delete the wiki source page
+    if (fs.existsSync(wikiSourcePath)) {
+      fs.unlinkSync(wikiSourcePath);
+    }
+
+    // Delete the raw source directory
+    if (fs.existsSync(rawSourceDir)) {
+      fs.rmSync(rawSourceDir, { recursive: true, force: true });
+    }
+
+    // Remove from file index
+    const relSourcePath = `${basePath}/wiki/sources/${sourceSlug}.md`;
+    removeFileIndex(settings.brainPath, relSourcePath);
+
+    logActivity(settings.brainPath, 'wiki-delete-source', `${sourceSlug} from ${basePath}`);
+    return { deleted: sourceSlug };
+  });
+
   ipcMain.handle('keel:start-wiki-compile', async (_event, basePath: string) => {
     if (basePath.includes('..') || basePath.startsWith('.config')) {
       throw new Error('Access denied');
