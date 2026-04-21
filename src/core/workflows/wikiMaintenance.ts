@@ -654,14 +654,34 @@ function slugify(value: string): string {
 }
 
 function upsertSection(content: string, heading: string, body: string): string {
-  const pattern = new RegExp(`(^##\\s+${escapeRegex(heading)}\\s*$)([\\s\\S]*?)(?=^##\\s+|\\Z)`, 'm');
   const section = `## ${heading}\n\n${body.trim()}\n`;
+  const isTarget = (line: string) =>
+    new RegExp(`^##\\s+${escapeRegex(heading)}\\s*$`).test(line.trim());
 
-  if (pattern.test(content)) {
-    return content.replace(pattern, `${section}\n`);
+  // Split into chunks on ## headings (lookahead keeps delimiter on right side)
+  const chunks = content.split(/(?=^## )/m);
+
+  let inserted = false;
+  const kept: string[] = [];
+
+  for (const chunk of chunks) {
+    const firstLine = chunk.split('\n')[0];
+    if (isTarget(firstLine)) {
+      if (!inserted) {
+        kept.push(section);
+        inserted = true;
+      }
+      // Additional duplicate occurrences are dropped
+    } else {
+      kept.push(chunk);
+    }
   }
 
-  return `${content.trim()}\n\n${section}\n`;
+  if (!inserted) {
+    kept.push(section);
+  }
+
+  return kept.join('').trimEnd() + '\n';
 }
 
 function escapeRegex(input: string): string {

@@ -161,20 +161,37 @@ interface ProjectGroupProps {
   onDrop?: (targetSlug: string | null) => void;
   onRename?: (slug: string, newName: string) => void;
   onDelete?: (slug: string) => void;
+  onAddTask?: (slug: string | null) => void;
   defaultExpanded?: boolean;
   showActions?: boolean;
+  addingTask?: boolean;
+  onTaskSubmit?: (text: string) => void;
+  onTaskCancel?: () => void;
 }
 
 function ProjectGroup({
-  projectName, slug, tasks, onToggle, onDrop, onRename, onDelete,
+  projectName, slug, tasks, onToggle, onDrop, onRename, onDelete, onAddTask,
   defaultExpanded = true, showActions = false,
+  addingTask = false, onTaskSubmit, onTaskCancel,
 }: ProjectGroupProps) {
   const [expanded, setExpanded] = useState(defaultExpanded);
   const [editing, setEditing] = useState(false);
   const [editName, setEditName] = useState(projectName);
+  const [newTaskText, setNewTaskText] = useState('');
   const [dragOver, setDragOver] = useState(false);
   const dragCounter = useRef(0);
   const inputRef = useRef<HTMLInputElement>(null);
+  const newTaskRef = useRef<HTMLInputElement>(null);
+  const taskSubmittedRef = useRef(false);
+
+  useEffect(() => {
+    if (addingTask) {
+      setExpanded(true);
+      setNewTaskText('');
+      taskSubmittedRef.current = false;
+      setTimeout(() => newTaskRef.current?.focus(), 0);
+    }
+  }, [addingTask]);
 
   const handleDragEnter = (e: React.DragEvent) => {
     e.preventDefault();
@@ -256,15 +273,24 @@ function ProjectGroup({
             <span className="inbox-project-group__count">{tasks.length}</span>
           </button>
         )}
-        {showActions && slug && !editing && (
+        {showActions && !editing && (
           <div className="inbox-project-group__actions">
             <button
-              className="inbox-project-group__action-btn inbox-project-group__action-btn--danger"
-              onClick={() => onDelete?.(slug)}
-              title="Delete project"
+              className="inbox-project-group__action-btn"
+              onClick={() => onAddTask?.(slug)}
+              title="Add task"
             >
-              <TrashIcon />
+              <PlusIcon />
             </button>
+            {slug && (
+              <button
+                className="inbox-project-group__action-btn inbox-project-group__action-btn--danger"
+                onClick={() => onDelete?.(slug)}
+                title="Delete project"
+              >
+                <TrashIcon />
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -279,6 +305,39 @@ function ProjectGroup({
               onToggle={onToggle}
             />
           ))}
+          {addingTask && (
+            <div className="inbox-task-row inbox-task-row--new">
+              <input
+                ref={newTaskRef}
+                className="inbox-new-task-input"
+                value={newTaskText}
+                onChange={(e) => setNewTaskText(e.target.value)}
+                placeholder="New task..."
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    const t = newTaskText.trim();
+                    if (t && !taskSubmittedRef.current) {
+                      taskSubmittedRef.current = true;
+                      onTaskSubmit?.(t);
+                    }
+                  } else if (e.key === 'Escape') {
+                    taskSubmittedRef.current = true;
+                    onTaskCancel?.();
+                  }
+                }}
+                onBlur={() => {
+                  if (taskSubmittedRef.current) return;
+                  const t = newTaskText.trim();
+                  if (t) {
+                    taskSubmittedRef.current = true;
+                    onTaskSubmit?.(t);
+                  } else {
+                    onTaskCancel?.();
+                  }
+                }}
+              />
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -365,6 +424,8 @@ type DialogState =
   | null
   | { type: 'add-project' }
   | { type: 'delete-project'; slug: string; projectName: string };
+// slug=null means General tasks.md
+type AddingTaskState = { slug: string | null } | null;
 
 export default function Inbox() {
   const [taskGroups, setTaskGroups] = useState<TaskGroup[]>([]);
@@ -373,6 +434,7 @@ export default function Inbox() {
   const [loading, setLoading] = useState(true);
   const [activeDropZone, setActiveDropZone] = useState<DropZone>(null);
   const [dialog, setDialog] = useState<DialogState>(null);
+  const [addingTask, setAddingTask] = useState<AddingTaskState>(null);
   const dragCounterRef = useRef<{ open: number; completed: number }>({ open: 0, completed: 0 });
 
   const fetchAll = useCallback(async () => {
@@ -485,6 +547,15 @@ export default function Inbox() {
   const openDropHandlers = makeDropHandlers('open');
   const completedDropHandlers = makeDropHandlers('completed');
 
+  // ── Task creation ──
+
+  const handleCreateTask = useCallback(async (slug: string | null, text: string) => {
+    setAddingTask(null);
+    const filePath = slug ? `projects/${slug}/tasks.md` : 'tasks.md';
+    await window.keel.createTask(filePath, text);
+    fetchAll();
+  }, [fetchAll]);
+
   // ── Project management ──
 
   const handleAddProject = useCallback(async (name: string) => {
@@ -592,7 +663,11 @@ export default function Inbox() {
                   onDrop={handleProjectDrop}
                   onRename={handleRenameProject}
                   onDelete={(s) => setDialog({ type: 'delete-project', slug: s, projectName: group.project })}
+                  onAddTask={(s) => setAddingTask({ slug: s })}
                   showActions
+                  addingTask={addingTask?.slug === group.slug}
+                  onTaskSubmit={(text) => handleCreateTask(group.slug, text)}
+                  onTaskCancel={() => setAddingTask(null)}
                 />
               ))
             ) : (
