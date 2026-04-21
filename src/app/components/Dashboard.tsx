@@ -5,7 +5,7 @@ import { getPersonalityGreeting } from '../../core/personalities';
 interface DashboardProps {
   onNavigateToTasks: () => void;
   onNavigateToChat: (sessionId: string) => void;
-  onNewChatWithDraft?: (draft: string) => void;
+  onNewChatWithDraft?: (draft: string, autoSend?: boolean) => void;
 }
 
 // ── Helpers ──
@@ -95,24 +95,16 @@ function activityLabel(action: string): string {
 
 // ── Greeting & Quotes ──
 
-const QUOTES = [
-  { text: 'The best way to predict the future is to create it.', author: 'Peter Drucker' },
-  { text: 'Focus is about saying no to the hundred other good ideas.', author: 'Steve Jobs' },
-  { text: 'Small daily improvements lead to staggering long-term results.', author: 'Robin Sharma' },
-  { text: 'Done is better than perfect.', author: 'Sheryl Sandberg' },
-  { text: 'The secret of getting ahead is getting started.', author: 'Mark Twain' },
-  { text: 'Simplicity is the ultimate sophistication.', author: 'Leonardo da Vinci' },
-  { text: 'What gets measured gets managed.', author: 'Peter Drucker' },
-  { text: 'Think big, start small, act now.', author: 'Robin Sharma' },
-  { text: 'Do less, but do it better.', author: 'Austin Kleon' },
-  { text: 'Progress, not perfection.', author: '' },
-  { text: 'You don\'t have to be great to start, but you have to start to be great.', author: 'Zig Ziglar' },
-  { text: 'The only way to do great work is to love what you do.', author: 'Steve Jobs' },
-];
+function useDailyQuote() {
+  const [quote, setQuote] = useState<{ text: string; author: string } | null>(null);
 
-function getDailyQuote() {
-  const dayOfYear = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / 86400000);
-  return QUOTES[dayOfYear % QUOTES.length];
+  useEffect(() => {
+    window.keel.getDailyQuote()
+      .then(setQuote)
+      .catch(() => setQuote({ text: 'Make today count.', author: '' }));
+  }, []);
+
+  return quote;
 }
 
 function getTimeOfDay(): 'morning' | 'afternoon' | 'evening' {
@@ -195,6 +187,7 @@ export default function Dashboard({ onNavigateToTasks, onNavigateToChat, onNewCh
   const [userName, setUserName] = useState<string>('');
   const [personalityId, setPersonalityId] = useState<string>('default');
   const [loading, setLoading] = useState(true);
+  const dailyQuote = useDailyQuote();
 
   const fetchAll = useCallback(async () => {
     try {
@@ -285,7 +278,7 @@ export default function Dashboard({ onNavigateToTasks, onNavigateToChat, onNewCh
               <path d="M3 21c3 0 7-1 7-8V5c0-1.25-.756-2.017-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V21z" />
               <path d="M15 21c3 0 7-1 7-8V5c0-1.25-.756-2.017-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V21z" />
             </svg>
-            "{getDailyQuote().text}"{getDailyQuote().author ? ` — ${getDailyQuote().author}` : ''}
+            {dailyQuote ? `"${dailyQuote.text}"${dailyQuote.author ? ` - ${dailyQuote.author}` : ''}` : '…'}
           </span>
         </div>
       </div>
@@ -341,7 +334,7 @@ export default function Dashboard({ onNavigateToTasks, onNavigateToChat, onNewCh
         <DashboardSection
           title="Reminders"
           icon={<BellIcon />}
-          action={onNewChatWithDraft ? { label: '+', onClick: () => onNewChatWithDraft('/remind '), icon: <PlusIcon /> } : undefined}
+          action={onNewChatWithDraft ? { label: 'View', onClick: () => onNewChatWithDraft('/reminders', true) } : undefined}
         >
           {upcomingReminders.length > 0 ? (
             <div className="dashboard-reminders">

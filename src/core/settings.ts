@@ -44,10 +44,7 @@ export function getDefaultSettings(): Settings {
     ollamaModel: 'llama3.2',
     personality: 'default',
     brainPath: getDefaultBrainPath(),
-    teamBrainPath: '',
     userName: '',
-    dailyBriefTime: '',
-    eodTime: '',
     timezone: '',
   };
 }

@@ -740,18 +740,22 @@ interface ChatProps {
   newChatSignal: number;
   loadSessionId: string | null;
   initialDraft?: string;
+  autoSendDraft?: boolean;
   onSessionChange: (id: string) => void;
   onSessionStreamStateChange?: (sessionId: string, isStreaming: boolean) => void;
   onOpenWikiPage?: (path: string) => void;
+  onBringToFront?: () => void;
 }
 
 export default function Chat({
   newChatSignal,
   loadSessionId,
   initialDraft,
+  autoSendDraft,
   onSessionChange,
   onSessionStreamStateChange,
   onOpenWikiPage,
+  onBringToFront,
 }: ChatProps) {
   const [messages, setMessages] = useState<MessageType[]>([]);
   const [input, setInput] = useState('');
@@ -937,11 +941,16 @@ export default function Chat({
   }, [newChatSignal]);
 
   // Consume initialDraft from external navigation (e.g. Dashboard "+" button)
+  const sendMessageRef = useRef<((text?: string) => void) | null>(null);
   useEffect(() => {
     if (initialDraft) {
       setInput(initialDraft);
+      if (autoSendDraft) {
+        // Defer to next tick so sendMessage is defined
+        setTimeout(() => sendMessageRef.current?.(initialDraft), 50);
+      }
     }
-  }, [initialDraft]);
+  }, [initialDraft, autoSendDraft]);
 
   // Load a specific session when selected from sidebar
   useEffect(() => {
@@ -967,9 +976,13 @@ export default function Chat({
     }
   }, [loadSessionId, onSessionChange, sessionId, syncVisibleStreamState]);
 
-  // Listen for scheduled notifications (daily brief / EOD)
+  // Listen for scheduled notifications (daily brief / EOD / jobs / reminders)
   useEffect(() => {
     window.keel.onScheduledNotification((notification) => {
+      // Switch to chat tab whenever a notification arrives
+      onBringToFront?.();
+
+      // Reminders are short freeform messages — show as-is
       if (notification.type === 'reminder') {
         setMessages((prev) => [
           ...prev,
@@ -977,16 +990,18 @@ export default function Chat({
         ]);
         return;
       }
-      const label = notification.type === 'daily-brief' ? 'Scheduled Daily Brief' : 'Scheduled EOD Summary';
+
+      // All other scheduled content (brief, eod, jobs) already has its own
+      // headings — just show the content directly without a redundant label prefix
       setMessages((prev) => [
         ...prev,
-        { role: 'assistant', content: `**${label}**\n\n${notification.content}`, timestamp: Date.now() },
+        { role: 'assistant', content: notification.content, timestamp: Date.now() },
       ]);
     });
     return () => {
       window.keel.removeScheduledNotificationListener();
     };
-  }, []);
+  }, [onBringToFront]);
 
   // Listen for auto-capture confirmations
   useEffect(() => {
@@ -1711,6 +1726,42 @@ export default function Chat({
       return;
     }
 
+    // Natural language reminder deletion
+    const deleteReminderMatch = /^(?:delete|remove|cancel|clear)\s+(?:the\s+|this\s+|that\s+|my\s+)?(?:(?:(.+?)\s+)?reminder|remind(?:er)?(?:\s+(.+))?)s?\s*\.?\s*$/i.exec(trimmed);
+    if (deleteReminderMatch) {
+      try {
+        const reminders = await window.keel.listReminders();
+        if (reminders.length === 0) {
+          setMessages((prev) => [...prev, { role: 'assistant', content: 'No reminders to delete.', timestamp: Date.now() }]);
+          setIsStreaming(false);
+          return;
+        }
+        const keyword = (deleteReminderMatch[1] || deleteReminderMatch[2] || '').trim().toLowerCase();
+        const match = keyword
+          ? reminders.find((r) => r.message.toLowerCase().includes(keyword))
+          : reminders.length === 1 ? reminders[0] : null;
+
+        if (match) {
+          await window.keel.deleteReminder(match.id);
+          setMessages((prev) => [...prev, { role: 'assistant', content: `Deleted reminder: ${match.message}`, timestamp: Date.now() }]);
+        } else if (reminders.length > 1) {
+          const lines = reminders.map((r) => {
+            const when = new Date(r.dueAt).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' });
+            const recur = r.recurring ? ` (${r.recurring})` : '';
+            return `- **${when}**${recur} — ${r.message}`;
+          });
+          setMessages((prev) => [...prev, { role: 'assistant', content: `Which reminder?\n\n${lines.join('\n')}`, timestamp: Date.now() }]);
+        } else {
+          setMessages((prev) => [...prev, { role: 'assistant', content: `No reminder found matching "${keyword}".`, timestamp: Date.now() }]);
+        }
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : 'Failed to delete reminder';
+        setMessages((prev) => [...prev, { role: 'assistant', content: msg, timestamp: Date.now() }]);
+      }
+      setIsStreaming(false);
+      return;
+    }
+
     // Schedule command
     const scheduleParsed = parseScheduleCommand(trimmed, userTimezone || undefined);
     if (scheduleParsed) {
@@ -1788,6 +1839,8 @@ export default function Chat({
       }
     }
   };
+  // Keep ref current so autoSendDraft effect can call it after mount
+  sendMessageRef.current = sendMessage;
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     // Command autocomplete navigation

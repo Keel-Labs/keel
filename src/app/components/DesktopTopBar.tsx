@@ -96,8 +96,8 @@ function PanelIcon({ open }: { open: boolean }) {
 }
 
 const MODES: Array<{ id: DesktopMode; label: string }> = [
-  { id: 'home', label: 'Home' },
   { id: 'chat', label: 'Chat' },
+  { id: 'home', label: 'Dashboard' },
   { id: 'wiki', label: 'Wiki' },
 ];
 

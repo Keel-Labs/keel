@@ -106,6 +106,8 @@ const api: KeelAPI = {
   listTasks: () => ipcRenderer.invoke('keel:list-tasks'),
   toggleTask: (filePath: string, taskText: string, completed: boolean) =>
     ipcRenderer.invoke('keel:toggle-task', filePath, taskText, completed),
+  createTask: (filePath: string, text: string) =>
+    ipcRenderer.invoke('keel:create-task', filePath, text),
   listIncomingTasks: () => ipcRenderer.invoke('keel:list-incoming-tasks'),
   acceptIncomingTask: (id: number) => ipcRenderer.invoke('keel:accept-incoming-task', id),
   dismissIncomingTask: (id: number) => ipcRenderer.invoke('keel:dismiss-incoming-task', id),
@@ -148,6 +150,14 @@ const api: KeelAPI = {
   listTeamFiles: (dirPath: string) => ipcRenderer.invoke('keel:list-team-files', dirPath),
   readTeamFile: (filePath: string) => ipcRenderer.invoke('keel:read-team-file', filePath),
   writeTeamFile: (filePath: string, content: string) => ipcRenderer.invoke('keel:write-team-file', filePath, content),
+
+  // Scheduled Jobs
+  listScheduledJobs: () => ipcRenderer.invoke('keel:list-scheduled-jobs'),
+  upsertScheduledJob: (job) => ipcRenderer.invoke('keel:upsert-scheduled-job', job),
+  deleteScheduledJob: (id: number) => ipcRenderer.invoke('keel:delete-scheduled-job', id),
+
+  // Daily Quote
+  getDailyQuote: () => ipcRenderer.invoke('keel:get-daily-quote'),
 };
 
 contextBridge.exposeInMainWorld('keel', api);
