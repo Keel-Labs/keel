@@ -107,6 +107,19 @@ export function getDb(brainPath: string): Database.Database {
       created_at       INTEGER NOT NULL,
       updated_at       INTEGER NOT NULL
     );
+
+    -- Scheduled recurring AI jobs
+    CREATE TABLE IF NOT EXISTS scheduled_jobs (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      name          TEXT NOT NULL,
+      prompt        TEXT NOT NULL,
+      schedule_type TEXT NOT NULL DEFAULT 'daily',
+      time          TEXT NOT NULL,
+      day_of_week   INTEGER,
+      enabled       INTEGER NOT NULL DEFAULT 1,
+      last_run_date TEXT,
+      created_at    INTEGER DEFAULT (unixepoch())
+    );
   `);
 
   // Migrate file_index: add hash column if missing
@@ -616,4 +629,70 @@ export function getIncomingTask(brainPath: string, id: number): IncomingTaskRow 
 export function deleteIncomingTask(brainPath: string, id: number): void {
   const d = getDb(brainPath);
   d.prepare('DELETE FROM incoming_tasks WHERE id = ?').run(id);
+}
+
+// ── Scheduled Jobs ──────────────────────────────────────────────────
+
+export interface ScheduledJobRow {
+  id: number;
+  name: string;
+  prompt: string;
+  scheduleType: 'daily' | 'weekly' | 'weekdays';
+  time: string;           // HH:MM
+  dayOfWeek: number | null; // 0=Sun..6=Sat, only for 'weekly'
+  enabled: boolean;
+  lastRunDate: string | null; // YYYY-MM-DD
+  createdAt: number;
+}
+
+export function listScheduledJobs(brainPath: string): ScheduledJobRow[] {
+  const d = getDb(brainPath);
+  const rows = d.prepare('SELECT * FROM scheduled_jobs ORDER BY created_at ASC').all() as Array<{
+    id: number; name: string; prompt: string; schedule_type: string;
+    time: string; day_of_week: number | null; enabled: number;
+    last_run_date: string | null; created_at: number;
+  }>;
+  return rows.map((r) => ({
+    id: r.id,
+    name: r.name,
+    prompt: r.prompt,
+    scheduleType: r.schedule_type as ScheduledJobRow['scheduleType'],
+    time: r.time,
+    dayOfWeek: r.day_of_week,
+    enabled: r.enabled === 1,
+    lastRunDate: r.last_run_date,
+    createdAt: r.created_at * 1000,
+  }));
+}
+
+export function upsertScheduledJob(
+  brainPath: string,
+  job: Omit<ScheduledJobRow, 'id' | 'createdAt'> & { id?: number }
+): number {
+  const d = getDb(brainPath);
+  if (job.id) {
+    d.prepare(
+      `UPDATE scheduled_jobs SET name=?, prompt=?, schedule_type=?, time=?, day_of_week=?, enabled=?, last_run_date=?
+       WHERE id=?`
+    ).run(job.name, job.prompt, job.scheduleType, job.time, job.dayOfWeek ?? null,
+          job.enabled ? 1 : 0, job.lastRunDate ?? null, job.id);
+    return job.id;
+  } else {
+    const result = d.prepare(
+      `INSERT INTO scheduled_jobs (name, prompt, schedule_type, time, day_of_week, enabled, last_run_date)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`
+    ).run(job.name, job.prompt, job.scheduleType, job.time, job.dayOfWeek ?? null,
+          job.enabled ? 1 : 0, job.lastRunDate ?? null);
+    return Number(result.lastInsertRowid);
+  }
+}
+
+export function deleteScheduledJob(brainPath: string, id: number): void {
+  const d = getDb(brainPath);
+  d.prepare('DELETE FROM scheduled_jobs WHERE id = ?').run(id);
+}
+
+export function markScheduledJobRan(brainPath: string, id: number, dateKey: string): void {
+  const d = getDb(brainPath);
+  d.prepare('UPDATE scheduled_jobs SET last_run_date = ? WHERE id = ?').run(dateKey, id);
 }

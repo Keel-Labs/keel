@@ -55,7 +55,7 @@ export async function exportLocalData(
   // 1. Settings
   report('Exporting settings', 0, 1);
   const settings = loadSettings();
-  const { brainPath: _bp, teamBrainPath: _tbp, ...settingsData } = settings;
+  const { brainPath: _bp, ...settingsData } = settings;
   report('Exporting settings', 1, 1);
 
   // 2. Brain files — all markdown and text files in the brain directory

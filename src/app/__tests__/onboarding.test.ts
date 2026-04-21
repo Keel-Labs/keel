@@ -17,10 +17,7 @@ function makeSettings(overrides: Partial<Settings> = {}): Settings {
     ollamaModel: 'llama3.2',
     personality: 'default',
     brainPath: '/tmp/keel',
-    teamBrainPath: '',
     userName: '',
-    dailyBriefTime: '',
-    eodTime: '',
     timezone: '',
     ...overrides,
   };
