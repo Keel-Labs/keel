@@ -6,9 +6,8 @@ import type {
   WikiSourceInput,
   WikiSourceType,
   XStatus,
+  ScheduledJob,
 } from '../../shared/types';
-import { X_SCOPES } from '../../shared/xScopes';
-import { X_REDIRECT_URI } from '../../core/connectors/xConfig';
 import { applyTheme } from '../theme';
 import { BUILT_IN_PERSONALITIES } from '../../core/personalities';
 
@@ -26,14 +25,6 @@ const OPENAI_MODELS = [
   { value: 'gpt-4.1-mini', label: 'GPT-4.1 Mini' },
 ];
 
-function renderCodeList(items: readonly string[]) {
-  return items.map((item, index) => (
-    <React.Fragment key={item}>
-      <code style={inlineCodeStyle}>{item}</code>
-      {index < items.length - 1 ? ', ' : '.'}
-    </React.Fragment>
-  ));
-}
 
 function formatOpenAIModelLabel(modelId: string): string {
   const known = OPENAI_MODELS.find((model) => model.value === modelId);
@@ -58,32 +49,16 @@ const PROVIDERS = [
 export type SettingsSectionId =
   | 'general-personal'
   | 'general-personality'
-  | 'general-workspace'
-  | 'general-notifications'
-  | 'ai-provider'
-  | 'ai-models'
-  | 'ai-local'
-  | 'knowledge-storage'
-  | 'knowledge-sources'
-  | 'knowledge-team'
-  | 'integrations-x'
-  | 'integrations-google'
-  | 'advanced-developer';
+  | 'general-scheduled-jobs'
+  | 'ai-setup'
+  | 'integrations';
 
 const SETTINGS_SECTION_IDS: SettingsSectionId[] = [
   'general-personal',
   'general-personality',
-  'general-workspace',
-  'general-notifications',
-  'ai-provider',
-  'ai-models',
-  'ai-local',
-  'knowledge-storage',
-  'knowledge-sources',
-  'knowledge-team',
-  'integrations-x',
-  'integrations-google',
-  'advanced-developer',
+  'general-scheduled-jobs',
+  'ai-setup',
+  'integrations',
 ];
 
 const SECTION_META: Record<SettingsSectionId, { title: string; description: string }> = {
@@ -93,96 +68,28 @@ const SECTION_META: Record<SettingsSectionId, { title: string; description: stri
   },
   'general-personality': {
     title: 'Personality',
-    description: 'Choose how Keel sounds when it talks to you.',
+    description: 'Adds flavor to greetings and sign-offs. Doesn\'t affect how Keel writes documents or briefs.',
   },
-  'general-workspace': {
-    title: 'Workspace',
-    description: 'Local scheduling and workspace-level behavior.',
+  'general-scheduled-jobs': {
+    title: 'Scheduled Jobs',
+    description: '',
   },
-  'general-notifications': {
-    title: 'Notifications',
-    description: 'Notification preferences will live here as the system grows.',
+  'ai-setup': {
+    title: 'Model',
+    description: '',
   },
-  'ai-provider': {
-    title: 'Provider',
-    description: 'Choose the active AI provider and manage credentials.',
-  },
-  'ai-models': {
-    title: 'Models',
-    description: 'Configure model selection and provider-specific runtime settings.',
-  },
-  'ai-local': {
-    title: 'Local AI',
-    description: 'Manage Ollama and local model availability.',
-  },
-  'knowledge-storage': {
-    title: 'Data Storage',
-    description: 'Control where Keel stores local knowledge and context.',
-  },
-  'knowledge-sources': {
-    title: 'Sources',
-    description: 'Source ingestion now happens inside the Wiki workspace.',
-  },
-  'knowledge-team': {
-    title: 'Team Brain',
-    description: 'Configure shared team context and collaboration settings.',
-  },
-  'integrations-x': {
-    title: 'X',
-    description: 'Draft and ingest X posts while the live account connection is still being built.',
-  },
-  'integrations-google': {
-    title: 'Google',
-    description: 'Manage Google account connection and sync behavior.',
-  },
-  'advanced-developer': {
-    title: 'Developer',
-    description: 'Advanced runtime controls and future diagnostics.',
+  'integrations': {
+    title: 'Integrations',
+    description: 'Connect external services to sync data and extend what Keel can do.',
   },
 };
 
-const NAV_GROUPS: Array<{
-  label: string;
-  items: Array<{ id: SettingsSectionId; label: string }>;
-}> = [
-  {
-    label: 'General',
-    items: [
-      { id: 'general-personal', label: 'Personal Settings' },
-      { id: 'general-personality', label: 'Personality' },
-      { id: 'general-workspace', label: 'Workspace' },
-      { id: 'general-notifications', label: 'Notifications' },
-    ],
-  },
-  {
-    label: 'AI',
-    items: [
-      { id: 'ai-provider', label: 'Provider' },
-      { id: 'ai-models', label: 'Models' },
-      { id: 'ai-local', label: 'Local AI' },
-    ],
-  },
-  {
-    label: 'Knowledge',
-    items: [
-      { id: 'knowledge-storage', label: 'Data Storage' },
-      { id: 'knowledge-sources', label: 'Sources' },
-      { id: 'knowledge-team', label: 'Team Brain' },
-    ],
-  },
-  {
-    label: 'Integrations',
-    items: [
-      { id: 'integrations-x', label: 'X' },
-      { id: 'integrations-google', label: 'Google' },
-    ],
-  },
-  {
-    label: 'Advanced',
-    items: [
-      { id: 'advanced-developer', label: 'Developer' },
-    ],
-  },
+const NAV_ITEMS: Array<{ id: SettingsSectionId; label: string }> = [
+  { id: 'general-personal', label: 'Personal Settings' },
+  { id: 'general-personality', label: 'Personality' },
+  { id: 'general-scheduled-jobs', label: 'Scheduled Jobs' },
+  { id: 'ai-setup', label: 'Model' },
+  { id: 'integrations', label: 'Integrations' },
 ];
 
 const TIMEZONES = [
@@ -451,14 +358,6 @@ export default function Settings({ onBack, navigation }: Props) {
     letterSpacing: '0.06em',
   };
 
-  const summaryChips = [
-    { label: 'Theme', value: settings.theme === 'system' ? 'System' : settings.theme === 'light' ? 'Light' : 'Dark' },
-    { label: 'Provider', value: providerLabel(settings.provider) },
-    { label: 'Timezone', value: settings.timezone || 'Auto' },
-    { label: 'Google', value: googleConnected ? 'Connected' : googleConfigured ? 'Ready to connect' : 'Unavailable' },
-    { label: 'X', value: xStatus?.connected ? 'Connected' : xStatus?.configured ? 'Ready to connect' : 'Unavailable' },
-    { label: 'Team Brain', value: settings.teamBrainPath ? 'Enabled' : 'Off' },
-  ];
 
   const openaiModelOptionIds = Array.from(new Set([
     ...(settings.openaiApiKey ? openaiModels : OPENAI_MODELS.map((model) => model.value)),
@@ -745,78 +644,78 @@ export default function Settings({ onBack, navigation }: Props) {
     switch (selectedSection) {
       case 'general-personal':
         return (
-          <>
-            <SectionCard title="Profile" description="Basic identity settings for your Keel workspace.">
-              <FieldRow
-                label="Your Name"
-                description="Used to identify your edits and updates across shared context."
+          <SectionCard>
+            <FieldRow label="Name">
+              <input
+                type="text"
+                value={settings.userName}
+                onChange={(e) => update({ userName: e.target.value })}
+                placeholder="Your name"
+                style={inputStyle}
+              />
+            </FieldRow>
+            <FieldRow label="Theme">
+              <div style={{ display: 'inline-flex', gap: 6, padding: 4, borderRadius: 14, background: 'var(--surface-muted)', border: '1px solid var(--panel-border)' }}>
+                {(['system', 'dark', 'light'] as const).map((themeOption) => {
+                  const active = settings.theme === themeOption;
+                  return (
+                    <button
+                      key={themeOption}
+                      onClick={() => update({ theme: themeOption })}
+                      style={{
+                        border: 'none',
+                        borderRadius: 10,
+                        padding: '9px 14px',
+                        background: active ? 'var(--surface-selected)' : 'transparent',
+                        color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
+                        fontSize: 13,
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {themeOption === 'system' ? 'Use system' : themeOption === 'dark' ? 'Dark mode' : 'Light mode'}
+                    </button>
+                  );
+                })}
+              </div>
+            </FieldRow>
+            <FieldRow label="Timezone">
+              <select
+                value={settings.timezone || ''}
+                onChange={(e) => update({ timezone: e.target.value })}
+                style={selectStyle}
               >
+                <option value="">Auto-detect ({Intl.DateTimeFormat().resolvedOptions().timeZone})</option>
+                {TIMEZONES.map((tz) => (
+                  <option key={tz} value={tz}>{tz.replace(/_/g, ' ')}</option>
+                ))}
+              </select>
+            </FieldRow>
+            <FieldRow label="Brain Path">
+              <div style={{ display: 'flex', gap: 10, flexDirection: isCompactLayout ? 'column' : 'row' }}>
                 <input
                   type="text"
-                  value={settings.userName}
-                  onChange={(e) => update({ userName: e.target.value })}
-                  placeholder="e.g. Medha"
-                  style={inputStyle}
+                  value={settings.brainPath}
+                  style={{ ...inputStyle, flex: 1 }}
+                  readOnly
                 />
-              </FieldRow>
-            </SectionCard>
-
-            <SectionCard title="Preferences" description="Personal defaults that shape how Keel behaves for you.">
-              <FieldRow
-                label="Theme"
-                description="Follow your OS appearance by default, or override it with a manual light or dark theme."
-              >
-                <div style={{ display: 'inline-flex', gap: 6, padding: 4, borderRadius: 14, background: 'var(--surface-muted)', border: '1px solid var(--panel-border)' }}>
-                  {(['system', 'dark', 'light'] as const).map((themeOption) => {
-                    const active = settings.theme === themeOption;
-                    return (
-                      <button
-                        key={themeOption}
-                        onClick={() => update({ theme: themeOption })}
-                        style={{
-                          border: 'none',
-                          borderRadius: 10,
-                          padding: '9px 14px',
-                          background: active ? 'var(--surface-selected)' : 'transparent',
-                          color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
-                          fontSize: 13,
-                          fontWeight: 600,
-                          cursor: 'pointer',
-                        }}
-                      >
-                        {themeOption === 'system'
-                          ? 'Use system'
-                          : themeOption === 'dark'
-                            ? 'Dark mode'
-                            : 'Light mode'}
-                      </button>
-                    );
-                  })}
-                </div>
-              </FieldRow>
-              <FieldRow
-                label="Timezone"
-                description="Used for reminders, scheduled briefs, and the time shown to your AI."
-              >
-                <select
-                  value={settings.timezone || ''}
-                  onChange={(e) => update({ timezone: e.target.value })}
-                  style={selectStyle}
+                <button
+                  onClick={async () => {
+                    const picked = await window.keel.pickFolder(settings.brainPath);
+                    if (picked) update({ brainPath: picked });
+                  }}
+                  style={secondaryButtonStyle(false)}
                 >
-                  <option value="">Auto-detect ({Intl.DateTimeFormat().resolvedOptions().timeZone})</option>
-                  {TIMEZONES.map((tz) => (
-                    <option key={tz} value={tz}>{tz.replace(/_/g, ' ')}</option>
-                  ))}
-                </select>
-              </FieldRow>
-              <InlineNote>More personal preferences will be added here over time.</InlineNote>
-            </SectionCard>
-          </>
+                  Browse…
+                </button>
+              </div>
+            </FieldRow>
+          </SectionCard>
         );
 
       case 'general-personality':
         return (
-          <SectionCard title="Keel's Voice" description="This adds flavor to greetings, sign-offs, and asides — it doesn't change how Keel writes documents or briefs.">
+          <SectionCard>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {BUILT_IN_PERSONALITIES.map((p) => (
                 <label
@@ -853,268 +752,273 @@ export default function Settings({ onBack, navigation }: Props) {
           </SectionCard>
         );
 
-      case 'general-workspace':
+      case 'general-scheduled-jobs':
+        return <ScheduledJobsSection />;
+
+      case 'ai-setup':
         return (
-          <SectionCard title="Scheduled Briefs" description="Configure when Keel should prepare recurring summaries.">
-            <div style={{ display: 'grid', gridTemplateColumns: isCompactLayout ? '1fr' : '1fr 1fr', gap: 16 }}>
-              <FieldRow label="Daily Brief Time">
-                <input
-                  type="time"
-                  value={settings.dailyBriefTime || ''}
-                  onChange={(e) => update({ dailyBriefTime: e.target.value })}
-                  style={inputStyle}
-                />
+          <SectionCard>
+            <FieldRow label="Provider">
+              <select
+                value={settings.provider}
+                onChange={(e) => {
+                  const val = e.target.value as SettingsType['provider'];
+                  update({ provider: val });
+                  if (val === 'ollama') fetchOllamaModels();
+                }}
+                style={selectStyle}
+              >
+                {PROVIDERS.map((p) => (
+                  <option key={p.value} value={p.value}>{p.label}</option>
+                ))}
+              </select>
+            </FieldRow>
+
+            {settings.provider !== 'ollama' && (
+              <FieldRow label="API Key">
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type={showApiKey['provider'] ? 'text' : 'password'}
+                    value={
+                      settings.provider === 'claude' ? settings.anthropicApiKey
+                      : settings.provider === 'openai' ? settings.openaiApiKey
+                      : settings.openrouterApiKey
+                    }
+                    onChange={(e) => {
+                      const field = settings.provider === 'claude' ? 'anthropicApiKey'
+                        : settings.provider === 'openai' ? 'openaiApiKey'
+                        : 'openrouterApiKey';
+                      update({ [field]: e.target.value } as Partial<SettingsType>);
+                    }}
+                    placeholder="sk-..."
+                    style={{ ...inputStyle, paddingRight: 60 }}
+                  />
+                  <button
+                    onClick={() => toggleKeyVisibility('provider')}
+                    style={{
+                      position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
+                      background: 'none', border: 'none', color: 'var(--text-tertiary)',
+                      cursor: 'pointer', fontSize: 12, padding: '4px 6px',
+                    }}
+                  >
+                    {showApiKey['provider'] ? 'Hide' : 'Show'}
+                  </button>
+                </div>
               </FieldRow>
-              <FieldRow label="End-of-Day Summary Time">
-                <input
-                  type="time"
-                  value={settings.eodTime || ''}
-                  onChange={(e) => update({ eodTime: e.target.value })}
-                  style={inputStyle}
-                />
-              </FieldRow>
-            </div>
-            <InlineNote>Leave a time blank to disable that scheduled brief.</InlineNote>
-            {(settings.dailyBriefTime || settings.eodTime) && (
-              <div style={{ marginTop: 8 }}>
-                <button
-                  onClick={() => update({ dailyBriefTime: '', eodTime: '' })}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    color: 'var(--text-tertiary)',
-                    fontSize: 12,
-                    cursor: 'pointer',
-                    padding: 0,
-                    textDecoration: 'underline',
-                  }}
+            )}
+
+            {settings.provider === 'claude' && (
+              <FieldRow label="Model">
+                <select
+                  value={settings.claudeModel}
+                  onChange={(e) => update({ claudeModel: e.target.value })}
+                  style={selectStyle}
                 >
-                  Clear schedule
-                </button>
-              </div>
+                  {CLAUDE_MODELS.map((m) => (
+                    <option key={m.value} value={m.value}>{m.label}</option>
+                  ))}
+                </select>
+              </FieldRow>
+            )}
+
+            {settings.provider === 'openai' && (
+              <FieldRow label="Model">
+                <select
+                  value={settings.openaiModel}
+                  onChange={(e) => update({ openaiModel: e.target.value })}
+                  style={selectStyle}
+                >
+                  {openaiModelOptions.map((m) => (
+                    <option key={m.value} value={m.value}>{m.label}</option>
+                  ))}
+                </select>
+              </FieldRow>
+            )}
+
+            {settings.provider === 'openrouter' && (
+              <>
+                <FieldRow label="Model">
+                  <input
+                    type="text"
+                    value={settings.openrouterModel}
+                    onChange={(e) => update({ openrouterModel: e.target.value })}
+                    placeholder="e.g. anthropic/claude-3.5-sonnet"
+                    style={inputStyle}
+                  />
+                </FieldRow>
+                <FieldRow label="Base URL">
+                  <input
+                    type="text"
+                    value={settings.openrouterBaseUrl}
+                    onChange={(e) => update({ openrouterBaseUrl: e.target.value })}
+                    placeholder="https://openrouter.ai/api/v1"
+                    style={inputStyle}
+                  />
+                </FieldRow>
+              </>
+            )}
+
+            {settings.provider === 'ollama' && (
+              <>
+                <FieldRow label="Model">
+                  {!ollamaManualEntry && !ollamaError && ollamaModels.length > 0 ? (
+                    <select
+                      value={ollamaModels.some((m) => m.name === settings.ollamaModel) ? settings.ollamaModel : ''}
+                      onChange={(e) => {
+                        if (e.target.value === '__manual__') { setOllamaManualEntry(true); return; }
+                        update({ ollamaModel: e.target.value });
+                      }}
+                      style={selectStyle}
+                    >
+                      <option value="">Select a model...</option>
+                      {ollamaModels.map((m) => (
+                        <option key={m.name} value={m.name}>
+                          {m.name}{m.parameterSize ? ` (${m.parameterSize})` : ''}
+                        </option>
+                      ))}
+                      <option value="__manual__">Type a custom model...</option>
+                    </select>
+                  ) : (
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <input
+                        type="text"
+                        value={settings.ollamaModel}
+                        onChange={(e) => update({ ollamaModel: e.target.value })}
+                        placeholder="e.g. llama3.2, mistral"
+                        style={{ ...inputStyle, flex: 1 }}
+                      />
+                      {ollamaModels.length > 0 && (
+                        <button onClick={() => setOllamaManualEntry(false)} style={secondaryButtonStyle(false)}>
+                          List
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </FieldRow>
+                <FieldRow label="Status">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <StatusBadge
+                      label={ollamaError ? 'Not running' : ollamaModels.length > 0 ? 'Available' : 'No models'}
+                      tone={ollamaError ? 'warning' : ollamaModels.length > 0 ? 'success' : 'neutral'}
+                    />
+                    <button onClick={fetchOllamaModels} disabled={ollamaLoading} style={secondaryButtonStyle(ollamaLoading)}>
+                      {ollamaLoading ? 'Checking...' : 'Refresh'}
+                    </button>
+                  </div>
+                </FieldRow>
+              </>
             )}
           </SectionCard>
         );
 
-      case 'general-notifications':
-        return (
-          <PlaceholderPanel
-            title="Notifications are coming next"
-            description="This section is reserved for response, reminder, and mobile notification preferences."
-          />
-        );
-
-      case 'ai-provider':
+      case 'integrations':
         return (
           <>
-            <SectionCard title="Active Provider" description="Select the AI backend Keel should use by default.">
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {PROVIDERS.map((provider) => (
-                  <label
-                    key={provider.value}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'flex-start',
-                      gap: 12,
-                      padding: '14px 16px',
-                      borderRadius: 'var(--radius-xl)',
-                      background: settings.provider === provider.value ? 'var(--accent-bg)' : 'var(--surface-panel)',
-                      border: `1px solid ${settings.provider === provider.value ? 'var(--accent-border)' : 'var(--panel-border)'}`,
-                      cursor: 'pointer',
-                    }}
-                  >
-                    <input
-                      type="radio"
-                      name="provider"
-                      checked={settings.provider === provider.value}
-                      onChange={() => {
-                        update({ provider: provider.value });
-                        if (provider.value === 'ollama') fetchOllamaModels();
+            <SectionCard title="X" description="Sync bookmarks into your wiki base and publish posts from Keel.">
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <StatusBadge
+                    label={xStatus?.connected ? 'Connected' : xStatus?.configured ? 'Ready' : 'Unavailable'}
+                    tone={xStatus?.connected ? 'success' : xStatus?.configured ? 'warning' : 'neutral'}
+                  />
+                  <span style={{ fontSize: 14, color: 'var(--text-muted)' }}>
+                    {xStatus?.connected
+                      ? `@${xStatus.account?.username || 'X'}`
+                      : 'Connect your X account to get started.'}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  {!xStatus?.connected ? (
+                    <button
+                      onClick={async () => {
+                        setXBusy(true);
+                        setXMessage('');
+                        try {
+                          const account = await window.keel.xConnect();
+                          setXMessage(`Connected to @${account.username}.`);
+                          await refreshXStatus();
+                        } catch (err) {
+                          setXMessage(err instanceof Error ? err.message : 'X connection failed');
+                          await refreshXStatus();
+                        } finally {
+                          setXBusy(false);
+                        }
                       }}
-                      style={{ accentColor: 'var(--accent)', marginTop: 2 }}
-                    />
-                    <div>
-                      <div style={{ fontSize: 'var(--text-base)', fontWeight: 600, color: 'var(--text-primary)' }}>
-                        {provider.label}
-                      </div>
-                      <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>
-                        {provider.description}
-                      </div>
-                    </div>
-                  </label>
-                ))}
-              </div>
-            </SectionCard>
-
-            {renderProviderStatus()}
-
-            <SectionCard title="Credentials" description="Only the active provider’s credentials are shown here.">
-              {renderProviderCredentials()}
-            </SectionCard>
-          </>
-        );
-
-      case 'ai-models':
-        return (
-          <>
-            {renderModelFields()}
-            <StatusPanel
-              title="Current AI configuration"
-              badge={{
-                label: providerLabel(settings.provider),
-                tone: 'accent',
-              }}
-              description={`Keel is currently configured to use ${providerLabel(settings.provider)}.`}
-            />
-          </>
-        );
-
-      case 'ai-local':
-        return renderLocalAi();
-
-      case 'knowledge-storage':
-        return (
-          <SectionCard title="Brain Path" description="This is where Keel stores local files, notes, and context.">
-            <FieldRow label="Brain Path">
-              <div style={{ display: 'flex', gap: 10, flexDirection: isCompactLayout ? 'column' : 'row' }}>
-                <input
-                  type="text"
-                  value={settings.brainPath}
-                  onChange={(e) => update({ brainPath: e.target.value })}
-                  style={{ ...inputStyle, flex: 1 }}
-                  readOnly
-                />
-                <button
-                  onClick={async () => {
-                    const picked = await window.keel.pickFolder(settings.brainPath);
-                    if (picked) update({ brainPath: picked });
-                  }}
-                  style={secondaryButtonStyle(false)}
-                >
-                  Browse…
-                </button>
-              </div>
-            </FieldRow>
-          </SectionCard>
-        );
-
-      case 'knowledge-sources':
-        return (
-          <>
-            <StatusPanel
-              title="Wiki Sources"
-              badge={{ label: 'Moved', tone: 'accent' }}
-              description="Add sources from the Wiki workspace so the ingest flow, base list, and synthesis page stay in one place."
-            />
-
-            <SectionCard
-              title="Where To Go Now"
-              description="Source ingestion is no longer a settings workflow."
-            >
-              <InlineNote>
-                Open <code style={inlineCodeStyle}>Wiki</code> to:
-              </InlineNote>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 14 }}>
-                <div style={{ color: 'var(--text-secondary)', lineHeight: 1.7 }}>
-                  1. See every wiki base Keel has already indexed and learned.
-                </div>
-                <div style={{ color: 'var(--text-secondary)', lineHeight: 1.7 }}>
-                  2. Create a new base if the topic does not exist yet.
-                </div>
-                <div style={{ color: 'var(--text-secondary)', lineHeight: 1.7 }}>
-                  3. Add URLs, pasted text, or files directly into the target base.
-                </div>
-              </div>
-            </SectionCard>
-          </>
-        );
-
-      case 'knowledge-team':
-        return (
-          <>
-            <StatusPanel
-              title="Team Brain Status"
-              badge={{
-                label: settings.teamBrainPath ? 'Enabled' : (isElectron ? 'Disabled' : 'Server-managed'),
-                tone: settings.teamBrainPath ? 'success' : 'neutral',
-              }}
-              description={
-                isElectron
-                  ? (settings.teamBrainPath
-                    ? 'A shared folder is configured for team knowledge.'
-                    : 'No shared folder is configured yet.')
-                  : 'On the server, team files are shared across all users.'
-              }
-            />
-
-            <SectionCard
-              title="Team Configuration"
-              description={isElectron ? 'Point every teammate to the same shared folder.' : 'Manage your team identity for shared edits.'}
-            >
-              {isElectron ? (
-                <>
-                  <FieldRow
-                    label="Team Brain Path"
-                    description="Use Dropbox, Google Drive, or another shared folder to share team context."
-                  >
-                    <div style={{ display: 'flex', gap: 10, flexDirection: isCompactLayout ? 'column' : 'row' }}>
-                      <input
-                        type="text"
-                        value={settings.teamBrainPath}
-                        onChange={(e) => update({ teamBrainPath: e.target.value })}
-                        placeholder="Not configured"
-                        style={{ ...inputStyle, flex: 1 }}
-                        readOnly
-                      />
+                      disabled={xBusy || !xStatus?.configured}
+                      style={primaryButtonStyle(xBusy || !xStatus?.configured)}
+                    >
+                      {xBusy ? 'Connecting...' : 'Connect X Account'}
+                    </button>
+                  ) : (
+                    <>
                       <button
                         onClick={async () => {
-                          const picked = await window.keel.pickFolder(settings.teamBrainPath || settings.brainPath);
-                          if (picked) update({ teamBrainPath: picked });
+                          setXBusy(true);
+                          setXMessage('');
+                          try {
+                            const result = await window.keel.xSyncBookmarks();
+                            const syncSummary = result.syncedCount === 0
+                              ? `No new bookmarks. Skipped ${result.skippedCount} already-ingested posts.`
+                              : `Synced ${result.syncedCount} new bookmarks into ${result.targetBaseTitle}.`;
+                            setXMessage(result.stoppedEarly ? `${syncSummary} Stopped early after reaching known bookmarks.` : syncSummary);
+                            await refreshXStatus();
+                          } catch (err) {
+                            setXMessage(err instanceof Error ? err.message : 'Bookmark sync failed');
+                            await refreshXStatus();
+                          } finally {
+                            setXBusy(false);
+                          }
                         }}
-                        style={secondaryButtonStyle(false)}
+                        disabled={xBusy}
+                        style={primaryButtonStyle(xBusy)}
                       >
-                        Browse…
+                        {xBusy ? 'Syncing...' : 'Sync Bookmarks'}
                       </button>
-                    </div>
-                  </FieldRow>
-
-                  <DangerZone
-                    title="Disconnect Team Brain"
-                    description="Turning this off removes the shared folder from this device only."
-                    actionLabel="Disconnect"
-                    onAction={() => update({ teamBrainPath: '' })}
-                    disabled={!settings.teamBrainPath}
-                  />
-                </>
-              ) : (
-                <InlineNote>
-                  Team Brain is shared across all users on this server. Edit team files in the Knowledge Browser.
-                </InlineNote>
+                      <button
+                        onClick={async () => {
+                          setXBusy(true);
+                          setXMessage('');
+                          try {
+                            await window.keel.xDisconnect();
+                            setXMessage('Disconnected from X.');
+                            await refreshXStatus();
+                          } catch (err) {
+                            setXMessage(err instanceof Error ? err.message : 'Disconnect failed');
+                          } finally {
+                            setXBusy(false);
+                          }
+                        }}
+                        style={secondaryButtonStyle(xBusy)}
+                        disabled={xBusy}
+                      >
+                        Disconnect
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+              {xMessage && (
+                <InlineMessage tone={xMessage.toLowerCase().includes('fail') || xMessage.toLowerCase().includes('error') ? 'danger' : 'success'}>
+                  {xMessage}
+                </InlineMessage>
+              )}
+              {xStatus?.lastPublishError && (
+                <InlineMessage tone="danger">Last publish error: {xStatus.lastPublishError}</InlineMessage>
               )}
             </SectionCard>
-          </>
-        );
 
-      case 'integrations-google':
-        return (
-          <>
-            {!googleConfigured ? (
-              <StatusPanel
-                title="Google Integration"
-                badge={{ label: 'Coming soon', tone: 'neutral' }}
-                description="Google integration is not configured in this build yet."
-              />
-            ) : (
-              <>
-                <StatusPanel
-                  title="Connection Status"
-                  badge={{ label: googleConnected ? 'Connected' : 'Disconnected', tone: googleConnected ? 'success' : 'warning' }}
-                  description={
-                    googleConnected
-                      ? 'Your Google account is connected and ready to sync calendar data.'
-                      : 'Connect a Google account to sync Calendar events and export to Docs.'
-                  }
-                  actions={(
+            <SectionCard title="Google" description="Sync Calendar events and export content to Google Docs.">
+              {!googleConfigured ? (
+                <div style={{ color: 'var(--text-muted)', fontSize: 14 }}>Google integration is not configured in this build yet.</div>
+              ) : (
+                <>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <StatusBadge label={googleConnected ? 'Connected' : 'Disconnected'} tone={googleConnected ? 'success' : 'warning'} />
+                      <span style={{ fontSize: 14, color: 'var(--text-muted)' }}>
+                        {googleConnected ? 'Your Google account is connected.' : 'Connect to sync Calendar events and export to Docs.'}
+                      </span>
+                    </div>
                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                       {!googleConnected ? (
                         <button
@@ -1164,200 +1068,17 @@ export default function Settings({ onBack, navigation }: Props) {
                         </>
                       )}
                     </div>
-                  )}
-                />
-                {googleMessage && (
-                  <InlineMessage
-                    tone={googleMessage.toLowerCase().includes('fail') || googleMessage.toLowerCase().includes('error') ? 'danger' : 'success'}
-                  >
-                    {googleMessage}
-                  </InlineMessage>
-                )}
-              </>
-            )}
-          </>
-        );
-
-      case 'integrations-x':
-        return (
-          <>
-            <StatusPanel
-              title="Connection Status"
-              badge={{
-                label: xStatus?.connected ? 'Connected' : xStatus?.configured ? 'Ready to connect' : 'Unavailable',
-                tone: xStatus?.connected ? 'success' : xStatus?.configured ? 'warning' : 'neutral',
-              }}
-              description={
-                xStatus?.connected
-                  ? `Connected to ${xStatus.account?.username ? `@${xStatus.account.username}` : 'X'}. You can sync bookmarks into the dedicated wiki base.`
-                  : 'Authorize your X account in an in-app window. Keel bundles the public client configuration and completes the callback locally.'
-              }
-              actions={(
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  {!xStatus?.connected ? (
-                    <button
-                      onClick={async () => {
-                        setXBusy(true);
-                        setXMessage('');
-                        try {
-                          const account = await window.keel.xConnect();
-                          setXMessage(`Connected to @${account.username}.`);
-                          await refreshXStatus();
-                        } catch (err) {
-                          setXMessage(err instanceof Error ? err.message : 'X connection failed');
-                          await refreshXStatus();
-                        } finally {
-                          setXBusy(false);
-                        }
-                      }}
-                      disabled={xBusy || !xStatus?.configured}
-                      style={primaryButtonStyle(xBusy || !xStatus?.configured)}
+                  </div>
+                  {googleMessage && (
+                    <InlineMessage
+                      tone={googleMessage.toLowerCase().includes('fail') || googleMessage.toLowerCase().includes('error') ? 'danger' : 'success'}
                     >
-                      {xBusy ? 'Connecting...' : 'Connect X Account'}
-                    </button>
-                  ) : (
-                    <>
-                      <button
-                        onClick={async () => {
-                          setXBusy(true);
-                          setXMessage('');
-                          try {
-                            const result = await window.keel.xSyncBookmarks();
-                            const syncSummary = result.syncedCount === 0
-                              ? `No new bookmarks. Skipped ${result.skippedCount} already-ingested posts in ${result.targetBaseTitle}.`
-                              : `Synced ${result.syncedCount} new bookmarks into ${result.targetBaseTitle} and skipped ${result.skippedCount} already-ingested posts.`;
-                            setXMessage(result.stoppedEarly ? `${syncSummary} Sync stopped early after reaching known bookmarks.` : syncSummary);
-                            await refreshXStatus();
-                          } catch (err) {
-                            setXMessage(err instanceof Error ? err.message : 'Bookmark sync failed');
-                            await refreshXStatus();
-                          } finally {
-                            setXBusy(false);
-                          }
-                        }}
-                        disabled={xBusy}
-                        style={primaryButtonStyle(xBusy)}
-                      >
-                        {xBusy ? 'Syncing...' : 'Sync Bookmarks'}
-                      </button>
-                      <button
-                        onClick={async () => {
-                          setXBusy(true);
-                          setXMessage('');
-                          try {
-                            await window.keel.xDisconnect();
-                            setXMessage('Disconnected from X.');
-                            await refreshXStatus();
-                          } catch (err) {
-                            setXMessage(err instanceof Error ? err.message : 'Disconnect failed');
-                          } finally {
-                            setXBusy(false);
-                          }
-                        }}
-                        style={secondaryButtonStyle(xBusy)}
-                        disabled={xBusy}
-                      >
-                        Disconnect
-                      </button>
-                    </>
+                      {googleMessage}
+                    </InlineMessage>
                   )}
-                </div>
-              )}
-            />
-
-            {xMessage && (
-              <InlineMessage
-                tone={xMessage.toLowerCase().includes('fail') || xMessage.toLowerCase().includes('error') ? 'danger' : 'success'}
-              >
-                {xMessage}
-              </InlineMessage>
-            )}
-
-            <SectionCard
-              title="App Authorization"
-              description="Keel bundles the X OAuth public client ID, so no manual app setup is required before you connect."
-            >
-              <InlineNote>
-                This slice requests {renderCodeList(X_SCOPES)}
-              </InlineNote>
-              <InlineNote>
-                Callback URL: <code style={inlineCodeStyle}>{X_REDIRECT_URI}</code>
-              </InlineNote>
-            </SectionCard>
-
-            <SectionCard
-              title="Bookmark Sync"
-              description="Manual sync currently imports your recent bookmarks into a dedicated wiki base."
-            >
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                <div style={{ color: 'var(--text-secondary)', lineHeight: 1.7 }}>
-                  Sync target: {xStatus?.targetBaseTitle || 'X Bookmarks'}
-                </div>
-                <div style={{ color: 'var(--text-secondary)', lineHeight: 1.7 }}>
-                  Last sync: {xStatus?.lastSyncAt ? new Date(xStatus.lastSyncAt).toLocaleString() : 'Not synced yet'}
-                </div>
-                <div style={{ color: 'var(--text-secondary)', lineHeight: 1.7 }}>
-                  Last sync result: {xStatus?.lastSyncAt
-                    ? `${xStatus.lastSyncNewCount || 0} new, ${xStatus.lastSyncSkippedCount || 0} skipped, ${xStatus.lastSyncFetchedCount || 0} fetched`
-                    : 'No sync results yet'}
-                </div>
-                <div style={{ color: 'var(--text-secondary)', lineHeight: 1.7 }}>
-                  Status: {xStatus?.status || 'idle'}
-                </div>
-              </div>
-              <InlineNote>
-                Bookmark sync currently lands in one dedicated base. Topic-based routing and inbox review will come in the next slice.
-              </InlineNote>
-            </SectionCard>
-
-            <SectionCard
-              title="Publishing"
-              description="Composer drafts now publish directly through the X API after explicit confirmation."
-            >
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                <div style={{ color: 'var(--text-secondary)', lineHeight: 1.7 }}>
-                  Granted scopes: {(xStatus?.scopes || []).join(', ')}
-                </div>
-                <div style={{ color: 'var(--text-secondary)', lineHeight: 1.7 }}>
-                  Last publish: {xStatus?.lastPublishAt ? new Date(xStatus.lastPublishAt).toLocaleString() : 'Not published yet'}
-                </div>
-                <div style={{ color: 'var(--text-secondary)', lineHeight: 1.7 }}>
-                  Latest post: {xStatus?.lastPublishedUrl ? <a href={xStatus.lastPublishedUrl} target="_blank" rel="noopener noreferrer">{xStatus.lastPublishedUrl}</a> : 'No published post yet'}
-                </div>
-              </div>
-              {xStatus?.lastPublishError && (
-                <InlineMessage tone="danger">
-                  {xStatus.lastPublishError}
-                </InlineMessage>
+                </>
               )}
             </SectionCard>
-          </>
-        );
-
-      case 'advanced-developer':
-        return (
-          <>
-            <SectionCard
-              title="Runtime Overrides"
-              description="Advanced connection controls and future diagnostics live here."
-            >
-              <FieldRow
-                label="OpenRouter Base URL"
-                description="Override the OpenAI-compatible endpoint if you are using a custom gateway."
-              >
-                <input
-                  type="text"
-                  value={settings.openrouterBaseUrl}
-                  onChange={(e) => update({ openrouterBaseUrl: e.target.value })}
-                  placeholder="https://openrouter.ai/api/v1"
-                  style={inputStyle}
-                />
-              </FieldRow>
-            </SectionCard>
-            <PlaceholderPanel
-              title="Developer tools will expand here"
-              description="Diagnostics, environment checks, and future reset tools should land in this section."
-            />
           </>
         );
 
@@ -1428,52 +1149,33 @@ export default function Settings({ onBack, navigation }: Props) {
             overflowY: 'auto',
           }}
         >
-          {NAV_GROUPS.map((group) => (
-            <div key={group.label} style={{ marginBottom: 22 }}>
-              <div
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            {NAV_ITEMS.map((item) => (
+              <button
+                key={item.id}
+                onClick={() => setSelectedSection(item.id)}
                 style={{
-                  fontSize: 11,
-                  color: 'var(--text-subtle)',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.08em',
-                  marginBottom: 10,
-                  paddingLeft: 10,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  width: '100%',
+                  textAlign: 'left',
+                  padding: '11px 12px',
+                  borderRadius: 'var(--radius-lg)',
+                  border: 'none',
+                  background: selectedSection === item.id ? 'var(--surface-selected)' : 'transparent',
+                  color: selectedSection === item.id ? 'var(--text-primary)' : 'var(--text-secondary)',
+                  cursor: 'pointer',
+                  fontSize: 14,
                 }}
               >
-                {group.label}
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                {group.items.map((item) => (
-                  <button
-                    key={item.id}
-                    onClick={() => setSelectedSection(item.id)}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      width: '100%',
-                      textAlign: 'left',
-                      padding: '11px 12px',
-                      borderRadius: 'var(--radius-lg)',
-                      border: 'none',
-                      background: selectedSection === item.id ? 'var(--surface-selected)' : 'transparent',
-                      color: selectedSection === item.id ? 'var(--text-primary)' : 'var(--text-secondary)',
-                      cursor: 'pointer',
-                      fontSize: 14,
-                    }}
-                  >
-                    <span>{item.label}</span>
-                    {item.id === 'integrations-google' && googleConnected && (
-                      <StatusBadge label="On" tone="success" />
-                    )}
-                    {item.id === 'knowledge-team' && settings.teamBrainPath && (
-                      <StatusBadge label="On" tone="success" />
-                    )}
-                  </button>
-                ))}
-              </div>
-            </div>
-          ))}
+                <span>{item.label}</span>
+                {item.id === 'integrations' && (googleConnected || xStatus?.connected) && (
+                  <StatusBadge label="On" tone="success" />
+                )}
+              </button>
+            ))}
+          </div>
         </div>
 
         <div style={{ flex: 1, minWidth: 0, minHeight: 0, overflowY: 'auto', padding: isCompactLayout ? 20 : '26px 34px 40px' }}>
@@ -1491,28 +1193,7 @@ export default function Settings({ onBack, navigation }: Props) {
               </div>
             </div>
 
-	            {selectedSection === 'general-personal' && (
-	              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 22 }}>
-	                {summaryChips.map((chip) => (
-	                  <div
-	                    key={chip.label}
-	                    style={{
-	                      display: 'flex',
-	                      alignItems: 'center',
-	                      gap: 8,
-	                      padding: '8px 10px',
-	                      borderRadius: 999,
-	                      background: 'var(--surface-muted)',
-	                      border: '1px solid var(--panel-border)',
-	                      fontSize: 12,
-	                    }}
-	                  >
-	                    <span style={{ color: 'var(--text-subtle)' }}>{chip.label}</span>
-	                    <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{chip.value}</span>
-	                  </div>
-	                ))}
-	              </div>
-	            )}
+
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
               {renderSection()}
@@ -1529,7 +1210,7 @@ function SectionCard({
   description,
   children,
 }: {
-  title: string;
+  title?: string;
   description?: string;
   children: React.ReactNode;
 }) {
@@ -1542,14 +1223,16 @@ function SectionCard({
         border: '1px solid var(--panel-border)',
       }}
     >
-      <div style={{ marginBottom: 18 }}>
-        <div style={{ fontSize: 18, fontWeight: 600, color: 'var(--text-primary)' }}>{title}</div>
-        {description && (
-          <div style={{ marginTop: 6, fontSize: 14, lineHeight: 1.5, color: 'var(--text-muted)' }}>
-            {description}
-          </div>
-        )}
-      </div>
+      {(title || description) && (
+        <div style={{ marginBottom: 18 }}>
+          {title && <div style={{ fontSize: 18, fontWeight: 600, color: 'var(--text-primary)' }}>{title}</div>}
+          {description && (
+            <div style={{ marginTop: title ? 6 : 0, fontSize: 14, lineHeight: 1.5, color: 'var(--text-muted)' }}>
+              {description}
+            </div>
+          )}
+        </div>
+      )}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
         {children}
       </div>
@@ -2336,6 +2019,276 @@ function WikiSourcesSection({
               </button>
             </div>
           </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+const DOW_LABELS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+function scheduleDescription(job: ScheduledJob): string {
+  const time = job.time || '??:??';
+  if (job.scheduleType === 'daily') return `Every day at ${time}`;
+  if (job.scheduleType === 'weekdays') return `Weekdays at ${time}`;
+  if (job.scheduleType === 'weekly') {
+    const day = job.dayOfWeek != null ? DOW_LABELS[job.dayOfWeek] : 'day';
+    return `Every ${day} at ${time}`;
+  }
+  return time;
+}
+
+const BLANK_JOB: Omit<ScheduledJob, 'id' | 'createdAt' | 'lastRunDate'> = {
+  name: '',
+  prompt: '',
+  scheduleType: 'daily',
+  time: '09:00',
+  dayOfWeek: 1,
+  enabled: true,
+};
+
+function ScheduledJobsSection() {
+  const [jobs, setJobs] = useState<ScheduledJob[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState<ScheduledJob | null>(null);
+  const [isNew, setIsNew] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  const inputStyle: React.CSSProperties = {
+    width: '100%',
+    padding: '11px 13px',
+    borderRadius: 'var(--radius-lg)',
+    background: 'var(--control-bg)',
+    border: '1px solid var(--control-border)',
+    color: 'var(--text-primary)',
+    fontSize: 'var(--text-base)',
+    outline: 'none',
+    fontFamily: 'inherit',
+  };
+
+  const selectStyle: React.CSSProperties = {
+    ...inputStyle,
+    appearance: 'none',
+    backgroundImage: `url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23888' stroke-width='1.5' fill='none'/%3E%3C/svg%3E")`,
+    backgroundRepeat: 'no-repeat',
+    backgroundPosition: 'right 14px center',
+    paddingRight: 36,
+    cursor: 'pointer',
+  };
+
+  const loadJobs = useCallback(async () => {
+    try {
+      const list = await window.keel.listScheduledJobs();
+      setJobs(list);
+    } catch {
+      setJobs([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { loadJobs(); }, [loadJobs]);
+
+  const handleAddNew = () => {
+    setEditing({ ...BLANK_JOB });
+    setIsNew(true);
+    setError('');
+  };
+
+  const handleEdit = (job: ScheduledJob) => {
+    setEditing({ ...job });
+    setIsNew(false);
+    setError('');
+  };
+
+  const handleCancel = () => {
+    setEditing(null);
+    setError('');
+  };
+
+  const handleSave = async () => {
+    if (!editing) return;
+    if (!editing.name.trim()) { setError('Job name is required.'); return; }
+    if (!editing.prompt.trim()) { setError('Prompt is required.'); return; }
+    if (!editing.time) { setError('Time is required.'); return; }
+    setSaving(true);
+    setError('');
+    try {
+      await window.keel.upsertScheduledJob(editing);
+      await loadJobs();
+      setEditing(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save job.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (id: number) => {
+    try {
+      await window.keel.deleteScheduledJob(id);
+      await loadJobs();
+    } catch {}
+  };
+
+  const handleToggle = async (job: ScheduledJob) => {
+    try {
+      await window.keel.upsertScheduledJob({ ...job, enabled: !job.enabled });
+      await loadJobs();
+    } catch {}
+  };
+
+  if (loading) {
+    return <PlaceholderPanel title="Loading scheduled jobs" description="Fetching your configured jobs…" />;
+  }
+
+  if (editing) {
+    return (
+      <SectionCard>
+        <FieldRow label="Name">
+          <input
+            type="text"
+            value={editing.name}
+            onChange={(e) => setEditing((prev) => prev ? { ...prev, name: e.target.value } : prev)}
+            placeholder="e.g. Thursday Group Post"
+            style={inputStyle}
+            autoFocus
+          />
+        </FieldRow>
+
+        <FieldRow label="Prompt">
+          <textarea
+            value={editing.prompt}
+            onChange={(e) => setEditing((prev) => prev ? { ...prev, prompt: e.target.value } : prev)}
+            placeholder="e.g. Write a short summary of what was top of mind for me this week, suitable for sharing with my team."
+            style={{ ...inputStyle, minHeight: 120, resize: 'vertical' }}
+          />
+        </FieldRow>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+          <FieldRow label="Frequency">
+            <select
+              value={editing.scheduleType}
+              onChange={(e) => setEditing((prev) => prev
+                ? { ...prev, scheduleType: e.target.value as ScheduledJob['scheduleType'] }
+                : prev
+              )}
+              style={selectStyle}
+            >
+              <option value="daily">Every day</option>
+              <option value="weekdays">Weekdays only</option>
+              <option value="weekly">Weekly (specific day)</option>
+            </select>
+          </FieldRow>
+
+          <FieldRow label="Time">
+            <input
+              type="time"
+              value={editing.time}
+              onChange={(e) => setEditing((prev) => prev ? { ...prev, time: e.target.value } : prev)}
+              style={inputStyle}
+            />
+          </FieldRow>
+        </div>
+
+        {editing.scheduleType === 'weekly' && (
+          <FieldRow label="Day of Week">
+            <select
+              value={editing.dayOfWeek ?? 1}
+              onChange={(e) => setEditing((prev) => prev ? { ...prev, dayOfWeek: Number(e.target.value) } : prev)}
+              style={selectStyle}
+            >
+              {DOW_LABELS.map((label, idx) => (
+                <option key={idx} value={idx}>{label}</option>
+              ))}
+            </select>
+          </FieldRow>
+        )}
+
+        {error && (
+          <div style={{ padding: '10px 14px', borderRadius: 12, background: 'rgba(248,113,113,0.1)', color: '#fca5a5', fontSize: 13 }}>
+            {error}
+          </div>
+        )}
+
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+          <button onClick={handleCancel} style={secondaryButtonStyle(saving)}>Cancel</button>
+          <button onClick={handleSave} disabled={saving} style={primaryButtonStyle(saving)}>
+            {saving ? 'Saving…' : 'Save Job'}
+          </button>
+        </div>
+      </SectionCard>
+    );
+  }
+
+  return (
+    <>
+      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+        <button onClick={handleAddNew} style={primaryButtonStyle(false)}>+ Add Job</button>
+      </div>
+
+      {jobs.length === 0 ? (
+        <div style={{ color: 'var(--text-muted)', fontSize: 14 }}>No jobs yet.</div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {jobs.map((job) => (
+            <div
+              key={job.id}
+              style={{
+                padding: '14px 16px',
+                borderRadius: 14,
+                background: 'var(--surface-panel)',
+                border: '1px solid var(--panel-border)',
+                opacity: job.enabled ? 1 : 0.5,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 12,
+              }}
+            >
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{job.name}</div>
+                <div style={{ marginTop: 2, fontSize: 12, color: 'var(--text-muted)' }}>
+                  {scheduleDescription(job)} · {job.prompt.length > 60 ? job.prompt.slice(0, 60) + '…' : job.prompt}
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
+                <button
+                  onClick={() => handleToggle(job)}
+                  title={job.enabled ? 'Disable' : 'Enable'}
+                  style={{
+                    width: 36, height: 20, borderRadius: 10, border: 'none',
+                    background: job.enabled ? 'var(--accent)' : 'var(--surface-muted)',
+                    cursor: 'pointer', position: 'relative', transition: 'background 0.2s',
+                    padding: 0, flexShrink: 0,
+                  }}
+                >
+                  <span style={{
+                    position: 'absolute', top: 2,
+                    left: job.enabled ? 18 : 2,
+                    width: 16, height: 16, borderRadius: '50%',
+                    background: '#fff', transition: 'left 0.2s',
+                  }} />
+                </button>
+                <button
+                  onClick={() => handleEdit(job)}
+                  style={{
+                    padding: '5px 10px', borderRadius: 8,
+                    border: '1px solid var(--panel-border)', background: 'var(--surface-muted)',
+                    color: 'var(--text-secondary)', fontSize: 12, cursor: 'pointer',
+                  }}
+                >Edit</button>
+                <button
+                  onClick={() => job.id != null && handleDelete(job.id)}
+                  style={{
+                    padding: '5px 10px', borderRadius: 8,
+                    border: '1px solid rgba(248,113,113,0.2)', background: 'rgba(248,113,113,0.07)',
+                    color: '#fca5a5', fontSize: 12, cursor: 'pointer',
+                  }}
+                >Delete</button>
+              </div>
+            </div>
+          ))}
         </div>
       )}
     </>

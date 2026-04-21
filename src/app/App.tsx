@@ -68,6 +68,7 @@ export default function App() {
   const [newChatSignal, setNewChatSignal] = useState(0);
   const [loadSessionId, setLoadSessionId] = useState<string | null>(null);
   const [chatDraft, setChatDraft] = useState<string | undefined>(undefined);
+  const [chatAutoSend, setChatAutoSend] = useState(false);
   const [currentSessionId, setCurrentSessionId] = useState('');
   const [refreshSidebar, setRefreshSidebar] = useState(0);
   const [desktopView, setDesktopView] = useState<DesktopView>('dashboard');
@@ -274,12 +275,13 @@ export default function App() {
     navigateDesktop('chat', { mode: 'chat' });
   };
 
-  const handleNewChatWithDraft = (draft: string) => {
+  const handleNewChatWithDraft = (draft: string, autoSend = false) => {
     markCurrentSessionUnreadIfStreaming();
     setLoadSessionId(null);
     setCurrentSessionId('');
     currentSessionIdRef.current = '';
     setChatDraft(draft);
+    setChatAutoSend(autoSend);
     setNewChatSignal((value) => value + 1);
     navigateDesktop('chat', { mode: 'chat' });
   };
@@ -324,21 +326,20 @@ export default function App() {
   }, []);
 
   const handleDesktopModeChange = (mode: DesktopMode) => {
-    // Always navigate to the mode's default view, even if already active.
-    // This lets users click the active tab to return from overlay views
-    // (e.g. Tasks, Search, Settings) back to the mode's main content.
+    // Tab switches never push history — only meaningful navigations (settings,
+    // wiki pages, etc.) should be back/forward-able.
     if (mode === 'home') {
       markCurrentSessionUnreadIfStreaming();
-      navigateDesktop('dashboard', { mode: 'home' });
+      navigateDesktop('dashboard', { mode: 'home', pushHistory: false });
       return;
     }
     if (mode === 'chat') {
-      navigateDesktop('chat', { mode: 'chat' });
+      navigateDesktop('chat', { mode: 'chat', pushHistory: false });
       return;
     }
     markCurrentSessionUnreadIfStreaming();
     openWikiLanding();
-    navigateDesktop('wiki', { mode: 'wiki' });
+    navigateDesktop('wiki', { mode: 'wiki', pushHistory: false });
   };
 
   const openSettings = useCallback((navigation: SettingsNavigationState = {}) => {
@@ -545,9 +546,11 @@ export default function App() {
               newChatSignal={newChatSignal}
               loadSessionId={loadSessionId}
               initialDraft={chatDraft}
+              autoSendDraft={chatAutoSend}
               onSessionChange={handleSessionChange}
               onSessionStreamStateChange={handleSessionStreamStateChange}
               onOpenWikiPage={handleOpenWikiCitation}
+              onBringToFront={() => navigateDesktop('chat', { mode: 'chat' })}
             />
           </div>
           {desktopView !== 'chat' && renderDesktopView()}

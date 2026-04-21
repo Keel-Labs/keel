@@ -42,8 +42,15 @@ import {
   getRecentActivity,
   recordXPublishFailure as recordXPublishFailureHistory,
   recordXPublishSuccess as recordXPublishSuccessHistory,
+  listScheduledJobs,
+  upsertScheduledJob,
+  deleteScheduledJob,
+  markScheduledJobRan,
+  getSyncState,
+  upsertSyncState,
+  type ScheduledJobRow,
 } from '../src/core/db';
-import { listAllTasks, toggleTask, moveTask, acceptIncomingTask, createProject, renameProject, deleteProject } from '../src/core/tasks';
+import { listAllTasks, toggleTask, moveTask, acceptIncomingTask, appendTask, createProject, renameProject, deleteProject } from '../src/core/tasks';
 import { capture } from '../src/core/workflows/capture';
 import { autoCapture } from '../src/core/workflows/autoCapture';
 import { dailyBrief } from '../src/core/workflows/dailyBrief';
@@ -216,9 +223,8 @@ const settings = loadSettings();
 const fileManager = new FileManager(settings.brainPath);
 const llmClient = new LLMClient();
 const contextAssembler = new ContextAssembler(fileManager, false, settings.timezone || undefined, settings.personality || 'default');
-let teamFileManager: TeamFileManager | null = settings.teamBrainPath
-  ? new TeamFileManager(settings.teamBrainPath)
-  : null;
+// Team Brain is deprecated — always null until the feature is rebuilt
+let teamFileManager: TeamFileManager | null = null;
 
 const isDev = process.env.NODE_ENV === 'development';
 
@@ -595,18 +601,19 @@ async function startFileWatcher(): Promise<void> {
 
 async function teamIndexFile(filePath: string): Promise<void> {
   if (!teamFileManager) return;
+  const tbPath = teamFileManager.getBrainPath();
   try {
-    const fullPath = path.join(settings.teamBrainPath, filePath);
+    const fullPath = path.join(tbPath, filePath);
     const raw = fs.readFileSync(fullPath, 'utf-8');
     const crypto = await import('crypto');
     const hash = crypto.createHash('sha256').update(raw).digest('hex');
-    const existing = getFileIndex(settings.teamBrainPath, filePath);
+    const existing = getFileIndex(tbPath, filePath);
     if (existing && (existing as any).hash === hash) return;
 
     const chunks = await embedFile(teamFileManager, filePath);
     if (chunks.length > 0) {
-      await upsertChunks(settings.teamBrainPath, chunks);
-      updateFileIndex(settings.teamBrainPath, filePath, chunks.length, hash);
+      await upsertChunks(tbPath, chunks);
+      updateFileIndex(tbPath, filePath, chunks.length, hash);
     }
   } catch (error) {
     console.error(`Failed to index team file ${filePath}:`, error);
@@ -615,15 +622,16 @@ async function teamIndexFile(filePath: string): Promise<void> {
 
 async function teamStartupIndex(): Promise<void> {
   if (!teamFileManager) return;
+  const tbPath = teamFileManager.getBrainPath();
   try {
     const allMdFiles = await teamFileManager.listFiles('**/*.md');
     for (const file of allMdFiles) {
-      const existing = getFileIndex(settings.teamBrainPath, file);
+      const existing = getFileIndex(tbPath, file);
       if (!existing) {
         await teamIndexFile(file);
       } else {
         try {
-          const fullPath = path.join(settings.teamBrainPath, file);
+          const fullPath = path.join(tbPath, file);
           const stat = fs.statSync(fullPath);
           if (stat.mtimeMs > existing.lastIndexedAt) {
             await teamIndexFile(file);
@@ -640,20 +648,21 @@ async function teamStartupIndex(): Promise<void> {
 }
 
 async function startTeamFileWatcher(): Promise<void> {
-  if (!teamFileManager || !settings.teamBrainPath) return;
+  if (!teamFileManager) return;
+  const tbPath = teamFileManager.getBrainPath();
   const chokidar = await import('chokidar');
-  const watcher = chokidar.watch(path.join(settings.teamBrainPath, '**/*.md'), {
+  const watcher = chokidar.watch(path.join(tbPath, '**/*.md'), {
     ignoreInitial: true,
     ignored: [/node_modules/, /\.config/],
   });
 
   watcher.on('add', (fullPath: string) => {
-    const relativePath = path.relative(settings.teamBrainPath, fullPath);
+    const relativePath = path.relative(tbPath, fullPath);
     if (!relativePath.endsWith('.md') || relativePath.startsWith('.')) return;
     teamIndexFile(relativePath);
   });
   watcher.on('change', (fullPath: string) => {
-    const relativePath = path.relative(settings.teamBrainPath, fullPath);
+    const relativePath = path.relative(tbPath, fullPath);
     if (!relativePath.endsWith('.md') || relativePath.startsWith('.')) return;
     teamIndexFile(relativePath);
   });
@@ -811,26 +820,11 @@ function registerIpcHandlers() {
   });
 
   ipcMain.handle('keel:save-settings', async (_event, newSettings: Settings) => {
-    const teamPathChanged = newSettings.teamBrainPath !== settings.teamBrainPath;
     saveSettingsToFile(newSettings);
     Object.assign(settings, newSettings);
     llmClient.reload();
     contextAssembler.setTimezone(newSettings.timezone || '');
     contextAssembler.setPersonality(newSettings.personality || 'default');
-
-    // Reinitialize team brain if path changed
-    if (teamPathChanged) {
-      if (newSettings.teamBrainPath) {
-        teamFileManager = new TeamFileManager(newSettings.teamBrainPath);
-        await teamFileManager.ensureTeamStructure();
-        contextAssembler.setTeamFileManager(teamFileManager);
-        teamStartupIndex().catch(() => {});
-        startTeamFileWatcher().catch(() => {});
-      } else {
-        teamFileManager = null;
-        contextAssembler.setTeamFileManager(null);
-      }
-    }
   });
 
   // Enrich messages: auto-fetch Google Docs and Calendar events
@@ -1112,9 +1106,26 @@ function registerIpcHandlers() {
             .get(s.id) as any)?.messages || '[]'
         );
         const messages = Array.isArray(session) ? session : session.messages || [];
+
+        // Prefer first user message as title
         const firstUser = messages.find((m: any) => m.role === 'user');
         const visibleContent = firstUser?.displayContent || firstUser?.content;
-        if (visibleContent) title = visibleContent.slice(0, 60);
+        if (visibleContent) {
+          title = visibleContent.slice(0, 60);
+        } else {
+          // Fallback: extract first # heading from assistant message content
+          // e.g. "# Keel App - Status Summary\n\n..." → "Keel App - Status Summary"
+          const firstAssistant = messages.find((m: any) => m.role === 'assistant');
+          const assistantContent = firstAssistant?.content || '';
+          const headingMatch = assistantContent.match(/^#+ (.+)$/m);
+          if (headingMatch) {
+            title = headingMatch[1].trim().slice(0, 60);
+          } else {
+            // Last resort: first non-empty line of content
+            const firstLine = assistantContent.split('\n').find((l: string) => l.trim());
+            if (firstLine) title = firstLine.replace(/^[#*\s]+/, '').trim().slice(0, 60);
+          }
+        }
       } catch {}
       return { id: s.id, title, updatedAt: s.updatedAt };
     });
@@ -1397,7 +1408,7 @@ function registerIpcHandlers() {
     if (dirPath.includes('..') || dirPath.startsWith('.config')) {
       throw new Error('Access denied');
     }
-    const fullPath = path.join(settings.teamBrainPath, dirPath);
+    const fullPath = path.join(teamFileManager!.getBrainPath(), dirPath);
     try {
       const entries = fs.readdirSync(fullPath, { withFileTypes: true });
       return entries
@@ -1453,6 +1464,11 @@ function registerIpcHandlers() {
     logActivity(settings.brainPath, 'task-moved', `Moved "${taskText}" from ${sourceFilePath} to ${targetFilePath}`);
   });
 
+  ipcMain.handle('keel:create-task', async (_event, filePath: string, text: string) => {
+    await appendTask(fileManager, filePath, text);
+    logActivity(settings.brainPath, 'task-created', text);
+  });
+
   ipcMain.handle('keel:list-incoming-tasks', async () => {
     return listIncomingTasksDb(settings.brainPath);
   });
@@ -1502,6 +1518,22 @@ function registerIpcHandlers() {
     deleteReminder(settings.brainPath, id);
   });
 
+  // --- Scheduled Jobs ---
+
+  ipcMain.handle('keel:list-scheduled-jobs', async () => {
+    return listScheduledJobs(settings.brainPath);
+  });
+
+  ipcMain.handle('keel:upsert-scheduled-job', async (_event, job) => {
+    const id = upsertScheduledJob(settings.brainPath, job);
+    logActivity(settings.brainPath, 'scheduled-job-saved', job.name);
+    return id;
+  });
+
+  ipcMain.handle('keel:delete-scheduled-job', async (_event, id: number) => {
+    deleteScheduledJob(settings.brainPath, id);
+  });
+
   // --- Activity ---
 
   ipcMain.handle('keel:get-recent-activity', async (_event, limit?: number) => {
@@ -1514,6 +1546,35 @@ function registerIpcHandlers() {
 
   ipcMain.handle('keel:fetch-ai-news', async () => {
     return fetchAiNewsRss();
+  });
+
+  ipcMain.handle('keel:get-daily-quote', async () => {
+    const todayKey = getTodayKey();
+    // Check cache first
+    const cached = getSyncState(settings.brainPath, 'daily-quote');
+    if (cached?.meta) {
+      try {
+        const parsed = JSON.parse(cached.meta) as { date: string; text: string; author: string };
+        if (parsed.date === todayKey) return { text: parsed.text, author: parsed.author };
+      } catch {}
+    }
+    // Generate a new one via LLM
+    try {
+      const raw = await llmClient.chat(
+        [{ role: 'user', content: 'Generate one short, memorable quote — under 20 words — about focus, leadership, execution, or personal growth. It can be a real quote or original. Respond with ONLY valid JSON, no markdown: {"text": "...", "author": "..."}. If original, use an empty string for author.', timestamp: Date.now() }],
+        'You are a quote generator. Output only valid JSON with no explanation or formatting.'
+      );
+      const match = raw.match(/\{[\s\S]*\}/);
+      if (match) {
+        const quote = JSON.parse(match[0]) as { text: string; author: string };
+        upsertSyncState(settings.brainPath, 'daily-quote', { meta: JSON.stringify({ date: todayKey, ...quote }) });
+        return quote;
+      }
+    } catch (err) {
+      console.error('Daily quote generation failed:', err);
+    }
+    // Fallback
+    return { text: 'Make today count.', author: '' };
   });
 
   // --- Google Integration ---
@@ -1743,10 +1804,9 @@ function registerIpcHandlers() {
   });
 }
 
-// --- Scheduler for Timed Briefs/EOD ---
+// --- Scheduler ---
 
 let schedulerInterval: ReturnType<typeof setInterval> | null = null;
-let lastTriggered: { brief?: string; eod?: string } = {};
 
 function getCurrentHHMM(): string {
   const now = new Date();
@@ -1759,68 +1819,6 @@ function getCurrentHHMM(): string {
 function getTodayKey(): string {
   const tz = settings.timezone || undefined;
   return new Date().toLocaleDateString('en-CA', { timeZone: tz }); // YYYY-MM-DD format
-}
-
-async function runScheduledBrief(): Promise<void> {
-  try {
-    const result = await dailyBrief(fileManager, llmClient, {
-      teamFileManager: teamFileManager || undefined,
-    });
-    logActivity(settings.brainPath, 'scheduled-brief', 'Auto-triggered daily brief');
-
-    if (Notification.isSupported()) {
-      const notif = new Notification({
-        title: 'Keel — Daily Brief',
-        body: result.slice(0, 200).replace(/[#*_`]/g, ''),
-      });
-      notif.on('click', () => {
-        mainWindow?.show();
-        mainWindow?.focus();
-      });
-      notif.show();
-    }
-
-    // Send to renderer if window is open
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('keel:scheduled-notification', {
-        type: 'daily-brief',
-        content: result,
-      });
-    }
-  } catch (error) {
-    console.error('Scheduled brief failed:', error);
-  }
-}
-
-async function runScheduledEod(): Promise<void> {
-  try {
-    const result = await eod(fileManager, llmClient, [], {
-      teamFileManager: teamFileManager || undefined,
-      userName: settings.userName || undefined,
-    });
-    logActivity(settings.brainPath, 'scheduled-eod', 'Auto-triggered EOD summary');
-
-    if (Notification.isSupported()) {
-      const notif = new Notification({
-        title: 'Keel — End of Day',
-        body: result.slice(0, 200).replace(/[#*_`]/g, ''),
-      });
-      notif.on('click', () => {
-        mainWindow?.show();
-        mainWindow?.focus();
-      });
-      notif.show();
-    }
-
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('keel:scheduled-notification', {
-        type: 'eod',
-        content: result,
-      });
-    }
-  } catch (error) {
-    console.error('Scheduled EOD failed:', error);
-  }
 }
 
 function checkDueReminders(): void {
@@ -1861,33 +1859,109 @@ function checkDueReminders(): void {
   }
 }
 
+async function runScheduledJob(job: ScheduledJobRow): Promise<void> {
+  try {
+    // Build context from profile
+    const contextParts: string[] = [];
+    try {
+      const keelMd = await fileManager.readFile('keel.md');
+      if (keelMd.trim()) contextParts.push(`## About Me\n${keelMd}`);
+    } catch {}
+
+    // Try to include today's tasks
+    try {
+      const taskGroups = await listAllTasks(fileManager);
+      const taskLines: string[] = [];
+      for (const group of taskGroups) {
+        const open = group.tasks.filter((t) => !t.completed);
+        if (open.length > 0) {
+          taskLines.push(`**${group.project}:** ${open.map((t) => t.text).join(', ')}`);
+        }
+      }
+      if (taskLines.length > 0) {
+        contextParts.push(`## Open Tasks\n${taskLines.join('\n')}`);
+      }
+    } catch {}
+
+    const today = new Date().toLocaleDateString('en-US', {
+      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+    });
+    const systemPrompt = `Today is ${today}. You are a personal AI assistant helping with productivity and work management. Be concise and actionable. Do not add a title, heading, or label at the top of your response — begin directly with the content.`;
+    const userMessage = contextParts.length > 0
+      ? `${contextParts.join('\n\n')}\n\n---\n\n${job.prompt}`
+      : job.prompt;
+
+    const result = await llmClient.chat([{ role: 'user', content: userMessage, timestamp: Date.now() }], systemPrompt);
+
+    // Append to daily log
+    const dateStr = getTodayKey();
+    try {
+      await fileManager.appendToFile(
+        `daily-log/${dateStr}.md`,
+        `\n## ${job.name}\n\n${result.trim()}\n`,
+      );
+    } catch {}
+
+    logActivity(settings.brainPath, 'scheduled-job', job.name);
+
+    if (Notification.isSupported()) {
+      const notif = new Notification({
+        title: `Keel — ${job.name}`,
+        body: result.slice(0, 200).replace(/[#*_`]/g, ''),
+      });
+      notif.on('click', () => { mainWindow?.show(); mainWindow?.focus(); });
+      notif.show();
+    }
+
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('keel:scheduled-notification', {
+        type: 'scheduled-job',
+        jobName: job.name,
+        content: result,
+      });
+    }
+  } catch (error) {
+    console.error(`Scheduled job "${job.name}" failed:`, error);
+  }
+}
+
+function checkScheduledJobs(): void {
+  try {
+    const jobs = listScheduledJobs(settings.brainPath);
+    const now = getCurrentHHMM();
+    const todayKey = getTodayKey();
+    const todayDow = new Date().getDay(); // 0=Sun..6=Sat
+
+    for (const job of jobs) {
+      if (!job.enabled) continue;
+      if (job.time !== now) continue;
+      if (job.lastRunDate === todayKey) continue;
+
+      // For weekly jobs, check day of week
+      if (job.scheduleType === 'weekly' && job.dayOfWeek !== null && job.dayOfWeek !== todayDow) continue;
+
+      // For weekdays jobs, skip Sat (6) and Sun (0)
+      if (job.scheduleType === 'weekdays' && (todayDow === 0 || todayDow === 6)) continue;
+
+      // Mark ran first to prevent duplicate fires within same minute
+      markScheduledJobRan(settings.brainPath, job.id, todayKey);
+      runScheduledJob(job);
+    }
+  } catch (error) {
+    console.error('Scheduled jobs check failed:', error);
+  }
+}
+
 function startScheduler(): void {
   if (schedulerInterval) clearInterval(schedulerInterval);
 
   // Check every 30 seconds
   schedulerInterval = setInterval(() => {
-    const currentSettings = loadSettings();
-    const now = getCurrentHHMM();
-    const todayKey = getTodayKey();
-
-    // Daily brief
-    if (currentSettings.dailyBriefTime && now === currentSettings.dailyBriefTime) {
-      if (lastTriggered.brief !== todayKey) {
-        lastTriggered.brief = todayKey;
-        runScheduledBrief();
-      }
-    }
-
-    // EOD
-    if (currentSettings.eodTime && now === currentSettings.eodTime) {
-      if (lastTriggered.eod !== todayKey) {
-        lastTriggered.eod = todayKey;
-        runScheduledEod();
-      }
-    }
-
     // Check for due reminders
     checkDueReminders();
+
+    // Check custom scheduled jobs
+    checkScheduledJobs();
   }, 30_000);
 }
 
@@ -1917,17 +1991,9 @@ app.whenReady().then(async () => {
   // Start file watcher
   startFileWatcher();
 
-  // Initialize team brain if configured
-  if (teamFileManager) {
-    teamFileManager.ensureTeamStructure().then(() => {
-      getDb(settings.teamBrainPath);
-      contextAssembler.setTeamFileManager(teamFileManager);
-      startTeamFileWatcher();
-      teamStartupIndex();
-    }).catch((err) => console.error('Team brain init failed:', err));
-  }
+  // Team Brain is deprecated — skipping init until feature is rebuilt
 
-  // Start scheduler for timed briefs/EOD
+  // Start scheduler
   startScheduler();
 
   // Run startup indexing in background

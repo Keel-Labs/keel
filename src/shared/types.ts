@@ -70,12 +70,8 @@ export interface Settings {
   personality: string;       // ID of active personality template (e.g. "default", "butler").
   // General
   brainPath: string;
-  // Team Brain
-  teamBrainPath: string;   // Path to shared team brain folder. Empty = disabled.
-  userName: string;         // User's display name for team updates.
-  // Scheduler
-  dailyBriefTime: string;  // HH:MM format, e.g. "09:00". Empty = disabled.
-  eodTime: string;         // HH:MM format, e.g. "17:30". Empty = disabled.
+  userName: string;         // User's display name.
+  // Locale
   timezone: string;        // IANA timezone, e.g. "America/New_York". Empty = auto-detect.
 }
 
@@ -261,8 +257,9 @@ export interface OpenAIListResult {
 
 // IPC channel types
 export interface ScheduledNotification {
-  type: 'daily-brief' | 'eod' | 'reminder';
+  type: 'daily-brief' | 'eod' | 'reminder' | 'scheduled-job';
   content: string;
+  jobName?: string;
 }
 
 export interface Reminder {
@@ -293,6 +290,18 @@ export interface TaskGroup {
   project: string;
   slug: string | null;
   tasks: Task[];
+}
+
+export interface ScheduledJob {
+  id?: number;
+  name: string;
+  prompt: string;
+  scheduleType: 'daily' | 'weekly' | 'weekdays';
+  time: string;           // HH:MM 24h
+  dayOfWeek?: number | null; // 0=Sun..6=Sat, only for 'weekly'
+  enabled: boolean;
+  lastRunDate?: string | null;
+  createdAt?: number;
 }
 
 export type IpcChannels =
@@ -348,6 +357,7 @@ export type IpcChannels =
   | 'keel:list-tasks'
   | 'keel:toggle-task'
   | 'keel:move-task'
+  | 'keel:create-task'
   | 'keel:list-incoming-tasks'
   | 'keel:accept-incoming-task'
   | 'keel:dismiss-incoming-task'
@@ -359,7 +369,11 @@ export type IpcChannels =
   | 'keel:fetch-ai-news'
   | 'keel:list-team-files'
   | 'keel:read-team-file'
-  | 'keel:write-team-file';
+  | 'keel:write-team-file'
+  | 'keel:list-scheduled-jobs'
+  | 'keel:upsert-scheduled-job'
+  | 'keel:delete-scheduled-job'
+  | 'keel:get-daily-quote';
 
 // Preload API exposed to renderer
 export interface KeelAPI {
@@ -407,6 +421,7 @@ export interface KeelAPI {
   listTasks: () => Promise<TaskGroup[]>;
   toggleTask: (filePath: string, taskText: string, completed: boolean) => Promise<void>;
   moveTask: (sourceFilePath: string, targetFilePath: string, taskText: string, completed: boolean) => Promise<void>;
+  createTask: (filePath: string, text: string) => Promise<void>;
   listIncomingTasks: () => Promise<IncomingTask[]>;
   acceptIncomingTask: (id: number) => Promise<void>;
   dismissIncomingTask: (id: number) => Promise<void>;
@@ -441,6 +456,12 @@ export interface KeelAPI {
   listTeamFiles: (dirPath: string) => Promise<FileEntry[]>;
   readTeamFile: (filePath: string) => Promise<string>;
   writeTeamFile: (filePath: string, content: string) => Promise<void>;
+  // Scheduled Jobs
+  listScheduledJobs: () => Promise<ScheduledJob[]>;
+  upsertScheduledJob: (job: ScheduledJob) => Promise<number>;
+  deleteScheduledJob: (id: number) => Promise<void>;
+  // Daily Quote
+  getDailyQuote: () => Promise<{ text: string; author: string }>;
 }
 
 declare global {
