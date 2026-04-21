@@ -553,7 +553,7 @@ export default function WikiWorkspace({
   useEffect(() => {
     let cancelled = false;
 
-    (async () => {
+    const checkJobs = async () => {
       try {
         if (!currentBasePath) {
           setJobs([]);
@@ -566,18 +566,18 @@ export default function WikiWorkspace({
         if (latestTerminal && latestTerminal.id !== lastTerminalJobRef.current) {
           lastTerminalJobRef.current = latestTerminal.id;
           await loadBases();
-          await loadCurrentBase();
+          if (!cancelled) await loadCurrentBase();
         }
       } catch (err) {
         if (!cancelled) {
           setJobError(err instanceof Error ? err.message : 'Failed to load wiki jobs.');
         }
       }
-    })();
+    };
 
-    const interval = window.setInterval(() => {
-      loadJobs().catch(() => undefined);
-    }, 2000);
+    checkJobs();
+
+    const interval = window.setInterval(checkJobs, 2000);
 
     return () => {
       cancelled = true;

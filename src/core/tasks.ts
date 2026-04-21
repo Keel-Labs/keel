@@ -180,6 +180,25 @@ export async function moveTask(
 /**
  * Create a new project with an empty tasks file.
  */
+/**
+ * Append a new open task to a task file (creating it if needed).
+ */
+export async function appendTask(
+  fileManager: FileManager,
+  filePath: string,
+  text: string,
+): Promise<void> {
+  let content = '';
+  try {
+    content = await fileManager.readFile(filePath);
+  } catch {
+    // File doesn't exist yet — start fresh
+  }
+  const line = `- [ ] ${text}`;
+  const newContent = content ? `${content.trimEnd()}\n${line}\n` : `${line}\n`;
+  await fileManager.writeFile(filePath, newContent);
+}
+
 export async function createProject(
   fileManager: FileManager,
   name: string,
