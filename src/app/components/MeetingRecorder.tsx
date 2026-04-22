@@ -80,9 +80,16 @@ export default function MeetingRecorder({ onOpenSettings }: Props) {
   const audioBlobRef = useRef<Blob | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const recordedDurationRef = useRef(0);
+  // Refs that stay current inside closures created during recording
+  const elapsedRef = useRef(0);
+  const hasOpenAIKeyRef = useRef(hasOpenAIKey);
 
   useEffect(() => {
-    window.keel.getSettings().then((s) => setHasOpenAIKey(!!s.openaiApiKey)).catch(() => {});
+    window.keel.getSettings().then((s) => {
+      const val = !!s.openaiApiKey;
+      setHasOpenAIKey(val);
+      hasOpenAIKeyRef.current = val;
+    }).catch(() => {});
   }, []);
 
   const loadMeetings = useCallback(() => {
@@ -98,8 +105,12 @@ export default function MeetingRecorder({ onOpenSettings }: Props) {
   }, []);
 
   const startTimer = () => {
+    elapsedRef.current = 0;
     setElapsed(0);
-    timerRef.current = setInterval(() => setElapsed((n) => n + 1), 1000);
+    timerRef.current = setInterval(() => {
+      elapsedRef.current += 1;
+      setElapsed((n) => n + 1);
+    }, 1000);
   };
 
   const stopTimer = () => {
@@ -120,12 +131,12 @@ export default function MeetingRecorder({ onOpenSettings }: Props) {
 
       mediaRecorder.onstop = () => {
         stream.getTracks().forEach((t) => t.stop());
-        recordedDurationRef.current = elapsed;
+        stopTimer();
+        recordedDurationRef.current = elapsedRef.current;
         const blob = new Blob(chunksRef.current, { type: mimeType });
         audioBlobRef.current = blob;
-        stopTimer();
 
-        if (hasOpenAIKey) {
+        if (hasOpenAIKeyRef.current) {
           handleWhisperTranscribe(blob);
         } else {
           setManualNotes('');
