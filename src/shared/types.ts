@@ -377,7 +377,11 @@ export type IpcChannels =
   | 'keel:transcribe-meeting'
   | 'keel:synthesize-meeting'
   | 'keel:list-meetings'
-  | 'keel:meeting-progress';
+  | 'keel:meeting-progress'
+  | 'keel:transcription-progress'
+  | 'keel:model-download-progress'
+  | 'keel:check-whisper'
+  | 'keel:download-whisper-model';
 
 export interface MeetingTranscriptionResult {
   ok: boolean;
@@ -392,6 +396,13 @@ export interface MeetingEntry {
   path: string;
   date: string;
   title: string;
+}
+
+export interface WhisperStatus {
+  binaryAvailable: boolean;
+  binaryPath: string | null;
+  modelDownloaded: boolean;
+  models: Array<{ id: string; downloaded: boolean; sizeMb: number }>;
 }
 
 // Preload API exposed to renderer
@@ -485,7 +496,11 @@ export interface KeelAPI {
   transcribeMeeting: (audioBuffer: ArrayBuffer) => Promise<MeetingTranscriptionResult>;
   synthesizeMeeting: (transcript: string) => Promise<MeetingTranscriptionResult>;
   onMeetingProgress: (callback: (payload: { step: string }) => void) => () => void;
+  onTranscriptionProgress: (callback: (payload: { percent: number }) => void) => () => void;
+  onModelDownloadProgress: (callback: (payload: { percent: number }) => void) => () => void;
   listMeetings: () => Promise<MeetingEntry[]>;
+  checkWhisper: () => Promise<WhisperStatus>;
+  downloadWhisperModel: (model?: string) => Promise<{ ok: boolean; error?: string }>;
 }
 
 declare global {
