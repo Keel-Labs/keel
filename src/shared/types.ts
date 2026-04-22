@@ -373,7 +373,26 @@ export type IpcChannels =
   | 'keel:list-scheduled-jobs'
   | 'keel:upsert-scheduled-job'
   | 'keel:delete-scheduled-job'
-  | 'keel:get-daily-quote';
+  | 'keel:get-daily-quote'
+  | 'keel:transcribe-meeting'
+  | 'keel:synthesize-meeting'
+  | 'keel:list-meetings'
+  | 'keel:meeting-progress';
+
+export interface MeetingTranscriptionResult {
+  ok: boolean;
+  title?: string;
+  summary?: string;
+  actionItems?: string[];
+  meetingPath?: string;
+  error?: string;
+}
+
+export interface MeetingEntry {
+  path: string;
+  date: string;
+  title: string;
+}
 
 // Preload API exposed to renderer
 export interface KeelAPI {
@@ -462,6 +481,11 @@ export interface KeelAPI {
   deleteScheduledJob: (id: number) => Promise<void>;
   // Daily Quote
   getDailyQuote: () => Promise<{ text: string; author: string }>;
+  // Meeting Transcription
+  transcribeMeeting: (audioBuffer: ArrayBuffer) => Promise<MeetingTranscriptionResult>;
+  synthesizeMeeting: (transcript: string) => Promise<MeetingTranscriptionResult>;
+  onMeetingProgress: (callback: (payload: { step: string }) => void) => () => void;
+  listMeetings: () => Promise<MeetingEntry[]>;
 }
 
 declare global {
