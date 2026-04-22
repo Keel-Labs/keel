@@ -10,9 +10,10 @@ import {
   Notification,
   net,
 } from 'electron';
-import OpenAI from 'openai';
+import OpenAI, { toFile } from 'openai';
 import * as path from 'path';
 import * as fs from 'fs';
+import * as os from 'os';
 // chokidar v5 is ESM-only — loaded via dynamic import in startFileWatcher()
 import { FileManager, TeamFileManager } from '../src/core/fileManager';
 import { LLMClient } from '../src/core/llmClient';
@@ -52,6 +53,7 @@ import {
 } from '../src/core/db';
 import { listAllTasks, toggleTask, moveTask, acceptIncomingTask, appendTask, createProject, renameProject, deleteProject } from '../src/core/tasks';
 import { capture } from '../src/core/workflows/capture';
+import { synthesizeMeeting, formatMeetingNote, formatDailyLogEntry } from '../src/core/workflows/meetingTranscription';
 import { autoCapture } from '../src/core/workflows/autoCapture';
 import { dailyBrief } from '../src/core/workflows/dailyBrief';
 import { eod } from '../src/core/workflows/eod';
@@ -1056,6 +1058,167 @@ function registerIpcHandlers() {
     return capture(input, fileManager, llmClient, googleConfig);
   });
 
+  // Synthesis-only path: transcript comes from the renderer (Web Speech API),
+  // so no OpenAI key is needed — just use the configured LLM provider.
+  ipcMain.handle('keel:synthesize-meeting', async (event, transcript: string) => {
+    if (!transcript || !transcript.trim()) {
+      return { ok: false, error: 'No transcript to synthesize.' };
+    }
+
+    const brainPath = fileManager.getBrainPath();
+
+    try {
+      event.sender.send('keel:meeting-progress', { step: 'Synthesizing notes…' });
+
+      let synthesis;
+      try {
+        synthesis = await synthesizeMeeting(transcript.trim(), llmClient);
+      } catch {
+        synthesis = { title: 'Meeting', summary: '', decisions: [], actionItems: [] };
+      }
+
+      event.sender.send('keel:meeting-progress', { step: 'Saving to brain…' });
+
+      const now = new Date();
+      const date = now.toISOString().split('T')[0];
+      const timeParts = now.toTimeString().split(':');
+      const time = `${timeParts[0]}-${timeParts[1]}-${Math.floor(Number(timeParts[2] || '00')).toString().padStart(2, '0')}`;
+      const meetingPath = `meetings/${date}/${time}.md`;
+      const logPath = `daily-log/${date}.md`;
+
+      const noteContent = formatMeetingNote(synthesis, transcript, date, time);
+      await fileManager.writeFile(meetingPath, noteContent);
+
+      const logEntry = formatDailyLogEntry(synthesis, meetingPath);
+      if (await fileManager.fileExists(logPath)) {
+        setSelfWriting();
+        await fileManager.appendToFile(logPath, logEntry);
+      } else {
+        setSelfWriting();
+        await fileManager.writeFile(logPath, `# Daily Log — ${date}\n${logEntry}`);
+      }
+
+      logActivity(brainPath, 'meeting-transcribe', synthesis.title);
+
+      return {
+        ok: true,
+        title: synthesis.title,
+        summary: synthesis.summary,
+        actionItems: synthesis.actionItems,
+        meetingPath,
+      };
+    } catch (err) {
+      return {
+        ok: false,
+        error: err instanceof Error ? err.message : 'Failed to synthesize meeting notes.',
+      };
+    }
+  });
+
+  ipcMain.handle('keel:transcribe-meeting', async (event, audioBuffer: ArrayBuffer) => {
+    if (!settings.openaiApiKey) {
+      return {
+        ok: false,
+        error: 'Transcription requires an OpenAI API key. Add one in Settings → Model.',
+      };
+    }
+
+    const brainPath = fileManager.getBrainPath();
+    const tmpPath = path.join(os.tmpdir(), `keel-meeting-${Date.now()}.webm`);
+
+    try {
+      event.sender.send('keel:meeting-progress', { step: 'Transcribing audio…' });
+
+      // Write audio buffer to temp file
+      const buffer = Buffer.from(audioBuffer);
+      fs.writeFileSync(tmpPath, buffer);
+
+      // Call OpenAI Whisper
+      const openaiClient = new OpenAI({
+        apiKey: settings.openaiApiKey,
+        fetch: getElectronAwareFetch(),
+      });
+      const transcription = await openaiClient.audio.transcriptions.create({
+        file: await toFile(fs.createReadStream(tmpPath), 'recording.webm', { type: 'audio/webm' }),
+        model: 'whisper-1',
+      });
+      const transcript = transcription.text.trim();
+
+      event.sender.send('keel:meeting-progress', { step: 'Synthesizing notes…' });
+
+      // Synthesize with LLM
+      let synthesis;
+      try {
+        synthesis = await synthesizeMeeting(transcript, llmClient);
+      } catch {
+        synthesis = { title: 'Meeting', summary: '', decisions: [], actionItems: [] };
+      }
+
+      event.sender.send('keel:meeting-progress', { step: 'Saving to brain…' });
+
+      // Determine file paths
+      const now = new Date();
+      const date = now.toISOString().split('T')[0]; // YYYY-MM-DD
+      const timeParts = now.toTimeString().split(':');
+      const time = `${timeParts[0]}-${timeParts[1]}-${Math.floor(Number(timeParts[2] || '00')).toString().padStart(2, '0')}`;
+      const meetingPath = `meetings/${date}/${time}.md`;
+      const logPath = `daily-log/${date}.md`;
+
+      // Save meeting note
+      const noteContent = formatMeetingNote(synthesis, transcript, date, time);
+      await fileManager.writeFile(meetingPath, noteContent);
+
+      // Append to daily log
+      const logEntry = formatDailyLogEntry(synthesis, meetingPath);
+      if (await fileManager.fileExists(logPath)) {
+        setSelfWriting();
+        await fileManager.appendToFile(logPath, logEntry);
+      } else {
+        setSelfWriting();
+        await fileManager.writeFile(logPath, `# Daily Log — ${date}\n${logEntry}`);
+      }
+
+      logActivity(brainPath, 'meeting-transcribe', synthesis.title);
+
+      return {
+        ok: true,
+        title: synthesis.title,
+        summary: synthesis.summary,
+        actionItems: synthesis.actionItems,
+        meetingPath,
+      };
+    } catch (err) {
+      return {
+        ok: false,
+        error: err instanceof Error ? err.message : 'Transcription failed',
+      };
+    } finally {
+      try { fs.unlinkSync(tmpPath); } catch { /* ignore */ }
+    }
+  });
+
+  ipcMain.handle('keel:list-meetings', async () => {
+    try {
+      const files = await fileManager.listFiles('meetings/**/*.md');
+      const meetings = [];
+      for (const filePath of files.sort().reverse()) {
+        // Extract date from path: meetings/YYYY-MM-DD/HH-MM-SS.md
+        const match = filePath.match(/meetings\/(\d{4}-\d{2}-\d{2})\//);
+        const date = match ? match[1] : '';
+        let title = 'Meeting';
+        try {
+          const content = await fileManager.readFile(filePath);
+          const h1 = content.match(/^#\s+(.+)$/m);
+          if (h1) title = h1[1].trim();
+        } catch { /* use default */ }
+        meetings.push({ path: filePath, date, title });
+      }
+      return meetings;
+    } catch {
+      return [];
+    }
+  });
+
   ipcMain.handle('keel:daily-brief', async () => {
     const result = await dailyBrief(fileManager, llmClient, {
       teamFileManager: teamFileManager || undefined,
@@ -1216,6 +1379,17 @@ function registerIpcHandlers() {
     }
 
     const fullPath = path.join(settings.brainPath, filePath);
+
+    // Try Obsidian first for markdown files
+    if (fullPath.endsWith('.md')) {
+      try {
+        await shell.openExternal('obsidian://open?path=' + encodeURIComponent(fullPath));
+        return '';
+      } catch {
+        // Obsidian not installed — fall through to system default
+      }
+    }
+
     return shell.openPath(fullPath);
   });
 

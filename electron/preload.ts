@@ -158,6 +158,16 @@ const api: KeelAPI = {
 
   // Daily Quote
   getDailyQuote: () => ipcRenderer.invoke('keel:get-daily-quote'),
+
+  // Meeting Transcription
+  synthesizeMeeting: (transcript: string) => ipcRenderer.invoke('keel:synthesize-meeting', transcript),
+  transcribeMeeting: (audioBuffer: ArrayBuffer) => ipcRenderer.invoke('keel:transcribe-meeting', audioBuffer),
+  onMeetingProgress: (callback: (payload: { step: string }) => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, payload: { step: string }) => callback(payload);
+    ipcRenderer.on('keel:meeting-progress', handler);
+    return () => ipcRenderer.off('keel:meeting-progress', handler);
+  },
+  listMeetings: () => ipcRenderer.invoke('keel:list-meetings'),
 };
 
 contextBridge.exposeInMainWorld('keel', api);
