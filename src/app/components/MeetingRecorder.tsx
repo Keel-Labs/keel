@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import type { MeetingEntry, MeetingTranscriptionResult, TaskGroup } from '../../shared/types';
+import type { MeetingEntry, MeetingTranscriptionResult, TaskGroup, WhisperStatus } from '../../shared/types';
 
-type RecorderState = 'idle' | 'recording' | 'stopped' | 'processing' | 'done' | 'error';
+type RecorderState = 'idle' | 'recording' | 'processing' | 'done' | 'error';
+type SetupState = 'checking' | 'ready' | 'needs-model' | 'needs-setup';
 
 interface Props {
   onOpenSettings?: (section?: string) => void;
@@ -57,16 +58,30 @@ function PlusIcon() {
   );
 }
 
+function DownloadIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+      <polyline points="7 10 12 15 17 10" />
+      <line x1="12" y1="15" x2="12" y2="3" />
+    </svg>
+  );
+}
+
 export default function MeetingRecorder({ onOpenSettings }: Props) {
   const [recorderState, setRecorderState] = useState<RecorderState>('idle');
+  const [setupState, setSetupState] = useState<SetupState>('checking');
+  const [whisperStatus, setWhisperStatus] = useState<WhisperStatus | null>(null);
   const [elapsed, setElapsed] = useState(0);
   const [progressStep, setProgressStep] = useState('');
+  const [transcriptionPercent, setTranscriptionPercent] = useState<number | null>(null);
+  const [downloadPercent, setDownloadPercent] = useState<number | null>(null);
+  const [isDownloading, setIsDownloading] = useState(false);
   const [result, setResult] = useState<MeetingTranscriptionResult | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
-  const [manualNotes, setManualNotes] = useState('');
-  const [hasOpenAIKey, setHasOpenAIKey] = useState(false);
   const [pastMeetings, setPastMeetings] = useState<MeetingEntry[]>([]);
   const [loadingMeetings, setLoadingMeetings] = useState(true);
+  const [hasOpenAIKey, setHasOpenAIKey] = useState(false);
 
   // Add-to-tasks state
   const [taskGroups, setTaskGroups] = useState<TaskGroup[]>([]);
@@ -80,17 +95,43 @@ export default function MeetingRecorder({ onOpenSettings }: Props) {
   const audioBlobRef = useRef<Blob | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const recordedDurationRef = useRef(0);
-  // Refs that stay current inside closures created during recording
   const elapsedRef = useRef(0);
-  const hasOpenAIKeyRef = useRef(hasOpenAIKey);
+  const hasOpenAIKeyRef = useRef(false);
+  const whisperReadyRef = useRef(false);
 
-  useEffect(() => {
-    window.keel.getSettings().then((s) => {
-      const val = !!s.openaiApiKey;
-      setHasOpenAIKey(val);
-      hasOpenAIKeyRef.current = val;
-    }).catch(() => {});
+  // ── Setup check ──────────────────────────────────────────────────────────
+  const checkSetup = useCallback(async () => {
+    setSetupState('checking');
+    try {
+      const [status, settings] = await Promise.all([
+        window.keel.checkWhisper(),
+        window.keel.getSettings(),
+      ]);
+      setWhisperStatus(status);
+      const hasKey = !!settings.openaiApiKey;
+      setHasOpenAIKey(hasKey);
+      hasOpenAIKeyRef.current = hasKey;
+
+      if (status.binaryAvailable && status.modelDownloaded) {
+        whisperReadyRef.current = true;
+        setSetupState('ready');
+      } else if (status.binaryAvailable && !status.modelDownloaded) {
+        whisperReadyRef.current = false;
+        setSetupState('needs-model');
+      } else if (hasKey) {
+        // No local whisper but OpenAI key available — still usable
+        whisperReadyRef.current = false;
+        setSetupState('ready');
+      } else {
+        whisperReadyRef.current = false;
+        setSetupState('needs-setup');
+      }
+    } catch {
+      setSetupState('needs-setup');
+    }
   }, []);
+
+  useEffect(() => { checkSetup(); }, [checkSetup]);
 
   const loadMeetings = useCallback(() => {
     setLoadingMeetings(true);
@@ -99,11 +140,15 @@ export default function MeetingRecorder({ onOpenSettings }: Props) {
 
   useEffect(() => { loadMeetings(); }, [loadMeetings]);
 
+  // Subscribe to progress events
   useEffect(() => {
-    const unsub = window.keel.onMeetingProgress((p) => setProgressStep(p.step));
-    return () => unsub();
+    const u1 = window.keel.onMeetingProgress((p) => setProgressStep(p.step));
+    const u2 = window.keel.onTranscriptionProgress((p) => setTranscriptionPercent(p.percent));
+    const u3 = window.keel.onModelDownloadProgress((p) => setDownloadPercent(p.percent));
+    return () => { u1(); u2(); u3(); };
   }, []);
 
+  // ── Timer ─────────────────────────────────────────────────────────────────
   const startTimer = () => {
     elapsedRef.current = 0;
     setElapsed(0);
@@ -112,11 +157,32 @@ export default function MeetingRecorder({ onOpenSettings }: Props) {
       setElapsed((n) => n + 1);
     }, 1000);
   };
-
   const stopTimer = () => {
     if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
   };
 
+  // ── Model download ────────────────────────────────────────────────────────
+  const handleDownloadModel = async () => {
+    setIsDownloading(true);
+    setDownloadPercent(0);
+    try {
+      const res = await window.keel.downloadWhisperModel('base.en');
+      if (res.ok) {
+        await checkSetup();
+      } else {
+        setErrorMessage(res.error || 'Download failed');
+        setRecorderState('error');
+      }
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : 'Download failed');
+      setRecorderState('error');
+    } finally {
+      setIsDownloading(false);
+      setDownloadPercent(null);
+    }
+  };
+
+  // ── Recording ─────────────────────────────────────────────────────────────
   const handleStartRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -135,13 +201,7 @@ export default function MeetingRecorder({ onOpenSettings }: Props) {
         recordedDurationRef.current = elapsedRef.current;
         const blob = new Blob(chunksRef.current, { type: mimeType });
         audioBlobRef.current = blob;
-
-        if (hasOpenAIKeyRef.current) {
-          handleWhisperTranscribe(blob);
-        } else {
-          setManualNotes('');
-          setRecorderState('stopped');
-        }
+        handleTranscribe(blob);
       };
 
       mediaRecorder.start(1000);
@@ -157,45 +217,28 @@ export default function MeetingRecorder({ onOpenSettings }: Props) {
     if (mediaRecorderRef.current?.state !== 'inactive') mediaRecorderRef.current?.stop();
   };
 
-  const handleWhisperTranscribe = async (blob: Blob) => {
+  const handleTranscribe = async (blob: Blob) => {
     setRecorderState('processing');
-    setProgressStep('Transcribing audio…');
+    setTranscriptionPercent(null);
+    setProgressStep('');
     try {
       const arrayBuffer = await blob.arrayBuffer();
       const res = await window.keel.transcribeMeeting(arrayBuffer);
+
       if (res.ok) {
         setResult(res);
         loadTasks();
         setRecorderState('done');
         loadMeetings();
+      } else if (res.error === 'no_transcription_available') {
+        setErrorMessage('');
+        setRecorderState('error');
       } else {
         setErrorMessage(res.error || 'Transcription failed.');
         setRecorderState('error');
       }
     } catch (err) {
       setErrorMessage(err instanceof Error ? err.message : 'Transcription failed.');
-      setRecorderState('error');
-    }
-  };
-
-  const handleSynthesizeFromNotes = async () => {
-    const text = manualNotes.trim();
-    if (!text) return;
-    setRecorderState('processing');
-    setProgressStep('Synthesizing notes…');
-    try {
-      const res = await window.keel.synthesizeMeeting(text);
-      if (res.ok) {
-        setResult(res);
-        loadTasks();
-        setRecorderState('done');
-        loadMeetings();
-      } else {
-        setErrorMessage(res.error || 'Synthesis failed.');
-        setRecorderState('error');
-      }
-    } catch (err) {
-      setErrorMessage(err instanceof Error ? err.message : 'Unexpected error.');
       setRecorderState('error');
     }
   };
@@ -214,9 +257,7 @@ export default function MeetingRecorder({ onOpenSettings }: Props) {
     setAddingTasks(true);
     const items = result.actionItems.filter((_, i) => checkedItems.has(i));
     for (const item of items) {
-      try {
-        await window.keel.createTask(selectedProject, item);
-      } catch { /* continue */ }
+      try { await window.keel.createTask(selectedProject, item); } catch { /* continue */ }
     }
     setAddingTasks(false);
     setTasksAdded(true);
@@ -229,7 +270,7 @@ export default function MeetingRecorder({ onOpenSettings }: Props) {
     setErrorMessage('');
     setProgressStep('');
     setElapsed(0);
-    setManualNotes('');
+    setTranscriptionPercent(null);
     setCheckedItems(new Set());
     setTasksAdded(false);
     chunksRef.current = [];
@@ -244,14 +285,20 @@ export default function MeetingRecorder({ onOpenSettings }: Props) {
     })),
   ];
 
+  // ── Render helpers ────────────────────────────────────────────────────────
+  const canRecord = setupState === 'ready';
+  const transcriptionEngine = whisperStatus?.binaryAvailable && whisperStatus?.modelDownloaded
+    ? 'local (whisper.cpp)'
+    : hasOpenAIKey ? 'OpenAI Whisper' : null;
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
       <div style={{ padding: '24px 32px 0', flexShrink: 0 }}>
         <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 4 }}>Meetings</div>
         <div style={{ fontSize: 14, color: 'var(--text-muted)' }}>
-          {hasOpenAIKey
-            ? 'Record a meeting — Keel will transcribe and extract action items automatically.'
-            : 'Record a meeting or paste a transcript to extract action items and save notes.'}
+          {transcriptionEngine
+            ? `Transcription: ${transcriptionEngine}`
+            : 'Record a meeting and transcribe it locally.'}
         </div>
       </div>
 
@@ -262,34 +309,106 @@ export default function MeetingRecorder({ onOpenSettings }: Props) {
           display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20, textAlign: 'center',
         }}>
 
-          {/* ── IDLE ── */}
-          {recorderState === 'idle' && (
+          {/* ── CHECKING setup ── */}
+          {setupState === 'checking' && recorderState === 'idle' && (
+            <div style={{ color: 'var(--text-muted)', fontSize: 14 }}>Checking transcription setup…</div>
+          )}
+
+          {/* ── NEEDS MODEL DOWNLOAD ── */}
+          {setupState === 'needs-model' && recorderState === 'idle' && (
+            <div style={{ width: '100%', textAlign: 'left' }}>
+              <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', marginBottom: 20 }}>
+                <div style={{ color: 'var(--text-muted)', opacity: 0.5, flexShrink: 0, marginTop: 4 }}><MicIcon size={32} /></div>
+                <div>
+                  <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4 }}>whisper.cpp is installed</div>
+                  <div style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.6 }}>
+                    Download the <strong>base.en</strong> model (~142 MB) once to enable local transcription.
+                    Transcription will run fully offline with no API key required.
+                  </div>
+                </div>
+              </div>
+              {isDownloading ? (
+                <div style={{ width: '100%' }}>
+                  <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 8 }}>
+                    Downloading model… {downloadPercent !== null ? `${downloadPercent}%` : ''}
+                  </div>
+                  <div style={{ height: 6, background: 'var(--bg-surface)', borderRadius: 3, overflow: 'hidden' }}>
+                    <div style={{
+                      height: '100%', background: 'var(--accent)', borderRadius: 3,
+                      width: `${downloadPercent ?? 0}%`, transition: 'width 0.3s',
+                    }} />
+                  </div>
+                </div>
+              ) : (
+                <button onClick={handleDownloadModel} style={btn('accent')}>
+                  <DownloadIcon /> Download Model (142 MB)
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* ── NEEDS SETUP (no binary, no key) ── */}
+          {setupState === 'needs-setup' && recorderState === 'idle' && (
+            <div style={{ width: '100%', textAlign: 'left' }}>
+              <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 12 }}>Set up transcription</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {/* Option A: whisper.cpp */}
+                <div style={{
+                  background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
+                  borderRadius: 8, padding: '14px 16px',
+                }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4 }}>
+                    Option A — Local (free, no API key)
+                  </div>
+                  <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 10, lineHeight: 1.6 }}>
+                    Install whisper.cpp via Homebrew. Runs offline on your Mac using the Neural Engine.
+                  </div>
+                  <code style={{
+                    display: 'block', background: 'var(--bg-card)', borderRadius: 6,
+                    padding: '8px 12px', fontSize: 12, color: 'var(--text-primary)',
+                    fontFamily: 'monospace', userSelect: 'all',
+                  }}>
+                    brew install whisper-cpp
+                  </code>
+                  <button onClick={checkSetup} style={{ ...btn('ghost'), marginTop: 10, fontSize: 12 }}>
+                    Check again
+                  </button>
+                </div>
+                {/* Option B: OpenAI key */}
+                <div style={{
+                  background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
+                  borderRadius: 8, padding: '14px 16px',
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                }}>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 2 }}>
+                      Option B — OpenAI Whisper API
+                    </div>
+                    <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Add an OpenAI key in Settings</div>
+                  </div>
+                  <button onClick={() => onOpenSettings?.('ai-setup')} style={{ ...btn('ghost'), fontSize: 12 }}>
+                    Open Settings
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ── IDLE (ready) ── */}
+          {setupState === 'ready' && recorderState === 'idle' && (
             <>
               <div style={{ color: 'var(--text-muted)', opacity: 0.4 }}><MicIcon size={44} /></div>
               <div>
                 <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 6 }}>Ready to record</div>
                 <div style={{ fontSize: 14, color: 'var(--text-muted)', maxWidth: 380 }}>
-                  {hasOpenAIKey
-                    ? 'Record your meeting. Keel will auto-transcribe with Whisper when you stop.'
-                    : 'Record your meeting, then add notes or a transcript to synthesize action items.'}
+                  {whisperStatus?.binaryAvailable && whisperStatus?.modelDownloaded
+                    ? 'Transcription runs locally on your device — no internet required.'
+                    : 'Recording will be transcribed via OpenAI Whisper.'}
                 </div>
               </div>
-              <div style={{ display: 'flex', gap: 10, flexDirection: 'column', alignItems: 'center', width: '100%' }}>
-                <button onClick={handleStartRecording} style={btn('accent')}>
-                  <MicIcon size={15} /> Start Recording
-                </button>
-                {!hasOpenAIKey && (
-                  <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-                    <button
-                      onClick={() => onOpenSettings?.('ai-setup')}
-                      style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', fontSize: 13, padding: 0, textDecoration: 'underline' }}
-                    >
-                      Add an OpenAI key
-                    </button>
-                    {' '}for auto-transcription
-                  </div>
-                )}
-              </div>
+              <button onClick={handleStartRecording} style={btn('accent')}>
+                <MicIcon size={15} /> Start Recording
+              </button>
             </>
           )}
 
@@ -312,47 +431,6 @@ export default function MeetingRecorder({ onOpenSettings }: Props) {
             </div>
           )}
 
-          {/* ── STOPPED (no Whisper key) — add notes ── */}
-          {recorderState === 'stopped' && (
-            <div style={{ width: '100%', textAlign: 'left' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
-                <div style={{
-                  width: 28, height: 28, borderRadius: '50%',
-                  background: 'rgba(34,197,94,0.15)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#22c55e', flexShrink: 0,
-                }}>
-                  <CheckIcon />
-                </div>
-                <div>
-                  <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-primary)' }}>
-                    Recording saved — {formatDuration(recordedDurationRef.current)}
-                  </div>
-                  <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 2 }}>
-                    Paste your transcript or jot down key notes below to synthesize action items.
-                  </div>
-                </div>
-              </div>
-              <textarea
-                autoFocus
-                value={manualNotes}
-                onChange={(e) => setManualNotes(e.target.value)}
-                placeholder="Paste meeting transcript or type key notes here…"
-                style={{
-                  width: '100%', minHeight: 160,
-                  background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
-                  borderRadius: 8, padding: '12px 14px', fontSize: 14, color: 'var(--text-primary)',
-                  lineHeight: 1.7, resize: 'vertical', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box',
-                }}
-              />
-              <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
-                <button onClick={handleSynthesizeFromNotes} disabled={!manualNotes.trim()} style={btn('accent', !manualNotes.trim())}>
-                  Synthesize Notes
-                </button>
-                <button onClick={handleReset} style={btn('ghost')}>Discard</button>
-              </div>
-            </div>
-          )}
-
           {/* ── PROCESSING ── */}
           {recorderState === 'processing' && (
             <>
@@ -361,9 +439,26 @@ export default function MeetingRecorder({ onOpenSettings }: Props) {
                 border: '3px solid var(--border-subtle)', borderTopColor: 'var(--accent)',
                 animation: 'keel-spin 0.8s linear infinite',
               }} />
-              <div>
-                <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4 }}>Processing meeting</div>
-                <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>{progressStep || 'Working…'}</div>
+              <div style={{ width: '100%', maxWidth: 360 }}>
+                <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4, textAlign: 'center' }}>
+                  Processing meeting
+                </div>
+                <div style={{ fontSize: 13, color: 'var(--text-muted)', textAlign: 'center', marginBottom: 10 }}>
+                  {progressStep || 'Working…'}
+                </div>
+                {transcriptionPercent !== null && (
+                  <div>
+                    <div style={{ height: 4, background: 'var(--bg-surface)', borderRadius: 2, overflow: 'hidden' }}>
+                      <div style={{
+                        height: '100%', background: 'var(--accent)', borderRadius: 2,
+                        width: `${transcriptionPercent}%`, transition: 'width 0.2s',
+                      }} />
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4, textAlign: 'center' }}>
+                      {transcriptionPercent}%
+                    </div>
+                  </div>
+                )}
               </div>
             </>
           )}
@@ -371,7 +466,6 @@ export default function MeetingRecorder({ onOpenSettings }: Props) {
           {/* ── DONE ── */}
           {recorderState === 'done' && result && (
             <div style={{ width: '100%', textAlign: 'left' }}>
-              {/* Title */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
                 <div style={{
                   width: 28, height: 28, borderRadius: '50%',
@@ -385,14 +479,12 @@ export default function MeetingRecorder({ onOpenSettings }: Props) {
                 </div>
               </div>
 
-              {/* Summary */}
               {result.summary && (
                 <div style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 20, lineHeight: 1.65 }}>
                   {result.summary}
                 </div>
               )}
 
-              {/* Action items with checkboxes */}
               {result.actionItems && result.actionItems.length > 0 && (
                 <div style={{ marginBottom: 20 }}>
                   <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 10 }}>
@@ -417,7 +509,6 @@ export default function MeetingRecorder({ onOpenSettings }: Props) {
                     ))}
                   </div>
 
-                  {/* Add to tasks bar */}
                   {checkedItems.size > 0 && !tasksAdded && (
                     <div style={{
                       display: 'flex', alignItems: 'center', gap: 10, marginTop: 14,
@@ -448,14 +539,11 @@ export default function MeetingRecorder({ onOpenSettings }: Props) {
                   )}
 
                   {tasksAdded && (
-                    <div style={{ marginTop: 10, fontSize: 13, color: '#22c55e' }}>
-                      ✓ Tasks added
-                    </div>
+                    <div style={{ marginTop: 10, fontSize: 13, color: '#22c55e' }}>✓ Tasks added</div>
                   )}
                 </div>
               )}
 
-              {/* Footer actions */}
               <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
                 {result.meetingPath && (
                   <button onClick={() => window.keel.openPath(result.meetingPath!)} style={btn('ghost')}>
@@ -472,17 +560,43 @@ export default function MeetingRecorder({ onOpenSettings }: Props) {
           {/* ── ERROR ── */}
           {recorderState === 'error' && (
             <>
-              <div style={{ color: '#ef4444', fontSize: 34 }}>✕</div>
-              <div>
-                <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 5 }}>Something went wrong</div>
-                <div style={{ fontSize: 14, color: 'var(--text-muted)', maxWidth: 360 }}>{errorMessage}</div>
+              {errorMessage ? (
+                <>
+                  <div style={{ color: '#ef4444', fontSize: 34 }}>✕</div>
+                  <div>
+                    <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 5 }}>Something went wrong</div>
+                    <div style={{ fontSize: 14, color: 'var(--text-muted)', maxWidth: 360 }}>{errorMessage}</div>
+                  </div>
+                </>
+              ) : (
+                /* no_transcription_available */
+                <div style={{ width: '100%', textAlign: 'left' }}>
+                  <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 12 }}>
+                    Transcription not available
+                  </div>
+                  <div style={{ fontSize: 14, color: 'var(--text-muted)', marginBottom: 16, lineHeight: 1.6 }}>
+                    Install whisper.cpp for local transcription (no API key needed), or add an OpenAI key.
+                  </div>
+                  <code style={{
+                    display: 'block', background: 'var(--bg-surface)', borderRadius: 6,
+                    padding: '8px 12px', fontSize: 12, color: 'var(--text-primary)',
+                    fontFamily: 'monospace', userSelect: 'all', marginBottom: 12,
+                  }}>
+                    brew install whisper-cpp
+                  </code>
+                </div>
+              )}
+              <div style={{ display: 'flex', gap: 10 }}>
+                <button onClick={() => { checkSetup(); handleReset(); }} style={btn('accent')}>Try Again</button>
+                {!hasOpenAIKey && (
+                  <button onClick={() => onOpenSettings?.('ai-setup')} style={btn('ghost')}>Add OpenAI Key</button>
+                )}
               </div>
-              <button onClick={handleReset} style={btn('accent')}>Try Again</button>
             </>
           )}
         </div>
 
-        {/* Past meetings */}
+        {/* ── Past meetings ── */}
         <div>
           <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 10 }}>Past Meetings</div>
           {loadingMeetings ? (
