@@ -54,6 +54,8 @@ import {
 import { listAllTasks, toggleTask, moveTask, acceptIncomingTask, appendTask, createProject, renameProject, deleteProject } from '../src/core/tasks';
 import { capture } from '../src/core/workflows/capture';
 import { synthesizeMeeting, formatMeetingNote, formatDailyLogEntry } from '../src/core/workflows/meetingTranscription';
+import { isWhisperAvailable, getWhisperBinary, transcribeAudioBuffer } from './transcriptionService';
+import { isModelDownloaded, getAvailableModels, downloadModel } from './modelManager';
 import { autoCapture } from '../src/core/workflows/autoCapture';
 import { dailyBrief } from '../src/core/workflows/dailyBrief';
 import { eod } from '../src/core/workflows/eod';
@@ -1115,38 +1117,70 @@ function registerIpcHandlers() {
     }
   });
 
-  ipcMain.handle('keel:transcribe-meeting', async (event, audioBuffer: ArrayBuffer) => {
-    if (!settings.openaiApiKey) {
-      return {
-        ok: false,
-        error: 'Transcription requires an OpenAI API key. Add one in Settings → Model.',
-      };
-    }
+  // Check whether local whisper.cpp transcription is available
+  ipcMain.handle('keel:check-whisper', async () => {
+    return {
+      binaryAvailable: isWhisperAvailable(),
+      binaryPath: getWhisperBinary(),
+      modelDownloaded: isModelDownloaded('base.en'),
+      models: getAvailableModels(),
+    };
+  });
 
+  // Download a whisper model with progress events
+  ipcMain.handle('keel:download-whisper-model', async (event, model = 'base.en') => {
+    try {
+      await downloadModel(model, (percent) => {
+        event.sender.send('keel:model-download-progress', { percent });
+      });
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : 'Download failed' };
+    }
+  });
+
+  ipcMain.handle('keel:transcribe-meeting', async (event, audioBuffer: ArrayBuffer) => {
     const brainPath = fileManager.getBrainPath();
-    const tmpPath = path.join(os.tmpdir(), `keel-meeting-${Date.now()}.webm`);
+    let transcript = '';
 
     try {
-      event.sender.send('keel:meeting-progress', { step: 'Transcribing audio…' });
+      // ── Path A: local whisper.cpp (preferred, no API key needed) ──────────
+      if (isWhisperAvailable() && isModelDownloaded('base.en')) {
+        transcript = await transcribeAudioBuffer(audioBuffer, 'base.en', (step, pct) => {
+          event.sender.send('keel:meeting-progress', { step });
+          if (pct !== undefined) event.sender.send('keel:transcription-progress', { percent: pct });
+        });
 
-      // Write audio buffer to temp file
-      const buffer = Buffer.from(audioBuffer);
-      fs.writeFileSync(tmpPath, buffer);
+      // ── Path B: OpenAI Whisper API ────────────────────────────────────────
+      } else if (settings.openaiApiKey) {
+        event.sender.send('keel:meeting-progress', { step: 'Transcribing audio…' });
+        const tmpPath = path.join(os.tmpdir(), `keel-meeting-${Date.now()}.webm`);
+        try {
+          fs.writeFileSync(tmpPath, Buffer.from(audioBuffer));
+          const openaiClient = new OpenAI({ apiKey: settings.openaiApiKey, fetch: getElectronAwareFetch() });
+          const result = await openaiClient.audio.transcriptions.create({
+            file: await toFile(fs.createReadStream(tmpPath), 'recording.webm', { type: 'audio/webm' }),
+            model: 'whisper-1',
+          });
+          transcript = result.text.trim();
+        } finally {
+          try { fs.unlinkSync(tmpPath); } catch { /* ignore */ }
+        }
 
-      // Call OpenAI Whisper
-      const openaiClient = new OpenAI({
-        apiKey: settings.openaiApiKey,
-        fetch: getElectronAwareFetch(),
-      });
-      const transcription = await openaiClient.audio.transcriptions.create({
-        file: await toFile(fs.createReadStream(tmpPath), 'recording.webm', { type: 'audio/webm' }),
-        model: 'whisper-1',
-      });
-      const transcript = transcription.text.trim();
+      // ── No transcription available ────────────────────────────────────────
+      } else {
+        return {
+          ok: false,
+          error: 'no_transcription_available',
+        };
+      }
 
+      if (!transcript) {
+        return { ok: false, error: 'Transcription returned empty text.' };
+      }
+
+      // ── Synthesize ────────────────────────────────────────────────────────
       event.sender.send('keel:meeting-progress', { step: 'Synthesizing notes…' });
-
-      // Synthesize with LLM
       let synthesis;
       try {
         synthesis = await synthesizeMeeting(transcript, llmClient);
@@ -1154,21 +1188,18 @@ function registerIpcHandlers() {
         synthesis = { title: 'Meeting', summary: '', decisions: [], actionItems: [] };
       }
 
+      // ── Save ──────────────────────────────────────────────────────────────
       event.sender.send('keel:meeting-progress', { step: 'Saving to brain…' });
-
-      // Determine file paths
       const now = new Date();
-      const date = now.toISOString().split('T')[0]; // YYYY-MM-DD
+      const date = now.toISOString().split('T')[0];
       const timeParts = now.toTimeString().split(':');
       const time = `${timeParts[0]}-${timeParts[1]}-${Math.floor(Number(timeParts[2] || '00')).toString().padStart(2, '0')}`;
       const meetingPath = `meetings/${date}/${time}.md`;
       const logPath = `daily-log/${date}.md`;
 
-      // Save meeting note
       const noteContent = formatMeetingNote(synthesis, transcript, date, time);
       await fileManager.writeFile(meetingPath, noteContent);
 
-      // Append to daily log
       const logEntry = formatDailyLogEntry(synthesis, meetingPath);
       if (await fileManager.fileExists(logPath)) {
         setSelfWriting();
@@ -1192,8 +1223,6 @@ function registerIpcHandlers() {
         ok: false,
         error: err instanceof Error ? err.message : 'Transcription failed',
       };
-    } finally {
-      try { fs.unlinkSync(tmpPath); } catch { /* ignore */ }
     }
   });
 

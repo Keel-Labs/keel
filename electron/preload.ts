@@ -167,7 +167,19 @@ const api: KeelAPI = {
     ipcRenderer.on('keel:meeting-progress', handler);
     return () => ipcRenderer.off('keel:meeting-progress', handler);
   },
+  onTranscriptionProgress: (callback: (payload: { percent: number }) => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, payload: { percent: number }) => callback(payload);
+    ipcRenderer.on('keel:transcription-progress', handler);
+    return () => ipcRenderer.off('keel:transcription-progress', handler);
+  },
+  onModelDownloadProgress: (callback: (payload: { percent: number }) => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, payload: { percent: number }) => callback(payload);
+    ipcRenderer.on('keel:model-download-progress', handler);
+    return () => ipcRenderer.off('keel:model-download-progress', handler);
+  },
   listMeetings: () => ipcRenderer.invoke('keel:list-meetings'),
+  checkWhisper: () => ipcRenderer.invoke('keel:check-whisper'),
+  downloadWhisperModel: (model?: string) => ipcRenderer.invoke('keel:download-whisper-model', model),
 };
 
 contextBridge.exposeInMainWorld('keel', api);
