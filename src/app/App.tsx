@@ -9,6 +9,7 @@ import PlaceholderPane from './components/PlaceholderPane';
 import Inbox from './components/Inbox';
 import Dashboard from './components/Dashboard';
 import ChatsIndex from './components/ChatsIndex';
+import MeetingRecorder from './components/MeetingRecorder';
 import type { Settings as SettingsType } from '../shared/types';
 import { applyTheme } from './theme';
 import {
@@ -480,6 +481,8 @@ export default function App() {
         );
       case 'inbox':
         return <Inbox />;
+      case 'meetings':
+        return <MeetingRecorder onOpenSettings={(section) => openSettings(section ? { section: section as any } : {})} />;
       case 'settings':
         return <Settings onBack={handleSettingsBack} navigation={settingsNavigation} />;
       default:
