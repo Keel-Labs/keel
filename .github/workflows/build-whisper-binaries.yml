@@ -1,0 +1,100 @@
+name: Build Whisper Binaries
+
+# Run manually, or automatically when this workflow file changes
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/build-whisper-binaries.yml'
+
+jobs:
+  # ── Compile for each architecture ───────────────────────────────────────────
+  build:
+    name: Build (${{ matrix.arch }})
+    strategy:
+      matrix:
+        include:
+          - os: macos-latest   # arm64 (Apple Silicon)
+            arch: arm64
+          - os: macos-13       # x86_64 (Intel)
+            arch: x64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Clone whisper.cpp
+        run: git clone --depth 1 https://github.com/ggerganov/whisper.cpp /tmp/whisper
+
+      - name: Build whisper-cli
+        run: |
+          cd /tmp/whisper
+          cmake -B build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DWHISPER_NO_AVX=ON \
+            -DWHISPER_NO_AVX2=ON \
+            -DWHISPER_NO_F16C=ON \
+            -DWHISPER_NO_FMA=ON \
+            -DBUILD_SHARED_LIBS=OFF
+          cmake --build build --target whisper-cli -j$(sysctl -n hw.logicalcpu)
+
+      - name: Verify binary
+        run: |
+          ls -lh /tmp/whisper/build/bin/whisper-cli
+          file /tmp/whisper/build/bin/whisper-cli
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: whisper-cli-${{ matrix.arch }}
+          path: /tmp/whisper/build/bin/whisper-cli
+          retention-days: 1
+
+  # ── Combine into a universal binary and publish ──────────────────────────────
+  release:
+    name: Create Universal Binary
+    needs: build
+    runs-on: macos-latest
+    permissions:
+      contents: write   # needed to create/update the release
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download arm64 binary
+        uses: actions/download-artifact@v4
+        with:
+          name: whisper-cli-arm64
+          path: /tmp/arm64
+
+      - name: Download x64 binary
+        uses: actions/download-artifact@v4
+        with:
+          name: whisper-cli-x64
+          path: /tmp/x64
+
+      - name: Create universal binary
+        run: |
+          chmod +x /tmp/arm64/whisper-cli /tmp/x64/whisper-cli
+          lipo -create \
+            -output /tmp/whisper-macos-universal \
+            /tmp/arm64/whisper-cli \
+            /tmp/x64/whisper-cli
+          chmod +x /tmp/whisper-macos-universal
+          echo "✅ Universal binary created"
+          file /tmp/whisper-macos-universal
+          ls -lh /tmp/whisper-macos-universal
+
+      - name: Delete existing whisper-binaries release (if any)
+        run: |
+          gh release delete whisper-binaries --yes 2>/dev/null || true
+          git push origin :refs/tags/whisper-binaries 2>/dev/null || true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create release and upload binary
+        run: |
+          gh release create whisper-binaries \
+            --title "Whisper Binaries (auto-updated)" \
+            --notes "Pre-compiled whisper-cli universal binary for macOS (arm64 + x64). Auto-downloaded by Keel on first use. Do not edit manually." \
+            --prerelease \
+            /tmp/whisper-macos-universal
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
