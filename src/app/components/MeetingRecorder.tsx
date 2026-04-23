@@ -77,6 +77,8 @@ export default function MeetingRecorder({ onOpenSettings }: Props) {
   const [transcriptionPercent, setTranscriptionPercent] = useState<number | null>(null);
   const [downloadPercent, setDownloadPercent] = useState<number | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [isDownloadingBinary, setIsDownloadingBinary] = useState(false);
+  const [binaryDownloadPercent, setBinaryDownloadPercent] = useState<number | null>(null);
   const [result, setResult] = useState<MeetingTranscriptionResult | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
   const [pastMeetings, setPastMeetings] = useState<MeetingEntry[]>([]);
@@ -145,7 +147,8 @@ export default function MeetingRecorder({ onOpenSettings }: Props) {
     const u1 = window.keel.onMeetingProgress((p) => setProgressStep(p.step));
     const u2 = window.keel.onTranscriptionProgress((p) => setTranscriptionPercent(p.percent));
     const u3 = window.keel.onModelDownloadProgress((p) => setDownloadPercent(p.percent));
-    return () => { u1(); u2(); u3(); };
+    const u4 = window.keel.onBinaryDownloadProgress((p) => setBinaryDownloadPercent(p.percent));
+    return () => { u1(); u2(); u3(); u4(); };
   }, []);
 
   // ── Timer ─────────────────────────────────────────────────────────────────
@@ -160,6 +163,34 @@ export default function MeetingRecorder({ onOpenSettings }: Props) {
   const stopTimer = () => {
     if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
   };
+
+  // ── Binary download (auto, no Homebrew needed) ────────────────────────────
+  const handleDownloadBinary = useCallback(async () => {
+    setIsDownloadingBinary(true);
+    setBinaryDownloadPercent(0);
+    try {
+      const res = await window.keel.downloadWhisperBinary();
+      if (res.ok) {
+        await checkSetup(); // re-check — will now find the binary
+      } else {
+        setErrorMessage(res.error || 'Binary download failed');
+        setRecorderState('error');
+      }
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : 'Binary download failed');
+      setRecorderState('error');
+    } finally {
+      setIsDownloadingBinary(false);
+      setBinaryDownloadPercent(null);
+    }
+  }, [checkSetup]);
+
+  // Auto-trigger binary download when setup state lands on needs-setup
+  useEffect(() => {
+    if (setupState === 'needs-setup' && !isDownloadingBinary) {
+      handleDownloadBinary();
+    }
+  }, [setupState]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Model download ────────────────────────────────────────────────────────
   const handleDownloadModel = async () => {
@@ -347,49 +378,28 @@ export default function MeetingRecorder({ onOpenSettings }: Props) {
             </div>
           )}
 
-          {/* ── NEEDS SETUP (no binary, no key) ── */}
+          {/* ── NEEDS SETUP — auto-download binary ── */}
           {setupState === 'needs-setup' && recorderState === 'idle' && (
             <div style={{ width: '100%', textAlign: 'left' }}>
-              <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 12 }}>Set up transcription</div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {/* Option A: whisper.cpp */}
-                <div style={{
-                  background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
-                  borderRadius: 8, padding: '14px 16px',
-                }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4 }}>
-                    Option A — Local (free, no API key)
+              <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', marginBottom: 20 }}>
+                <div style={{ color: 'var(--text-muted)', opacity: 0.5, flexShrink: 0, marginTop: 4 }}><MicIcon size={32} /></div>
+                <div>
+                  <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4 }}>
+                    Setting up transcription
                   </div>
-                  <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 10, lineHeight: 1.6 }}>
-                    Install whisper.cpp via Homebrew. Runs offline on your Mac using the Neural Engine.
+                  <div style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.6 }}>
+                    Downloading the transcription engine (~5 MB). This only happens once.
                   </div>
-                  <code style={{
-                    display: 'block', background: 'var(--bg-card)', borderRadius: 6,
-                    padding: '8px 12px', fontSize: 12, color: 'var(--text-primary)',
-                    fontFamily: 'monospace', userSelect: 'all',
-                  }}>
-                    brew install whisper-cpp
-                  </code>
-                  <button onClick={checkSetup} style={{ ...btn('ghost'), marginTop: 10, fontSize: 12 }}>
-                    Check again
-                  </button>
                 </div>
-                {/* Option B: OpenAI key */}
+              </div>
+              <div style={{ height: 6, background: 'var(--bg-surface)', borderRadius: 3, overflow: 'hidden', marginBottom: 8 }}>
                 <div style={{
-                  background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
-                  borderRadius: 8, padding: '14px 16px',
-                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                }}>
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 2 }}>
-                      Option B — OpenAI Whisper API
-                    </div>
-                    <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Add an OpenAI key in Settings</div>
-                  </div>
-                  <button onClick={() => onOpenSettings?.('ai-setup')} style={{ ...btn('ghost'), fontSize: 12 }}>
-                    Open Settings
-                  </button>
-                </div>
+                  height: '100%', background: 'var(--accent)', borderRadius: 3,
+                  width: `${binaryDownloadPercent ?? 0}%`, transition: 'width 0.3s',
+                }} />
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                {binaryDownloadPercent !== null ? `${binaryDownloadPercent}%` : 'Starting…'}
               </div>
             </div>
           )}
@@ -569,21 +579,12 @@ export default function MeetingRecorder({ onOpenSettings }: Props) {
                   </div>
                 </>
               ) : (
-                /* no_transcription_available */
-                <div style={{ width: '100%', textAlign: 'left' }}>
-                  <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 12 }}>
-                    Transcription not available
+                /* no_transcription_available — retry auto-download */
+                <div>
+                  <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 5 }}>Transcription engine unavailable</div>
+                  <div style={{ fontSize: 14, color: 'var(--text-muted)', maxWidth: 360 }}>
+                    Could not download the transcription engine. Check your internet connection and try again.
                   </div>
-                  <div style={{ fontSize: 14, color: 'var(--text-muted)', marginBottom: 16, lineHeight: 1.6 }}>
-                    Install whisper.cpp for local transcription (no API key needed), or add an OpenAI key.
-                  </div>
-                  <code style={{
-                    display: 'block', background: 'var(--bg-surface)', borderRadius: 6,
-                    padding: '8px 12px', fontSize: 12, color: 'var(--text-primary)',
-                    fontFamily: 'monospace', userSelect: 'all', marginBottom: 12,
-                  }}>
-                    brew install whisper-cpp
-                  </code>
                 </div>
               )}
               <div style={{ display: 'flex', gap: 10 }}>

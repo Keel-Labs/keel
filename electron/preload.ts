@@ -179,6 +179,12 @@ const api: KeelAPI = {
   },
   listMeetings: () => ipcRenderer.invoke('keel:list-meetings'),
   checkWhisper: () => ipcRenderer.invoke('keel:check-whisper'),
+  downloadWhisperBinary: () => ipcRenderer.invoke('keel:download-whisper-binary'),
+  onBinaryDownloadProgress: (callback: (payload: { percent: number }) => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, payload: { percent: number }) => callback(payload);
+    ipcRenderer.on('keel:binary-download-progress', handler);
+    return () => ipcRenderer.off('keel:binary-download-progress', handler);
+  },
   downloadWhisperModel: (model?: string) => ipcRenderer.invoke('keel:download-whisper-model', model),
 };
 

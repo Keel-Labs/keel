@@ -4,9 +4,20 @@ import { promisify } from 'util'
 import * as path from 'path'
 import * as fs from 'fs'
 import * as os from 'os'
+import * as https from 'https'
+import * as http from 'http'
 import { getModelPath } from './modelManager'
 
 const execFileAsync = promisify(execFile)
+
+const REPO = 'Keel-Labs/keel'
+const RELEASE_TAG = 'whisper-binaries'
+const ASSET_NAME = 'whisper-macos-universal'
+
+// Where the runtime-downloaded binary lives (writable, outside app bundle)
+function getUserDataBinaryPath(): string {
+  return path.join(app.getPath('userData'), 'bin', 'whisper')
+}
 
 // ---------------------------------------------------------------------------
 // Binary resolution
@@ -15,22 +26,24 @@ const execFileAsync = promisify(execFile)
 /**
  * Returns the path to the whisper-cli binary.
  * Priority:
- *   1. Bundled binary in app extraResources (production)
- *   2. System binary installed via Homebrew (development)
+ *   1. Bundled binary in app extraResources (production .app)
+ *   2. Runtime-downloaded binary in userData/bin/ (auto-downloaded on first run)
+ *   3. Homebrew / system binary (development convenience)
  */
 export function getWhisperBinary(): string | null {
-  // 1. Bundled binary
-  const arch = process.arch === 'arm64' ? 'arm64' : 'x64'
-  const bundledName = `whisper-${arch}`
+  // 1. Bundled inside .app (production)
   const bundledPath = app.isPackaged
-    ? path.join(process.resourcesPath, bundledName)
-    : path.join(__dirname, '../../resources', bundledName)
-
+    ? path.join(process.resourcesPath, 'whisper')
+    : path.join(__dirname, '../../resources/whisper')
   if (fs.existsSync(bundledPath)) return bundledPath
 
-  // 2. Homebrew / system binary
+  // 2. Runtime downloaded to userData
+  const userDataPath = getUserDataBinaryPath()
+  if (fs.existsSync(userDataPath)) return userDataPath
+
+  // 3. Homebrew / system (dev convenience)
   const candidates = [
-    '/opt/homebrew/bin/whisper-cli',   // whisper.cpp >= 1.7
+    '/opt/homebrew/bin/whisper-cli',
     '/usr/local/bin/whisper-cli',
     '/opt/homebrew/bin/whisper-cpp',
     '/usr/local/bin/whisper-cpp',
@@ -46,6 +59,61 @@ export function getWhisperBinary(): string | null {
 
 export function isWhisperAvailable(): boolean {
   return getWhisperBinary() !== null
+}
+
+// ---------------------------------------------------------------------------
+// Runtime binary download (for users without the packaged .app)
+// ---------------------------------------------------------------------------
+
+function fetchJson(url: string): Promise<any> {
+  return new Promise((resolve, reject) => {
+    https.get(url, { headers: { 'User-Agent': 'keel-app' } }, (res) => {
+      let data = ''
+      res.on('data', (c) => (data += c))
+      res.on('end', () => { try { resolve(JSON.parse(data)) } catch (e) { reject(e) } })
+    }).on('error', reject)
+  })
+}
+
+function downloadFile(url: string, dest: string, onProgress?: (pct: number) => void, redirects = 0): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (redirects > 5) return reject(new Error('Too many redirects'))
+    const mod = url.startsWith('https') ? https : http
+    mod.get(url, { headers: { 'User-Agent': 'keel-app' } }, (res) => {
+      if (res.statusCode === 301 || res.statusCode === 302 || res.statusCode === 307) {
+        return resolve(downloadFile(res.headers.location!, dest, onProgress, redirects + 1))
+      }
+      if (res.statusCode !== 200) return reject(new Error(`HTTP ${res.statusCode}`))
+      const total = parseInt(res.headers['content-length'] || '0', 10)
+      let received = 0
+      const file = fs.createWriteStream(dest + '.partial')
+      res.on('data', (chunk: Buffer) => {
+        received += chunk.length
+        if (total && onProgress) onProgress(Math.round((received / total) * 100))
+      })
+      res.pipe(file)
+      file.on('finish', () => { file.close(); fs.renameSync(dest + '.partial', dest); resolve() })
+      file.on('error', (err) => { fs.unlink(dest + '.partial', () => {}); reject(err) })
+    }).on('error', reject)
+  })
+}
+
+/**
+ * Downloads the pre-compiled whisper binary from the GitHub release.
+ * Saves to userData/bin/whisper and marks it executable.
+ */
+export async function downloadWhisperBinary(onProgress?: (pct: number) => void): Promise<void> {
+  const dest = getUserDataBinaryPath()
+  fs.mkdirSync(path.dirname(dest), { recursive: true })
+
+  const release = await fetchJson(
+    `https://api.github.com/repos/${REPO}/releases/tags/${RELEASE_TAG}`
+  )
+  const asset = release.assets?.find((a: any) => a.name === ASSET_NAME)
+  if (!asset) throw new Error('Whisper binary not found in release. The build workflow may need to be run first.')
+
+  await downloadFile(asset.browser_download_url, dest, onProgress)
+  fs.chmodSync(dest, 0o755)
 }
 
 // ---------------------------------------------------------------------------

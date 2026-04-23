@@ -13,9 +13,10 @@
     "dev:electron": "concurrently \"vite\" \"tsc -p tsconfig.electron.json --watch\" \"wait-on http://localhost:5173 && NODE_ENV=development electron .\"",
     "electron:install-app-deps": "electron-builder install-app-deps",
     "package:mac:dir": "npm run build:desktop && npm run electron:install-app-deps && electron-builder --config electron-builder.config.mjs --mac --dir",
-    "dist:mac": "npm run build:desktop && npm run electron:install-app-deps && electron-builder --config electron-builder.config.mjs --mac dmg --universal",
-    "dist:mac:arm64": "npm run build:desktop && npm run electron:install-app-deps && KEEL_MAC_SPLIT=1 electron-builder --config electron-builder.config.mjs --mac dmg --arm64",
-    "dist:mac:x64": "npm run build:desktop && npm run electron:install-app-deps && KEEL_MAC_SPLIT=1 electron-builder --config electron-builder.config.mjs --mac dmg --x64",
+    "download-whisper": "node scripts/download-whisper-binary.js",
+    "dist:mac": "node scripts/download-whisper-binary.js && npm run build:desktop && npm run electron:install-app-deps && electron-builder --config electron-builder.config.mjs --mac dmg --universal",
+    "dist:mac:arm64": "node scripts/download-whisper-binary.js && npm run build:desktop && npm run electron:install-app-deps && KEEL_MAC_SPLIT=1 electron-builder --config electron-builder.config.mjs --mac dmg --arm64",
+    "dist:mac:x64": "node scripts/download-whisper-binary.js && npm run build:desktop && npm run electron:install-app-deps && KEEL_MAC_SPLIT=1 electron-builder --config electron-builder.config.mjs --mac dmg --x64",
     "test": "vitest run",
     "test:watch": "vitest"
   },

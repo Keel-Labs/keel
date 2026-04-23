@@ -381,6 +381,8 @@ export type IpcChannels =
   | 'keel:transcription-progress'
   | 'keel:model-download-progress'
   | 'keel:check-whisper'
+  | 'keel:download-whisper-binary'
+  | 'keel:binary-download-progress'
   | 'keel:download-whisper-model';
 
 export interface MeetingTranscriptionResult {
@@ -500,6 +502,8 @@ export interface KeelAPI {
   onModelDownloadProgress: (callback: (payload: { percent: number }) => void) => () => void;
   listMeetings: () => Promise<MeetingEntry[]>;
   checkWhisper: () => Promise<WhisperStatus>;
+  downloadWhisperBinary: () => Promise<{ ok: boolean; error?: string }>;
+  onBinaryDownloadProgress: (callback: (payload: { percent: number }) => void) => () => void;
   downloadWhisperModel: (model?: string) => Promise<{ ok: boolean; error?: string }>;
 }
 
