@@ -8,75 +8,50 @@ on:
       - '.github/workflows/build-whisper-binaries.yml'
 
 jobs:
-  # ── Compile for each architecture ───────────────────────────────────────────
-  build:
-    name: Build (${{ matrix.arch }})
-    strategy:
-      matrix:
-        include:
-          - os: macos-latest   # arm64 (Apple Silicon)
-            arch: arm64
-          - os: macos-13       # x86_64 (Intel)
-            arch: x64
-    runs-on: ${{ matrix.os }}
+  build-universal:
+    name: Build Universal Binary
+    runs-on: macos-latest   # Apple Silicon — can cross-compile for x86_64
+    permissions:
+      contents: write
+
     steps:
+      - uses: actions/checkout@v4
+
       - name: Clone whisper.cpp
         run: git clone --depth 1 https://github.com/ggerganov/whisper.cpp /tmp/whisper
 
-      - name: Build whisper-cli
+      - name: Build arm64 binary
         run: |
           cd /tmp/whisper
-          cmake -B build \
+          cmake -B build-arm64 \
             -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_OSX_ARCHITECTURES=arm64 \
             -DWHISPER_NO_AVX=ON \
             -DWHISPER_NO_AVX2=ON \
             -DWHISPER_NO_F16C=ON \
             -DWHISPER_NO_FMA=ON \
             -DBUILD_SHARED_LIBS=OFF
-          cmake --build build --target whisper-cli -j$(sysctl -n hw.logicalcpu)
+          cmake --build build-arm64 --target whisper-cli -j$(sysctl -n hw.logicalcpu)
 
-      - name: Verify binary
+      - name: Build x86_64 binary (cross-compile)
         run: |
-          ls -lh /tmp/whisper/build/bin/whisper-cli
-          file /tmp/whisper/build/bin/whisper-cli
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: whisper-cli-${{ matrix.arch }}
-          path: /tmp/whisper/build/bin/whisper-cli
-          retention-days: 1
-
-  # ── Combine into a universal binary and publish ──────────────────────────────
-  release:
-    name: Create Universal Binary
-    needs: build
-    runs-on: macos-latest
-    permissions:
-      contents: write   # needed to create/update the release
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Download arm64 binary
-        uses: actions/download-artifact@v4
-        with:
-          name: whisper-cli-arm64
-          path: /tmp/arm64
-
-      - name: Download x64 binary
-        uses: actions/download-artifact@v4
-        with:
-          name: whisper-cli-x64
-          path: /tmp/x64
+          cd /tmp/whisper
+          cmake -B build-x64 \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_OSX_ARCHITECTURES=x86_64 \
+            -DWHISPER_NO_AVX=ON \
+            -DWHISPER_NO_AVX2=ON \
+            -DWHISPER_NO_F16C=ON \
+            -DWHISPER_NO_FMA=ON \
+            -DBUILD_SHARED_LIBS=OFF
+          cmake --build build-x64 --target whisper-cli -j$(sysctl -n hw.logicalcpu)
 
       - name: Create universal binary
         run: |
-          chmod +x /tmp/arm64/whisper-cli /tmp/x64/whisper-cli
-          lipo -create \
-            -output /tmp/whisper-macos-universal \
-            /tmp/arm64/whisper-cli \
-            /tmp/x64/whisper-cli
+          ARM64=/tmp/whisper/build-arm64/bin/whisper-cli
+          X64=/tmp/whisper/build-x64/bin/whisper-cli
+          chmod +x "$ARM64" "$X64"
+          lipo -create -output /tmp/whisper-macos-universal "$ARM64" "$X64"
           chmod +x /tmp/whisper-macos-universal
           echo "✅ Universal binary created"
           file /tmp/whisper-macos-universal
