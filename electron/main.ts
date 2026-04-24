@@ -1084,7 +1084,7 @@ function registerIpcHandlers() {
       const now = new Date();
       const date = now.toISOString().split('T')[0];
       const timeParts = now.toTimeString().split(':');
-      const time = `${timeParts[0]}-${timeParts[1]}-${Math.floor(Number(timeParts[2] || '00')).toString().padStart(2, '0')}`;
+      const time = `${timeParts[0]}-${timeParts[1]}-${parseInt(timeParts[2] ?? '0', 10).toString().padStart(2, '0')}`;
       const meetingPath = `meetings/${date}/${time}.md`;
       const logPath = `daily-log/${date}.md`;
 
@@ -1205,7 +1205,7 @@ function registerIpcHandlers() {
       const now = new Date();
       const date = now.toISOString().split('T')[0];
       const timeParts = now.toTimeString().split(':');
-      const time = `${timeParts[0]}-${timeParts[1]}-${Math.floor(Number(timeParts[2] || '00')).toString().padStart(2, '0')}`;
+      const time = `${timeParts[0]}-${timeParts[1]}-${parseInt(timeParts[2] ?? '0', 10).toString().padStart(2, '0')}`;
       const meetingPath = `meetings/${date}/${time}.md`;
       const logPath = `daily-log/${date}.md`;
 
