@@ -258,7 +258,7 @@ export default function MeetingRecorder({ onOpenSettings }: Props) {
 
       if (res.ok) {
         setResult(res);
-        loadTasks();
+        loadTasks(res.actionItems?.length ?? 0);
         setRecorderState('done');
         loadMeetings();
       } else if (res.error === 'no_transcription_available') {
@@ -274,10 +274,11 @@ export default function MeetingRecorder({ onOpenSettings }: Props) {
     }
   };
 
-  const loadTasks = () => {
+  const loadTasks = (actionItemCount = 0) => {
     window.keel.listTasks().then((groups) => {
       setTaskGroups(groups);
-      setCheckedItems(new Set());
+      // Pre-select all action items — user deselects ones they don't want
+      setCheckedItems(new Set(Array.from({ length: actionItemCount }, (_, i) => i)));
       setSelectedProject('tasks.md');
       setTasksAdded(false);
     }).catch(() => {});
@@ -497,8 +498,20 @@ export default function MeetingRecorder({ onOpenSettings }: Props) {
 
               {result.actionItems && result.actionItems.length > 0 && (
                 <div style={{ marginBottom: 20 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 10 }}>
-                    Action Items
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+                      Action Items
+                    </div>
+                    <button
+                      onClick={() => {
+                        const allSelected = checkedItems.size === result.actionItems!.length;
+                        setCheckedItems(allSelected ? new Set() : new Set(result.actionItems!.map((_, i) => i)));
+                        setTasksAdded(false);
+                      }}
+                      style={{ fontSize: 12, color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                    >
+                      {checkedItems.size === result.actionItems.length ? 'Deselect all' : 'Select all'}
+                    </button>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                     {result.actionItems.map((item, i) => (
@@ -557,7 +570,7 @@ export default function MeetingRecorder({ onOpenSettings }: Props) {
               <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
                 {result.meetingPath && (
                   <button onClick={() => window.keel.openPath(result.meetingPath!)} style={btn('ghost')}>
-                    <FileIcon /> Open in Obsidian
+                    <FileIcon /> Open Note
                   </button>
                 )}
                 <button onClick={handleReset} style={btn('accent')}>
