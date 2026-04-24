@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import type { MeetingEntry, MeetingTranscriptionResult, TaskGroup, WhisperStatus } from '../../shared/types';
 
 type RecorderState = 'idle' | 'recording' | 'processing' | 'done' | 'error';
-type SetupState = 'checking' | 'ready' | 'needs-model' | 'needs-setup';
+type SetupState = 'checking' | 'ready' | 'needs-model';
 
 interface Props {
   onOpenSettings?: (section?: string) => void;
@@ -77,8 +77,6 @@ export default function MeetingRecorder({ onOpenSettings }: Props) {
   const [transcriptionPercent, setTranscriptionPercent] = useState<number | null>(null);
   const [downloadPercent, setDownloadPercent] = useState<number | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
-  const [isDownloadingBinary, setIsDownloadingBinary] = useState(false);
-  const [binaryDownloadPercent, setBinaryDownloadPercent] = useState<number | null>(null);
   const [result, setResult] = useState<MeetingTranscriptionResult | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
   const [pastMeetings, setPastMeetings] = useState<MeetingEntry[]>([]);
@@ -120,13 +118,10 @@ export default function MeetingRecorder({ onOpenSettings }: Props) {
       } else if (status.binaryAvailable && !status.modelDownloaded) {
         whisperReadyRef.current = false;
         setSetupState('needs-model');
-      } else if (hasKey) {
-        // No local whisper but OpenAI key available — still usable
-        whisperReadyRef.current = false;
-        setSetupState('ready');
       } else {
+        // Binary always bundled; if missing fall back to OpenAI key or show needs-model
         whisperReadyRef.current = false;
-        setSetupState('needs-setup');
+        setSetupState(hasKey ? 'ready' : 'needs-model');
       }
     } catch {
       setSetupState('needs-setup');
@@ -147,8 +142,7 @@ export default function MeetingRecorder({ onOpenSettings }: Props) {
     const u1 = window.keel.onMeetingProgress((p) => setProgressStep(p.step));
     const u2 = window.keel.onTranscriptionProgress((p) => setTranscriptionPercent(p.percent));
     const u3 = window.keel.onModelDownloadProgress((p) => setDownloadPercent(p.percent));
-    const u4 = window.keel.onBinaryDownloadProgress((p) => setBinaryDownloadPercent(p.percent));
-    return () => { u1(); u2(); u3(); u4(); };
+    return () => { u1(); u2(); u3(); };
   }, []);
 
   // ── Timer ─────────────────────────────────────────────────────────────────
@@ -163,34 +157,6 @@ export default function MeetingRecorder({ onOpenSettings }: Props) {
   const stopTimer = () => {
     if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
   };
-
-  // ── Binary download (auto, no Homebrew needed) ────────────────────────────
-  const handleDownloadBinary = useCallback(async () => {
-    setIsDownloadingBinary(true);
-    setBinaryDownloadPercent(0);
-    try {
-      const res = await window.keel.downloadWhisperBinary();
-      if (res.ok) {
-        await checkSetup(); // re-check — will now find the binary
-      } else {
-        setErrorMessage(res.error || 'Binary download failed');
-        setRecorderState('error');
-      }
-    } catch (err) {
-      setErrorMessage(err instanceof Error ? err.message : 'Binary download failed');
-      setRecorderState('error');
-    } finally {
-      setIsDownloadingBinary(false);
-      setBinaryDownloadPercent(null);
-    }
-  }, [checkSetup]);
-
-  // Auto-trigger binary download when setup state lands on needs-setup
-  useEffect(() => {
-    if (setupState === 'needs-setup' && !isDownloadingBinary) {
-      handleDownloadBinary();
-    }
-  }, [setupState]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Model download ────────────────────────────────────────────────────────
   const handleDownloadModel = async () => {
@@ -377,32 +343,6 @@ export default function MeetingRecorder({ onOpenSettings }: Props) {
                   <DownloadIcon /> Download Model (142 MB)
                 </button>
               )}
-            </div>
-          )}
-
-          {/* ── NEEDS SETUP — auto-download binary ── */}
-          {setupState === 'needs-setup' && recorderState === 'idle' && (
-            <div style={{ width: '100%', textAlign: 'left' }}>
-              <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', marginBottom: 20 }}>
-                <div style={{ color: 'var(--text-muted)', opacity: 0.5, flexShrink: 0, marginTop: 4 }}><MicIcon size={32} /></div>
-                <div>
-                  <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4 }}>
-                    Setting up transcription
-                  </div>
-                  <div style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.6 }}>
-                    Downloading the transcription engine (~5 MB). This only happens once.
-                  </div>
-                </div>
-              </div>
-              <div style={{ height: 6, background: 'var(--bg-surface)', borderRadius: 3, overflow: 'hidden', marginBottom: 8 }}>
-                <div style={{
-                  height: '100%', background: 'var(--accent)', borderRadius: 3,
-                  width: `${binaryDownloadPercent ?? 0}%`, transition: 'width 0.3s',
-                }} />
-              </div>
-              <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                {binaryDownloadPercent !== null ? `${binaryDownloadPercent}%` : 'Starting…'}
-              </div>
             </div>
           )}
 
