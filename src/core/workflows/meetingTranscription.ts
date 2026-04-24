@@ -5,7 +5,9 @@ export interface MeetingSynthesis {
   title: string;
   summary: string;
   decisions: string[];
-  actionItems: string[];
+  actionItems: string[];        // combined (for saved note)
+  myActionItems: string[];      // assigned to the speaker/recorder
+  othersActionItems: string[];  // assigned to other people
 }
 
 const SYNTHESIS_SYSTEM_PROMPT = `You are a meeting analyst. Given a meeting transcript, extract structured information.
@@ -20,10 +22,13 @@ Extract the following and return as JSON:
   "title": "A short title for this meeting (5-10 words)",
   "summary": "A 2-3 sentence summary of what was discussed",
   "decisions": ["Key decision made", "Another decision (may be empty array)"],
-  "actionItems": ["Owner: action item description", "Another action item"]
+  "myActionItems": ["action items assigned to the person speaking/recording (the 'Speaker', 'I', 'me', or 'you' — first-person perspective)"],
+  "othersActionItems": ["Name: action item — tasks assigned to other named people"]
 }
 
-If no clear decisions or action items exist, use empty arrays.`;
+If no clear decisions or action items exist, use empty arrays.
+For myActionItems: include anything the speaker committed to doing themselves.
+For othersActionItems: include tasks explicitly assigned to other named people.`;
 
 export async function synthesizeMeeting(
   transcript: string,
@@ -43,11 +48,15 @@ export async function synthesizeMeeting(
     // Strip potential markdown code fences
     const cleaned = response.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
     const parsed = JSON.parse(cleaned) as Partial<MeetingSynthesis>;
+    const myItems = Array.isArray(parsed.myActionItems) ? parsed.myActionItems : [];
+    const othersItems = Array.isArray(parsed.othersActionItems) ? parsed.othersActionItems : [];
     return {
       title: parsed.title || 'Meeting',
       summary: parsed.summary || '',
       decisions: Array.isArray(parsed.decisions) ? parsed.decisions : [],
-      actionItems: Array.isArray(parsed.actionItems) ? parsed.actionItems : [],
+      myActionItems: myItems,
+      othersActionItems: othersItems,
+      actionItems: [...myItems, ...othersItems],  // combined for saved note
     };
   } catch {
     // Fallback: return minimal structure
@@ -55,6 +64,8 @@ export async function synthesizeMeeting(
       title: 'Meeting',
       summary: transcript.slice(0, 200),
       decisions: [],
+      myActionItems: [],
+      othersActionItems: [],
       actionItems: [],
     };
   }
