@@ -124,7 +124,7 @@ export default function MeetingRecorder({ onOpenSettings }: Props) {
         setSetupState(hasKey ? 'ready' : 'needs-model');
       }
     } catch {
-      setSetupState('needs-setup');
+      setSetupState('needs-model');
     }
   }, []);
 
