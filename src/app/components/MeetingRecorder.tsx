@@ -258,7 +258,7 @@ export default function MeetingRecorder({ onOpenSettings }: Props) {
 
       if (res.ok) {
         setResult(res);
-        loadTasks(res.actionItems?.length ?? 0);
+        loadTasks(res.myActionItems?.length ?? 0);
         setRecorderState('done');
         loadMeetings();
       } else if (res.error === 'no_transcription_available') {
@@ -274,20 +274,21 @@ export default function MeetingRecorder({ onOpenSettings }: Props) {
     }
   };
 
-  const loadTasks = (actionItemCount = 0) => {
+  const loadTasks = (myItemCount = 0) => {
     window.keel.listTasks().then((groups) => {
       setTaskGroups(groups);
-      // Pre-select all action items — user deselects ones they don't want
-      setCheckedItems(new Set(Array.from({ length: actionItemCount }, (_, i) => i)));
+      // Pre-select all "my" action items — user deselects ones they don't want
+      setCheckedItems(new Set(Array.from({ length: myItemCount }, (_, i) => i)));
       setSelectedProject('tasks.md');
       setTasksAdded(false);
     }).catch(() => {});
   };
 
   const handleAddToTasks = async () => {
-    if (!result?.actionItems) return;
+    const items_source = result?.myActionItems ?? result?.actionItems;
+    if (!items_source) return;
     setAddingTasks(true);
-    const items = result.actionItems.filter((_, i) => checkedItems.has(i));
+    const items = items_source.filter((_, i) => checkedItems.has(i));
     for (const item of items) {
       try { await window.keel.createTask(selectedProject, item); } catch { /* continue */ }
     }
@@ -496,25 +497,26 @@ export default function MeetingRecorder({ onOpenSettings }: Props) {
                 </div>
               )}
 
-              {result.actionItems && result.actionItems.length > 0 && (
+              {/* My action items — with add-to-tasks */}
+              {result.myActionItems && result.myActionItems.length > 0 && (
                 <div style={{ marginBottom: 20 }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
                     <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
-                      Action Items
+                      My Action Items
                     </div>
                     <button
                       onClick={() => {
-                        const allSelected = checkedItems.size === result.actionItems!.length;
-                        setCheckedItems(allSelected ? new Set() : new Set(result.actionItems!.map((_, i) => i)));
+                        const allSelected = checkedItems.size === result.myActionItems!.length;
+                        setCheckedItems(allSelected ? new Set() : new Set(result.myActionItems!.map((_, i) => i)));
                         setTasksAdded(false);
                       }}
                       style={{ fontSize: 12, color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
                     >
-                      {checkedItems.size === result.actionItems.length ? 'Deselect all' : 'Select all'}
+                      {checkedItems.size === result.myActionItems.length ? 'Deselect all' : 'Select all'}
                     </button>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    {result.actionItems.map((item, i) => (
+                    {result.myActionItems.map((item, i) => (
                       <label key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer' }}>
                         <input
                           type="checkbox"
@@ -564,6 +566,43 @@ export default function MeetingRecorder({ onOpenSettings }: Props) {
                   {tasksAdded && (
                     <div style={{ marginTop: 10, fontSize: 13, color: '#22c55e' }}>✓ Tasks added</div>
                   )}
+                </div>
+              )}
+
+              {/* Others' action items — read-only, no add-to-tasks */}
+              {result.othersActionItems && result.othersActionItems.length > 0 && (
+                <div style={{ marginBottom: 20 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 10 }}>
+                    Others' Action Items
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {result.othersActionItems.map((item, i) => (
+                      <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                        <div style={{
+                          width: 15, height: 15, borderRadius: 3, border: '1.5px solid var(--border-subtle)',
+                          flexShrink: 0, marginTop: 3,
+                        }} />
+                        <span style={{ fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.5 }}>{item}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Fallback: show combined list if split wasn't available (older results) */}
+              {(!result.myActionItems && !result.othersActionItems) && result.actionItems && result.actionItems.length > 0 && (
+                <div style={{ marginBottom: 20 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 10 }}>
+                    Action Items
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {result.actionItems.map((item, i) => (
+                      <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                        <div style={{ width: 15, height: 15, borderRadius: 3, border: '1.5px solid var(--border-subtle)', flexShrink: 0, marginTop: 3 }} />
+                        <span style={{ fontSize: 14, color: 'var(--text-primary)', lineHeight: 1.5 }}>{item}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
 
