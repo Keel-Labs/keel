@@ -54,7 +54,7 @@ import {
 import { listAllTasks, toggleTask, moveTask, acceptIncomingTask, appendTask, createProject, renameProject, deleteProject } from '../src/core/tasks';
 import { capture } from '../src/core/workflows/capture';
 import { synthesizeMeeting, formatMeetingNote, formatDailyLogEntry } from '../src/core/workflows/meetingTranscription';
-import { isWhisperAvailable, getWhisperBinary, transcribeAudioBuffer, downloadWhisperBinary } from './transcriptionService';
+import { isWhisperAvailable, getWhisperBinary, transcribeAudioBuffer } from './transcriptionService';
 import { isModelDownloaded, getAvailableModels, downloadModel } from './modelManager';
 import { autoCapture } from '../src/core/workflows/autoCapture';
 import { dailyBrief } from '../src/core/workflows/dailyBrief';
@@ -1127,18 +1127,6 @@ function registerIpcHandlers() {
       modelDownloaded: isModelDownloaded('base.en'),
       models: getAvailableModels(),
     };
-  });
-
-  // Download the whisper-cli binary from the GitHub release (runtime, no Homebrew needed)
-  ipcMain.handle('keel:download-whisper-binary', async (event) => {
-    try {
-      await downloadWhisperBinary((percent) => {
-        event.sender.send('keel:binary-download-progress', { percent });
-      });
-      return { ok: true };
-    } catch (err) {
-      return { ok: false, error: err instanceof Error ? err.message : 'Download failed' };
-    }
   });
 
   // Download a whisper model with progress events
