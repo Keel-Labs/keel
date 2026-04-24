@@ -39,6 +39,7 @@ jobs:
           cmake -B build-x64 \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_OSX_ARCHITECTURES=x86_64 \
+            -DGGML_NATIVE=OFF \
             -DWHISPER_NO_AVX=ON \
             -DWHISPER_NO_AVX2=ON \
             -DWHISPER_NO_F16C=ON \
