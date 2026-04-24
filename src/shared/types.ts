@@ -390,6 +390,8 @@ export interface MeetingTranscriptionResult {
   title?: string;
   summary?: string;
   actionItems?: string[];
+  myActionItems?: string[];
+  othersActionItems?: string[];
   meetingPath?: string;
   error?: string;
 }
