@@ -34,7 +34,7 @@ export function getWhisperBinary(): string | null {
   // 1. Bundled inside .app (production)
   const bundledPath = app.isPackaged
     ? path.join(process.resourcesPath, 'whisper')
-    : path.join(__dirname, '../../resources/whisper')
+    : path.join(__dirname, '../../../resources/whisper')
   if (fs.existsSync(bundledPath)) return bundledPath
 
   // 2. Runtime downloaded to userData
@@ -189,12 +189,15 @@ export async function runWhisper(
     }
 
     // Write output to a temp JSON file so we get timestamps
+    // Use an explicit output file path — newer whisper.cpp writes to cwd by default,
+    // not next to the input file, so we must pass --output-file to pin the location.
     const jsonOut = wavPath.replace(/\.wav$/, '')  // whisper appends .json itself
 
     const args = [
       '-m', modelPath,
       '-f', wavPath,
       '--output-json',        // structured output with timestamps
+      '--output-file', jsonOut, // pin output location (whisper appends .json)
       '--print-progress',     // progress % on stderr
       '--language', 'en',
       '--threads', String(Math.min(os.cpus().length, 4)),
