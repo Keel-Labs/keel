@@ -70,6 +70,10 @@ Tasks live as markdown in your projects with a dedicated inbox view. Reminders a
 
 Connect Google Calendar and Google Docs to sync events, read documents directly into context, and export Keel's output to a Doc with one command.
 
+### X (Twitter) integration
+
+Sync your X bookmarks into a searchable wiki base, or publish posts directly from chat. Each bookmarked post becomes an indexed page with metadata (author, engagement metrics, timestamps). Perfect for building a personal archive of curated content or quick-sharing thoughts to X from Keel.
+
 ### Ships as a real desktop app
 
 Built on Electron, React, and TypeScript, Keel installs as a proper macOS app via a signed DMG.
@@ -96,6 +100,25 @@ Keel isn't tuned to a single role — it's tuned to the way people actually thin
 - **Parents, planners, and caregivers** keeping track of the hundred small things nobody else is going to remember.
 - **Tinkerers and researchers** building personal knowledge bases from messy source material.
 - **Anyone** who's tired of AI assistants with amnesia and wants a tool that learns their world and keeps it on their own machine.
+
+---
+
+## Integrations
+
+### Google Workspace
+- **Google Calendar:** Sync upcoming events into daily briefs and chat context
+- **Google Docs:** Read shared docs directly into context, export Keel output to Docs
+
+### X (Twitter)
+- **Bookmark Sync:** Pull all your bookmarked posts into a searchable wiki base with metadata (author, engagement metrics, timestamps)
+- **Post Publishing:** Publish thoughts directly to X from chat (up to 280 characters)
+- **Account Management:** Connect/disconnect your X account in Settings → Integrations
+
+**How to use:**
+1. Go to Settings → Integrations
+2. Click "Connect X Account" (one-time OAuth login)
+3. Once connected, click "Sync Bookmarks" to fetch your bookmarks into a wiki
+4. Or publish a post from chat using `window.keel.xPublishPost()`
 
 ---
 
