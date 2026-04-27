@@ -221,6 +221,10 @@ export default function App() {
   const handleOnboardingComplete = (settings: SettingsType) => {
     setInitialSettings(settings);
     setShowOnboarding(false);
+    // First-time users land on chat — they just briefed Keel; let them start talking to it
+    // instead of staring at empty dashboard widgets.
+    setDesktopView('chat');
+    setDesktopMode('chat');
   };
 
   const markSessionUnread = useCallback((sessionId: string) => {

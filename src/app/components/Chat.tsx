@@ -1286,16 +1286,7 @@ export default function Chat({
     return currentModel || 'OpenRouter';
   };
 
-  const getConversationTitle = (): string => {
-    const firstMeaningfulMessage = messages.find((message) => getUserVisibleMessageContent(message).trim().length > 0);
-    if (!firstMeaningfulMessage) return 'New chat';
-    const singleLine = getUserVisibleMessageContent(firstMeaningfulMessage).replace(/\s+/g, ' ').trim();
-    return singleLine.length > 56 ? `${singleLine.slice(0, 56)}...` : singleLine;
-  };
-
-  const conversationTitle = getConversationTitle();
   const isCommandMode = input.startsWith('/');
-  const showHeader = messages.length > 0 || isStreaming;
   const emptyStateGreeting = getTimeOfDayGreeting(userName);
   const filteredWikiBases = useMemo(() => {
     return filterWikiBases(wikiBases, wikiSearch);
@@ -1316,6 +1307,8 @@ export default function Chat({
     { command: '/reminders', description: 'List upcoming reminders' },
     { command: '/schedule', description: 'Create a calendar event' },
     { command: '/reset', description: 'Reset your profile' },
+    { command: '/create-kb', description: 'Build a knowledge base from a project' },
+    { command: '/refresh-kb', description: 'Re-ingest new files into a project KB' },
   ];
 
   const commandSuggestions = isCommandMode && !input.includes(' ')
@@ -1324,6 +1317,83 @@ export default function Chat({
 
   const [commandIndex, setCommandIndex] = useState(0);
   useEffect(() => { setCommandIndex(0); }, [input]);
+
+  // ── Voice input (whisper) ─────────────────────────────────────────────────
+  const [voiceState, setVoiceState] = useState<'idle' | 'recording' | 'transcribing'>('idle');
+  const [voiceError, setVoiceError] = useState<string | null>(null);
+  const voiceRecorderRef = useRef<MediaRecorder | null>(null);
+  const voiceChunksRef = useRef<Blob[]>([]);
+  const voiceStreamRef = useRef<MediaStream | null>(null);
+
+  const handleStopVoice = () => {
+    if (voiceRecorderRef.current && voiceRecorderRef.current.state !== 'inactive') {
+      voiceRecorderRef.current.stop();
+    }
+  };
+
+  const handleStartVoice = async () => {
+    if (voiceState !== 'idle') {
+      handleStopVoice();
+      return;
+    }
+    setVoiceError(null);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      voiceStreamRef.current = stream;
+      voiceChunksRef.current = [];
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : 'audio/webm';
+      const recorder = new MediaRecorder(stream, { mimeType });
+      voiceRecorderRef.current = recorder;
+
+      recorder.ondataavailable = (e) => { if (e.data.size > 0) voiceChunksRef.current.push(e.data); };
+      recorder.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop());
+        voiceStreamRef.current = null;
+        const blob = new Blob(voiceChunksRef.current, { type: mimeType });
+        if (blob.size === 0) {
+          setVoiceState('idle');
+          return;
+        }
+        setVoiceState('transcribing');
+        try {
+          const buffer = await blob.arrayBuffer();
+          const result = await window.keel.transcribeAudio(buffer);
+          if (result.ok) {
+            setInput((prev) => {
+              const trimmed = (prev || '').trimEnd();
+              const sep = trimmed.length > 0 ? ' ' : '';
+              return trimmed + sep + result.text;
+            });
+          } else if (result.error === 'no_transcription_available') {
+            setVoiceError('No transcription available. Install whisper or add an OpenAI key in Settings.');
+          } else {
+            setVoiceError(result.error || 'Transcription failed.');
+          }
+        } catch (err) {
+          setVoiceError(err instanceof Error ? err.message : 'Transcription failed.');
+        } finally {
+          setVoiceState('idle');
+        }
+      };
+
+      recorder.start(1000);
+      setVoiceState('recording');
+    } catch (err) {
+      setVoiceError(err instanceof Error ? err.message : 'Could not access microphone.');
+      setVoiceState('idle');
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      try {
+        if (voiceRecorderRef.current && voiceRecorderRef.current.state !== 'inactive') {
+          voiceRecorderRef.current.stop();
+        }
+      } catch { /* ignore */ }
+      voiceStreamRef.current?.getTracks().forEach((t) => t.stop());
+    };
+  }, []);
 
   const handleImageAttach = () => {
     closeActionMenu();
@@ -1636,6 +1706,76 @@ export default function Chat({
       return;
     }
 
+    if (trimmed === '/create-kb' || trimmed === '/refresh-kb') {
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: 'assistant',
+          content:
+            trimmed === '/create-kb'
+              ? '**Usage:** `/create-kb [project name]`\n\nExample: `/create-kb App Development`\n\nThis spins up a knowledge base from the files in that project folder.'
+              : '**Usage:** `/refresh-kb [project name]`\n\nExample: `/refresh-kb App Development`\n\nRe-ingests any new or modified files into the project\'s knowledge base.',
+          timestamp: Date.now(),
+        },
+      ]);
+      setIsStreaming(false);
+      return;
+    }
+
+    if (trimmed.startsWith('/create-kb ')) {
+      const projectName = trimmed.slice('/create-kb '.length).trim();
+      try {
+        const result = await window.keel.createProjectKb(projectName);
+        const lines = [
+          result.created
+            ? `**Knowledge base created** for *${projectName}* → \`knowledge-bases/${result.wikiBaseSlug}/\``
+            : `**Knowledge base already exists** for *${projectName}* → \`knowledge-bases/${result.wikiBaseSlug}/\``,
+          `Ingested ${result.added} file${result.added === 1 ? '' : 's'}, skipped ${result.skipped}.`,
+        ];
+        if (result.errors && result.errors.length > 0) {
+          lines.push('', '**Errors:**', ...result.errors.map((e) => `- ${e}`));
+        }
+        if (result.added > 0) {
+          lines.push('', '_Compiling synthesis in the background — open the wiki workspace to see the result._');
+        }
+        setMessages((prev) => [
+          ...prev,
+          { role: 'assistant', content: lines.join('\n'), timestamp: Date.now() },
+        ]);
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : 'create-kb failed';
+        setMessages((prev) => [...prev, { role: 'assistant', content: msg, timestamp: Date.now() }]);
+      }
+      setIsStreaming(false);
+      return;
+    }
+
+    if (trimmed.startsWith('/refresh-kb ')) {
+      const projectName = trimmed.slice('/refresh-kb '.length).trim();
+      try {
+        const result = await window.keel.refreshProjectKb(projectName);
+        const lines = [
+          `**Knowledge base refreshed** for *${projectName}* → \`knowledge-bases/${result.wikiBaseSlug}/\``,
+          `Added ${result.added}, skipped ${result.skipped} unchanged.`,
+        ];
+        if (result.errors && result.errors.length > 0) {
+          lines.push('', '**Errors:**', ...result.errors.map((e) => `- ${e}`));
+        }
+        if (result.added > 0) {
+          lines.push('', '_Recompiling synthesis in the background._');
+        }
+        setMessages((prev) => [
+          ...prev,
+          { role: 'assistant', content: lines.join('\n'), timestamp: Date.now() },
+        ]);
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : 'refresh-kb failed';
+        setMessages((prev) => [...prev, { role: 'assistant', content: msg, timestamp: Date.now() }]);
+      }
+      setIsStreaming(false);
+      return;
+    }
+
     if (trimmed === '/reset') {
       try {
         await window.keel.resetProfile();
@@ -1882,12 +2022,6 @@ export default function Chat({
 
   return (
     <div className="chat-pane">
-      {showHeader && (
-        <div className="chat-pane__header">
-          <div className="chat-pane__title">{conversationTitle}</div>
-        </div>
-      )}
-
       <div ref={scrollRef} className="chat-pane__scroll">
         <div className="chat-pane__content">
           {messages.length === 0 && !isStreaming && (
@@ -2117,6 +2251,36 @@ export default function Chat({
             className={isCommandMode ? 'chat-composer__textarea is-command' : 'chat-composer__textarea'}
           />
 
+          {(voiceState !== 'idle' || voiceError) && (
+            <div style={{
+              marginTop: 4,
+              fontSize: 11,
+              color: voiceError ? '#e35d5d' : 'var(--text-muted)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+            }}>
+              {voiceState === 'recording' && (
+                <>
+                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#e35d5d', display: 'inline-block', animation: 'pulse 1.2s infinite' }} />
+                  Recording… click the mic again to stop.
+                </>
+              )}
+              {voiceState === 'transcribing' && 'Transcribing…'}
+              {voiceState === 'idle' && voiceError && (
+                <>
+                  <span>{voiceError}</span>
+                  <button
+                    onClick={() => setVoiceError(null)}
+                    style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 11, padding: 0, marginLeft: 4 }}
+                  >
+                    dismiss
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+
           <div className="chat-composer__footer">
             <div className="chat-composer__meta">
               <div className="chat-composer__menu-wrap">
@@ -2309,6 +2473,38 @@ export default function Chat({
                   </>
                 )}
               </div>
+
+              <button
+                type="button"
+                onClick={handleStartVoice}
+                disabled={isStreaming || voiceState === 'transcribing'}
+                title={
+                  voiceState === 'recording'
+                    ? 'Stop recording'
+                    : voiceState === 'transcribing'
+                      ? 'Transcribing…'
+                      : 'Dictate (whisper)'
+                }
+                aria-label="Dictate message"
+                className="chat-composer__icon-button"
+                style={
+                  voiceState === 'recording'
+                    ? { color: '#e35d5d', borderColor: '#e35d5d', background: 'color-mix(in srgb, #e35d5d 14%, var(--control-bg))' }
+                    : undefined
+                }
+              >
+                {voiceState === 'transcribing' ? (
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                  </svg>
+                ) : (
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="9" y="2" width="6" height="12" rx="3" />
+                    <path d="M5 10v2a7 7 0 0 0 14 0v-2" />
+                    <line x1="12" y1="19" x2="12" y2="22" />
+                  </svg>
+                )}
+              </button>
 
               {isStreaming ? (
                 <button
