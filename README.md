@@ -1,178 +1,277 @@
 # Keel
 
-Keel is a desktop-first personal AI chief of staff built with Electron, React, and TypeScript. It keeps a local markdown workspace, assembles context from that workspace at chat time, supports wiki-style knowledge bases, and layers capture, reminders, Google integrations, and packaging workflows on top.
+**Your personal AI chief of staff.**
 
-This repository is in an active transition phase. The recent commit history matters:
+Keel is a desktop-first AI assistant that runs on your computer. It captures what matters from your conversations, organizes it into projects and wikis, and stays available through a fast chat interface powered by the AI model of your choice.
 
-- `74ddc4d` removed the old Fly.io server, mobile/Capacitor app, and cloud auth paths.
-- `102edf8`, `9e381ec`, `96d51be`, and `7b4cc90` introduced the current wiki workspace, source ingest, compile, and health-check flow.
-- `9827766`, `93d289d`, `a127c0c`, and `d2d03c4` tightened chat memory extraction, auto-capture, Google Doc export behavior, and response guardrails.
-- `3203c4c` added Mac DMG packaging support.
+---
 
-If you are contributing, treat Keel as a local desktop app first. Older specs may describe ideas that are still useful, but they are not always the implemented state.
+## The Core Idea: Your Context Is Yours. The Model Is Just a Tenant.
 
-## What Keel Does Today
+Most AI tools invert ownership. Your notes, your history, and the context that makes an assistant useful end up trapped inside someone else's product — tied to a specific model, a specific vendor, a specific subscription. The day that model gets deprecated or that company changes direction, your context goes with it.
 
-- Streams AI chat through a desktop Electron shell.
-- Stores user context in a local markdown "brain" outside the repo.
-- Persists chat sessions, reminders, file indexes, and search chunks in SQLite.
-- Uses hybrid retrieval: SQLite FTS is the baseline and LanceDB vector search is optional.
-- Supports multiple AI backends: Claude, OpenAI, OpenRouter, and Ollama.
-- Auto-captures substantial chat context back into the user's workspace.
-- Generates daily briefs and end-of-day summaries from the local workspace.
-- Supports local wiki bases with source ingest, compile, and health-check workflows.
-- Integrates with Google Calendar and Google Docs for sync, export, and document reads.
-- Packages the desktop app for macOS via `electron-builder`.
+Keel flips that. **You own your memories. You own your context.** It all lives on your machine, in plain markdown, in a folder you control. Your projects, your captures, your wikis, your daily logs — they're files, not database rows inside someone else's cloud.
 
-## Repository Map
+The model is the part that's interchangeable. Claude today, GPT tomorrow, a local Llama model on a flight, Ollama on your laptop when you want privacy — swap providers whenever you want. The assistant changes; your brain doesn't. Your context travels with you, provider to provider, year to year, machine to machine.
 
-| Path | Responsibility |
-| --- | --- |
-| `electron/` | Main-process app shell, IPC handlers, desktop integration, packaging entrypoints |
-| `src/app/` | React renderer, desktop shell UI, onboarding, settings, chat, wiki workspace |
-| `src/core/` | LLM client, storage, retrieval, workflows, wiki logic, connectors |
-| `src/shared/` | Shared TypeScript contracts between renderer and Electron |
-| `docs/` | Design guidance and durable reference docs |
-| `specs/` | Product specs plus current-state contributor docs |
-| `build/` | Packaging assets and entitlements |
-| `scripts/` | Small build helpers |
+**That's the promise:** one portable harness, any model you like, no lock-in.
 
-## Architecture In One Minute
+---
 
-1. The React renderer in `src/app/` renders the shell and calls `window.keel`.
-2. `electron/preload.ts` exposes that safe IPC bridge to the renderer.
-3. `electron/main.ts` owns app startup, windows, IPC handlers, scheduling, and workflow orchestration.
-4. `src/core/` implements the business logic:
-   - `llmClient.ts` chooses the active AI provider and falls back when needed.
-   - `contextAssembler.ts` builds the system prompt context from markdown files plus search.
-   - `fileManager.ts` owns the local brain and wiki filesystem structure.
-   - `db.ts`, `embeddings.ts`, and `vectorStore.ts` power indexing and retrieval.
-   - `workflows/` contains capture, memory extraction, wiki ingest/compile/health, daily brief, and EOD flows.
-5. User data lives outside the repo in the configured brain path, while settings live in a stable OS-specific config directory.
+## Why Keel
 
-## Local Data Model
+Most AI tools forget you the moment the tab closes. Keel remembers, because everything lives in a local folder you own, in human-readable markdown, indexed and searchable on your machine. No server round-trips for your notes, no vendor lock-in, no lost context.
 
-### Settings
+---
 
-- Stable config path:
-  - macOS: `~/Library/Application Support/Keel/settings.json`
-  - Windows: `%APPDATA%/Keel/settings.json`
-  - Linux: `$XDG_CONFIG_HOME/keel/settings.json`
-- Legacy compatibility copy: `<brainPath>/.config/settings.json`
-- Overrides:
-  - `KEEL_DEFAULT_BRAIN_PATH`
-  - `KEEL_CONFIG_DIR`
+## Core Features
 
-### Brain Workspace
+### A local-first "cortex" you fully own
 
-By default Keel creates a local workspace such as `~/Keel` with:
+Keel maintains a workspace on your own disk — typically `~/Keel` — made up of markdown files, project folders, daily logs, and knowledge bases. You can edit it in any editor, back it up yourself, and move it with you. Keel reads and writes it in the background as you work.
 
-```text
-keel.md
-tasks.md
-projects/
-daily-log/
-knowledge-bases/
-```
+### Context-aware chat
 
-Important substructures:
+Every chat draws on a system prompt assembled from your workspace: relevant project context, recent captures, tasks, and search hits. Ask about a project and Keel already knows who's involved, where you left off, and what's open.
 
-- `projects/*/context.md`: long-lived project context
-- `projects/*/tasks.md`: project task lists
-- `projects/captures/`: standalone captures
-- `daily-log/*.md`: daily brief and EOD output
-- `knowledge-bases/*/`: wiki bases with `raw/`, `wiki/`, `outputs/`, and `health/`
+### Multiple AI providers, your choice
 
-### Search And Persistence
+Keel speaks to Claude, OpenAI, OpenRouter, and local models via Ollama. Swap providers in settings; fall back automatically when one is unavailable. Use cloud models when you want power, local models when you want privacy.
 
-- SQLite database: `<brainPath>/.config/keel.db`
-- Optional LanceDB vector index: `<brainPath>/.config/lancedb`
-- Chat sessions and reminders are stored in SQLite, not in repo files.
+### Hybrid retrieval that actually works
+
+Keel combines SQLite full-text search with optional LanceDB vector search for semantic recall. Your files stay indexed and searchable the instant they change.
+
+### Auto-capture and memory extraction
+
+When a chat produces something worth keeping — decisions, facts about a project, new tasks — Keel quietly captures it back into your workspace so tomorrow's conversation starts with today's progress baked in.
+
+### Wiki workspaces
+
+Keel ships a first-class wiki experience for building and reading knowledge bases. Each base has a clean homepage, a navigable left rail, and a calm reading surface. Drop in source material, and Keel can ingest it, compile a structured wiki, and run health checks to flag stale or inconsistent pages.
+
+### Daily briefs and end-of-day summaries
+
+Keel generates a morning brief from your workspace and a wrap-up at the end of the day — pulling from your projects, tasks, and the day's captures.
+
+### Tasks and reminders
+
+Tasks live as markdown in your projects with a dedicated inbox view. Reminders and scheduled jobs run on your desktop so Keel can nudge you at the right moment.
+
+### Google integrations
+
+Connect Google Calendar and Google Docs to sync events, read documents directly into context, and export Keel's output to a Doc with one command.
+
+### Ships as a real desktop app
+
+Built on Electron, React, and TypeScript, Keel installs as a proper macOS app via a signed DMG.
+
+---
+
+## How It Works
+
+1. **Install** the desktop app and point Keel at a folder for your workspace.
+2. **Chat** — Keel streams responses while pulling in context from your markdown files, tasks, and wiki bases.
+3. **Capture** — substantial moments from chat flow back into your projects automatically.
+4. **Organize** — build wikis from source material, maintain tasks, and let Keel compile daily summaries.
+5. **Own your data** — every note stays on your machine, in plain markdown, forever portable.
+
+---
+
+## Who It's For
+
+Keel isn't tuned to a single role — it's tuned to the way people actually think. If you have a head full of context across work, home, side projects, reading, and everything in between, Keel is built for you. That includes:
+
+- **Professionals** tracking projects, meetings, and decisions across a dozen surfaces.
+- **Students and lifelong learners** organizing notes, sources, and what they're reading.
+- **Creatives and writers** collecting ideas before they evaporate.
+- **Parents, planners, and caregivers** keeping track of the hundred small things nobody else is going to remember.
+- **Tinkerers and researchers** building personal knowledge bases from messy source material.
+- **Anyone** who's tired of AI assistants with amnesia and wants a tool that learns their world and keeps it on their own machine.
+
+---
+
+## Status
+
+⚠️ **Keel is in active beta.** Core chat, wiki, and task features work. The system is stable on macOS. Some features (mobile, cloud sync) are planned but not yet shipped. [See the roadmap](./specs/README.md) for what's coming.
+
+---
 
 ## Getting Started
 
 ### Prerequisites
 
-- A recent Node.js and npm install
-- macOS desktop build tooling if you plan to package the app
+- Node.js 18+ and npm
+- macOS, Windows, or Linux desktop
+- ~500MB disk space for dependencies
 - Optional: Ollama if you want local chat or embedding support
 
-### Install
+### Install & Run
 
 ```bash
+git clone https://github.com/Keel-Labs/keel.git
+cd keel
 npm install
-```
-
-### Run The Desktop App In Development
-
-```bash
 npm run dev:electron
 ```
 
-This starts:
+This launches Keel in development mode. On first run, you'll choose a workspace location and configure an AI provider.
 
-- the Vite renderer dev server
-- the Electron TypeScript watcher
-- the Electron desktop shell
-
-### Common Commands
+### Build for Distribution
 
 ```bash
-npm test
-npm run build:desktop
-npm run dist:mac
+npm run dist:mac          # macOS DMG (requires macOS)
+npm run build:desktop     # Generic desktop build
 ```
 
-- `npm test`: runs the Vitest suite
-- `npm run build:desktop`: builds the renderer and Electron main process
-- `npm run dist:mac`: creates a macOS DMG build
+See [`build/`](./build) for packaging configuration and signing entitlements.
 
-## Where To Start When Changing Things
+---
 
-- Chat UI or desktop shell behavior:
-  - `src/app/App.tsx`
-  - `src/app/components/Chat.tsx`
-  - `src/app/components/Sidebar.tsx`
-  - `src/app/components/DesktopTopBar.tsx`
-- IPC surface or desktop integrations:
-  - `src/shared/types.ts`
-  - `electron/preload.ts`
-  - `electron/main.ts`
-- Settings and provider behavior:
-  - `src/app/components/Settings.tsx`
-  - `src/core/settings.ts`
-  - `src/core/llmClient.ts`
-- Retrieval, indexing, and memory behavior:
-  - `src/core/contextAssembler.ts`
-  - `src/core/db.ts`
-  - `src/core/embeddings.ts`
-  - `src/core/vectorStore.ts`
-  - `src/core/workflows/memoryExtract.ts`
-  - `src/core/workflows/autoCapture.ts`
-- Wiki features:
-  - `src/app/components/WikiWorkspace.tsx`
-  - `src/core/workflows/wikiBase.ts`
-  - `src/core/workflows/wikiIngest.ts`
-  - `src/core/workflows/wikiMaintenance.ts`
-- Google integrations:
-  - `src/core/connectors/googleAuth.ts`
-  - `src/core/connectors/googleCalendar.ts`
-  - `src/core/connectors/googleDocs.ts`
+## Repository Structure
 
-## Documentation Map
+| Path | Purpose |
+|------|---------|
+| `electron/` | Main process, IPC handlers, window management, packaging entry points |
+| `src/app/` | React renderer UI, desktop shell, chat, wiki, settings, onboarding |
+| `src/core/` | LLM client, storage, retrieval, workflows, wiki logic, integrations |
+| `src/shared/` | TypeScript contracts between renderer and main process |
+| `docs/` | Design guidance and UI style reference |
+| `specs/` | Product specs and contributor playbooks |
+| `build/` | Packaging assets, app icons, entitlements |
 
-- [`AGENTS.md`](./AGENTS.md): repo operating rules and branch discipline
-- [`CONTRIBUTING.md`](./CONTRIBUTING.md): codebase-specific contributor guidance
-- [`specs/README.md`](./specs/README.md): specs index with active vs archived docs
-- [`specs/repository-architecture.md`](./specs/repository-architecture.md): current runtime and storage map
-- [`specs/contributor-playbook.md`](./specs/contributor-playbook.md): change recipes and repo-specific gotchas
-- [`specs/recent-product-evolution.md`](./specs/recent-product-evolution.md): commit-log-based repository timeline
-- [`docs/UI_STYLE_GUIDE.md`](./docs/UI_STYLE_GUIDE.md): current UI styling reference
+---
 
-## Notes For Codex And Other Agents
+## Architecture In One Minute
 
-- Assume desktop-first behavior unless a spec explicitly says otherwise.
-- Treat `specs/cloud-mobile-architecture.md` as historical reference, not current implementation.
-- When you change IPC, update the shared type, preload bridge, main-process handler, and renderer callers together.
-- When you change wiki behavior, preserve the distinction between `raw/` source packages and generated wiki/output files.
-- When you change retrieval, remember SQLite FTS is the reliable baseline and LanceDB may be unavailable on some setups.
+1. The React renderer (`src/app/`) calls `window.keel` — a safe IPC bridge exposed by `electron/preload.ts`.
+2. `electron/main.ts` owns the Electron shell, IPC handlers, scheduler, and workflow orchestration.
+3. `src/core/` implements the business logic:
+   - `llmClient.ts` chooses the active AI provider and handles fallbacks.
+   - `contextAssembler.ts` builds the system prompt from markdown files, tasks, and search results.
+   - `fileManager.ts` manages the local brain and wiki filesystem.
+   - `db.ts`, `embeddings.ts`, and `vectorStore.ts` handle indexing and retrieval.
+   - `workflows/` contains capture, memory extraction, wiki ingest/compile, daily briefs, and end-of-day summaries.
+4. User data lives outside the repo in the configured workspace path. Settings live in an OS-specific config directory.
+
+---
+
+## Data Model
+
+### Settings
+
+- **macOS:** `~/Library/Application Support/Keel/settings.json`
+- **Windows:** `%APPDATA%/Keel/settings.json`
+- **Linux:** `$XDG_CONFIG_HOME/keel/settings.json`
+
+Override with:
+- `KEEL_DEFAULT_BRAIN_PATH` — workspace location
+- `KEEL_CONFIG_DIR` — config directory
+
+### Brain Workspace
+
+By default, Keel creates `~/Keel` with:
+
+```
+keel.md                    # Home page
+tasks.md                   # Global task list
+projects/                  # Project folders
+  {slug}/
+    context.md             # Project context
+    tasks.md               # Project task list
+    .keel-kb.json          # Project knowledge base metadata
+daily-log/                 # Daily briefs and summaries
+knowledge-bases/           # Wiki bases
+  {slug}/
+    raw/                   # Source material
+    wiki/                  # Generated pages
+    outputs/               # Compiled outputs
+    health/                # Health check reports
+```
+
+### Storage & Indexing
+
+- **Chat sessions & reminders:** SQLite (`<workspace>/.config/keel.db`)
+- **Full-text search:** SQLite FTS (baseline)
+- **Vector search:** Optional LanceDB (`<workspace>/.config/lancedb`)
+
+---
+
+## For Contributors
+
+### Running Tests
+
+```bash
+npm test                   # Run Vitest suite once
+npm run test:watch        # Watch mode
+```
+
+### Key Files When Making Changes
+
+**Chat & Desktop UI:**
+- `src/app/App.tsx`
+- `src/app/components/Chat.tsx`
+- `src/app/components/Sidebar.tsx`
+
+**IPC & Desktop Integration:**
+- `src/shared/types.ts`
+- `electron/preload.ts`
+- `electron/main.ts`
+
+**Settings & Providers:**
+- `src/app/components/Settings.tsx`
+- `src/core/llmClient.ts`
+
+**Retrieval & Memory:**
+- `src/core/contextAssembler.ts`
+- `src/core/db.ts`
+- `src/core/workflows/memoryExtract.ts`
+
+**Wiki Features:**
+- `src/app/components/WikiWorkspace.tsx`
+- `src/core/workflows/wikiIngest.ts`
+- `src/core/workflows/wikiMaintenance.ts`
+
+**Google Integrations:**
+- `src/core/connectors/googleAuth.ts`
+- `src/core/connectors/googleCalendar.ts`
+
+---
+
+## Documentation
+
+- [**CONTRIBUTING.md**](./CONTRIBUTING.md) — Code style, branch discipline, and PR process
+- [**Code of Conduct**](./CODE_OF_CONDUCT.md) — Community expectations
+- [**docs/UI_STYLE_GUIDE.md**](./docs/UI_STYLE_GUIDE.md) — Typography, spacing, colors
+- [**specs/repository-architecture.md**](./specs/repository-architecture.md) — Detailed runtime map
+- [**specs/contributor-playbook.md**](./specs/contributor-playbook.md) — Common change recipes
+
+---
+
+## Privacy & Legal
+
+- [**Privacy Policy**](./PRIVACY.md) — How Keel handles your data
+- [**Terms of Service**](./TERMS.md) — Usage and liability terms
+
+---
+
+## Support & Feedback
+
+- **Report a bug** or **request a feature:** [Fider board](https://keel.fider.io)
+- **Questions?** Open an issue or reach out on GitHub
+
+---
+
+## License
+
+MIT. See [LICENSE](./LICENSE) for full details.
+
+---
+
+## Notes for Agents and Contributors
+
+- Assume desktop-first behavior unless explicitly stated otherwise.
+- IPC changes must update: `src/shared/types.ts` → `electron/preload.ts` → `electron/main.ts` → renderer callers.
+- When changing wiki behavior, preserve the distinction between `raw/` sources and generated `wiki/` outputs.
+- SQLite FTS is the reliable baseline for search; LanceDB is optional and may not be available.
+- The local brain path (`~/Keel` by default) is user-owned and should never be modified without explicit intent.
