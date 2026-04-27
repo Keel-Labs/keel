@@ -38,6 +38,14 @@ Every chat draws on a system prompt assembled from your workspace: relevant proj
 
 Keel speaks to Claude, OpenAI, OpenRouter, and local models via Ollama. Swap providers in settings; fall back automatically when one is unavailable. Use cloud models when you want power, local models when you want privacy.
 
+### Voice input to chat
+
+Speak instead of type. Keel transcribes audio directly into your chat using local Whisper or OpenAI's API (your choice). Perfect for quick thoughts, hands-free operation, or when the keyboard is too slow.
+
+### Per-project knowledge bases
+
+Turn any project folder into a queryable knowledge base with `/create-kb` and `/refresh-kb` slash commands. Keel automatically ingests markdown, PDFs, and other source material, compiles them into a structured wiki, and keeps it in sync as files change.
+
 ### Hybrid retrieval that actually works
 
 Keel combines SQLite full-text search with optional LanceDB vector search for semantic recall. Your files stay indexed and searchable the instant they change.
