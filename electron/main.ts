@@ -63,6 +63,12 @@ import { extractAndSaveMemory } from '../src/core/workflows/memoryExtract';
 import { extractFileSource, ingestWikiSource } from '../src/core/workflows/wikiIngest';
 import { createWikiBase } from '../src/core/workflows/wikiBase';
 import { compileWikiBase, runWikiHealthCheck } from '../src/core/workflows/wikiMaintenance';
+import {
+  ensureProjectKB,
+  refreshProjectKB,
+  getProjectKBStatus,
+  resolveProjectSlugByName,
+} from '../src/core/workflows/projectKnowledgeBase';
 import { listWikiBaseSummaries } from '../src/core/wikiBaseSummaries';
 import { assembleWikiChatContext } from '../src/core/wikiChatContext';
 import {
@@ -823,6 +829,10 @@ function registerIpcHandlers() {
     return loadSettings();
   });
 
+  ipcMain.handle('keel:get-app-version', () => {
+    return app.getVersion();
+  });
+
   ipcMain.handle('keel:save-settings', async (_event, newSettings: Settings) => {
     saveSettingsToFile(newSettings);
     Object.assign(settings, newSettings);
@@ -1141,6 +1151,33 @@ function registerIpcHandlers() {
     }
   });
 
+  // Lightweight transcribe — returns raw text only. Used by the chat mic button.
+  ipcMain.handle('keel:transcribe-audio', async (_event, audioBuffer: ArrayBuffer) => {
+    try {
+      if (isWhisperAvailable() && isModelDownloaded('base.en')) {
+        const text = await transcribeAudioBuffer(audioBuffer, 'base.en', () => {});
+        return { ok: true, text: (text || '').trim() };
+      }
+      if (settings.openaiApiKey) {
+        const tmpPath = path.join(os.tmpdir(), `keel-voice-${Date.now()}.webm`);
+        try {
+          fs.writeFileSync(tmpPath, Buffer.from(audioBuffer));
+          const openaiClient = new OpenAI({ apiKey: settings.openaiApiKey, fetch: getElectronAwareFetch() });
+          const result = await openaiClient.audio.transcriptions.create({
+            file: await toFile(fs.createReadStream(tmpPath), 'voice.webm', { type: 'audio/webm' }),
+            model: 'whisper-1',
+          });
+          return { ok: true, text: (result.text || '').trim() };
+        } finally {
+          try { fs.unlinkSync(tmpPath); } catch { /* ignore */ }
+        }
+      }
+      return { ok: false, error: 'no_transcription_available' };
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : 'Transcription failed' };
+    }
+  });
+
   ipcMain.handle('keel:transcribe-meeting', async (event, audioBuffer: ArrayBuffer) => {
     const brainPath = fileManager.getBrainPath();
     let transcript = '';
@@ -1337,6 +1374,203 @@ function registerIpcHandlers() {
     });
     if (result.canceled || result.filePaths.length === 0) return null;
     return result.filePaths[0];
+  });
+
+  ipcMain.handle('keel:scan-folder', async (_event, folderPath: string) => {
+    const PARA_NAMES = new Set(['projects', 'areas', 'resources', 'archive']);
+    const KEEL_FILES = new Set(['keel.md', 'tasks.md', '.keel']);
+    try {
+      const stat = await fs.promises.stat(folderPath).catch(() => null);
+      if (!stat || !stat.isDirectory()) {
+        return {
+          exists: false,
+          isEmpty: true,
+          fileCount: 0,
+          dirCount: 0,
+          topLevel: [],
+          hasParaDirs: false,
+          hasKeelFiles: false,
+        };
+      }
+      const entries = await fs.promises.readdir(folderPath, { withFileTypes: true });
+      const topLevel = entries.map((e) => ({
+        name: e.name,
+        isDir: e.isDirectory(),
+        isHidden: e.name.startsWith('.'),
+      }));
+      const visible = topLevel.filter((e) => !e.isHidden);
+      const fileCount = visible.filter((e) => !e.isDir).length;
+      const dirCount = visible.filter((e) => e.isDir).length;
+      const lowerNames = new Set(visible.map((e) => e.name.toLowerCase()));
+      const hasParaDirs = ['projects', 'areas', 'resources', 'archive'].every((n) =>
+        lowerNames.has(n),
+      );
+      const hasKeelFiles = topLevel.some((e) => KEEL_FILES.has(e.name));
+      // Sort dirs first, then alphabetical, cap displayed list at 50
+      const sorted = topLevel
+        .filter((e) => !e.isHidden)
+        .sort((a, b) => {
+          if (a.isDir !== b.isDir) return a.isDir ? -1 : 1;
+          return a.name.localeCompare(b.name);
+        })
+        .slice(0, 50);
+      return {
+        exists: true,
+        isEmpty: visible.length === 0,
+        fileCount,
+        dirCount,
+        topLevel: sorted,
+        hasParaDirs,
+        hasKeelFiles,
+      };
+    } catch (error) {
+      return {
+        exists: false,
+        isEmpty: true,
+        fileCount: 0,
+        dirCount: 0,
+        topLevel: [],
+        hasParaDirs: false,
+        hasKeelFiles: false,
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+  });
+
+  ipcMain.handle('keel:pick-files', async () => {
+    const result = await dialog.showOpenDialog(mainWindow!, {
+      title: 'Choose Documents',
+      properties: ['openFile', 'multiSelections'],
+      filters: [
+        { name: 'Supported Documents', extensions: ['md', 'markdown', 'txt', 'pdf', 'docx', 'pptx'] },
+      ],
+    });
+    if (result.canceled || result.filePaths.length === 0) return [];
+    return result.filePaths;
+  });
+
+  ipcMain.handle('keel:onboarding-ingest', async (_event, input: {
+    name: string;
+    role: string;
+    projects: Array<{ name: string; description: string; docRefs: string[] }>;
+    people: string;
+    context: string;
+  }) => {
+    const result = {
+      projectsCreated: 0,
+      docsFetched: 0,
+      docsFailed: [] as Array<{ ref: string; error: string }>,
+    };
+
+    // Ensure brain dirs exist before any writes
+    await fileManager.ensureDirectoryStructure();
+
+    // 1. Write keel.md profile
+    const lines: string[] = ['# About Me', ''];
+    if (input.name) lines.push(`- **Name:** ${input.name}`);
+    if (input.role) lines.push(`- **Role:** ${input.role}`);
+    lines.push('');
+
+    if (input.projects.length > 0) {
+      lines.push('## Active Projects', '');
+      for (const p of input.projects) {
+        if (!p.name.trim()) continue;
+        lines.push(`- **${p.name.trim()}**${p.description.trim() ? ` — ${p.description.trim()}` : ''}`);
+      }
+      lines.push('');
+    }
+
+    const peopleLines = input.people.split('\n').map((l) => l.trim()).filter(Boolean);
+    if (peopleLines.length > 0) {
+      lines.push('## Key People', '');
+      for (const person of peopleLines) {
+        lines.push(`- ${person}`);
+      }
+      lines.push('');
+    }
+
+    if (input.context.trim()) {
+      lines.push('## Context', '', input.context.trim(), '');
+    }
+
+    lines.push('## Priorities', '');
+
+    try {
+      await fileManager.writeFile('keel.md', lines.join('\n'));
+    } catch (err) {
+      // Non-fatal — continue
+    }
+
+    // 2. Create each project + ingest doc refs
+    const googleConfig = (GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET)
+      ? { clientId: GOOGLE_CLIENT_ID, clientSecret: GOOGLE_CLIENT_SECRET, scopes: GOOGLE_SCOPES }
+      : null;
+    const googleAvailable = googleConfig != null && isGoogleConnected(fileManager.getBrainPath());
+
+    for (const project of input.projects) {
+      const projectName = project.name.trim();
+      if (!projectName) continue;
+      try {
+        const slug = await createProject(fileManager, projectName);
+        result.projectsCreated++;
+
+        const contextPath = `projects/${slug}/context.md`;
+        const sections: string[] = [];
+
+        // Re-read existing context.md created by createProject and replace placeholder
+        const header = `# ${projectName}\n`;
+        const descBlock = project.description.trim()
+          ? `\n${project.description.trim()}\n`
+          : '\nProject context and notes.\n';
+        sections.push(header + descBlock);
+
+        // Fetch each doc ref
+        for (const rawRef of project.docRefs) {
+          const ref = rawRef.trim();
+          if (!ref) continue;
+
+          try {
+            // Google Doc URL?
+            const docId = extractDocId(ref);
+            if (docId) {
+              if (!googleAvailable) {
+                result.docsFailed.push({ ref, error: 'Google not connected. Connect Google in Settings to import Docs.' });
+                continue;
+              }
+              const { title, content } = await readGoogleDoc(fileManager.getBrainPath(), googleConfig!, docId);
+              const truncated = content.slice(0, 50000);
+              sections.push(`\n## Source: ${title}\n\n_Imported from Google Doc: ${ref}_\n\n${truncated}\n`);
+              result.docsFetched++;
+              continue;
+            }
+
+            // Local file path?
+            if (ref.startsWith('/') || ref.startsWith('~')) {
+              const expanded = ref.startsWith('~') ? path.join(os.homedir(), ref.slice(1)) : ref;
+              const extracted = await extractFileSource(expanded, path.basename(expanded));
+              const truncated = extracted.normalizedContent.slice(0, 50000);
+              sections.push(`\n## Source: ${extracted.title}\n\n_Imported from: ${ref}_\n\n${truncated}\n`);
+              result.docsFetched++;
+              continue;
+            }
+
+            // Unknown ref type
+            result.docsFailed.push({ ref, error: 'Unrecognized link. Use a Google Doc URL or local file path.' });
+          } catch (err) {
+            result.docsFailed.push({
+              ref,
+              error: err instanceof Error ? err.message : String(err),
+            });
+          }
+        }
+
+        await fileManager.writeFile(contextPath, sections.join(''));
+      } catch (err) {
+        // Skip this project on error, continue with rest
+      }
+    }
+
+    return result;
   });
 
   ipcMain.handle('keel:pick-chat-documents', async () => {
@@ -1560,6 +1794,61 @@ function registerIpcHandlers() {
 
   ipcMain.handle('keel:list-wiki-bases', async () => {
     return listWikiBaseSummaries(settings.brainPath);
+  });
+
+  // --- Project Knowledge Base ---
+  const resolveProjectSlugOrThrow = async (input: string): Promise<string> => {
+    const slug = await resolveProjectSlugByName(input, fileManager);
+    if (!slug) {
+      throw new Error(`No project matched "${input}". Check the project name.`);
+    }
+    return slug;
+  };
+
+  const compileProjectKbInBackground = (wikiBaseSlug: string) => {
+    const basePath = `knowledge-bases/${wikiBaseSlug}`;
+    const job = createWikiJob('compile', basePath, 'Compiling project knowledge base.');
+    void (async () => {
+      updateWikiJob(job.id, { status: 'running', detail: 'Compiling wiki pages and synthesis outputs.' });
+      try {
+        const compileResult = await compileWikiBase(basePath, fileManager, llmClient);
+        updateWikiJob(job.id, {
+          status: 'completed',
+          detail: compileResult.message,
+          finishedAt: Date.now(),
+          outputPath: compileResult.synthesisPath,
+        });
+        logActivity(settings.brainPath, 'wiki-compile', `${basePath} -> ${compileResult.synthesisPath}`);
+      } catch (error) {
+        updateWikiJob(job.id, {
+          status: 'failed',
+          detail: 'Project KB compile failed.',
+          finishedAt: Date.now(),
+          error: error instanceof Error ? error.message : 'Unknown compile error',
+        });
+      }
+    })();
+  };
+
+  ipcMain.handle('keel:project-kb-status', async (_event, projectInput: string) => {
+    const slug = await resolveProjectSlugOrThrow(projectInput);
+    return getProjectKBStatus(slug, fileManager);
+  });
+
+  ipcMain.handle('keel:project-kb-create', async (_event, projectInput: string) => {
+    const slug = await resolveProjectSlugOrThrow(projectInput);
+    const result = await ensureProjectKB(slug, fileManager);
+    logActivity(settings.brainPath, 'project-kb-create', `${slug} -> knowledge-bases/${result.wikiBaseSlug}`);
+    if (result.added > 0) compileProjectKbInBackground(result.wikiBaseSlug);
+    return { ...result, projectSlug: slug };
+  });
+
+  ipcMain.handle('keel:project-kb-refresh', async (_event, projectInput: string) => {
+    const slug = await resolveProjectSlugOrThrow(projectInput);
+    const result = await refreshProjectKB(slug, fileManager);
+    logActivity(settings.brainPath, 'project-kb-refresh', `${slug} +${result.added} ~${result.skipped}`);
+    if (result.added > 0) compileProjectKbInBackground(result.wikiBaseSlug);
+    return { ...result, projectSlug: slug };
   });
 
   ipcMain.handle('keel:list-files', async (_event, dirPath: string) => {

@@ -40,6 +40,8 @@ const api: KeelAPI = {
 
   getSettings: () => ipcRenderer.invoke('keel:get-settings'),
 
+  getAppVersion: () => ipcRenderer.invoke('keel:get-app-version'),
+
   saveSettings: (settings) => ipcRenderer.invoke('keel:save-settings', settings),
 
   ensureBrain: () => ipcRenderer.invoke('keel:ensure-brain'),
@@ -63,6 +65,9 @@ const api: KeelAPI = {
   listSessions: () => ipcRenderer.invoke('keel:list-sessions'),
 
   pickFolder: (defaultPath?: string) => ipcRenderer.invoke('keel:pick-folder', defaultPath),
+  scanFolder: (folderPath: string) => ipcRenderer.invoke('keel:scan-folder', folderPath),
+  onboardingIngest: (input) => ipcRenderer.invoke('keel:onboarding-ingest', input),
+  pickFiles: () => ipcRenderer.invoke('keel:pick-files'),
   pickChatDocuments: () => ipcRenderer.invoke('keel:pick-chat-documents'),
   pickWikiFiles: () => ipcRenderer.invoke('keel:pick-wiki-files'),
   createWikiBase: (title, description) => ipcRenderer.invoke('keel:create-wiki-base', title, description),
@@ -81,6 +86,9 @@ const api: KeelAPI = {
   startWikiHealthCheck: (basePath) => ipcRenderer.invoke('keel:start-wiki-health-check', basePath),
   listWikiJobs: (basePath) => ipcRenderer.invoke('keel:list-wiki-jobs', basePath),
   listWikiBases: () => ipcRenderer.invoke('keel:list-wiki-bases'),
+  getProjectKbStatus: (projectSlug: string) => ipcRenderer.invoke('keel:project-kb-status', projectSlug),
+  createProjectKb: (projectName: string) => ipcRenderer.invoke('keel:project-kb-create', projectName),
+  refreshProjectKb: (projectName: string) => ipcRenderer.invoke('keel:project-kb-refresh', projectName),
 
   onScheduledNotification: (callback) => {
     ipcRenderer.on('keel:scheduled-notification', (_event, notification) => callback(notification));
@@ -162,6 +170,7 @@ const api: KeelAPI = {
   // Meeting Transcription
   synthesizeMeeting: (transcript: string) => ipcRenderer.invoke('keel:synthesize-meeting', transcript),
   transcribeMeeting: (audioBuffer: ArrayBuffer) => ipcRenderer.invoke('keel:transcribe-meeting', audioBuffer),
+  transcribeAudio: (audioBuffer: ArrayBuffer) => ipcRenderer.invoke('keel:transcribe-audio', audioBuffer),
   onMeetingProgress: (callback: (payload: { step: string }) => void) => {
     const handler = (_event: Electron.IpcRendererEvent, payload: { step: string }) => callback(payload);
     ipcRenderer.on('keel:meeting-progress', handler);

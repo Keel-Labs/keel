@@ -127,6 +127,27 @@ export interface WikiSourceInput {
   xText?: string;
 }
 
+export interface ProjectKBManifest {
+  wikiBaseSlug: string;
+  lastRefreshed: number;
+  ingestedFiles: { path: string; mtime: number }[];
+}
+
+export interface ProjectKBStatus {
+  hasKB: boolean;
+  wikiBaseSlug?: string;
+  lastRefreshed?: number;
+  ingestedCount?: number;
+}
+
+export interface ProjectKBRefreshResult {
+  wikiBaseSlug: string;
+  added: number;
+  skipped: number;
+  errors?: string[];
+  created?: boolean;
+}
+
 export interface WikiIngestResult {
   sourceSlug: string;
   title: string;
@@ -327,6 +348,9 @@ export type IpcChannels =
   | 'keel:read-file'
   | 'keel:write-file'
   | 'keel:pick-folder'
+  | 'keel:scan-folder'
+  | 'keel:onboarding-ingest'
+  | 'keel:pick-files'
   | 'keel:pick-chat-documents'
   | 'keel:pick-wiki-files'
   | 'keel:create-wiki-base'
@@ -409,6 +433,37 @@ export interface WhisperStatus {
   models: Array<{ id: string; downloaded: boolean; sizeMb: number }>;
 }
 
+export interface OnboardingProjectInput {
+  name: string;
+  description: string;
+  docRefs: string[]; // URLs (Google Docs) or local file paths
+}
+
+export interface OnboardingIngestInput {
+  name: string;
+  role: string;
+  projects: OnboardingProjectInput[];
+  people: string; // free-form, one per line
+  context: string; // free-text "anything else"
+}
+
+export interface OnboardingIngestResult {
+  projectsCreated: number;
+  docsFetched: number;
+  docsFailed: Array<{ ref: string; error: string }>;
+}
+
+export interface ScanFolderResult {
+  exists: boolean;
+  isEmpty: boolean;
+  fileCount: number;
+  dirCount: number;
+  topLevel: Array<{ name: string; isDir: boolean; isHidden: boolean }>;
+  hasParaDirs: boolean;
+  hasKeelFiles: boolean;
+  error?: string;
+}
+
 // Preload API exposed to renderer
 export interface KeelAPI {
   cancelStream: (requestId: string) => Promise<void>;
@@ -420,6 +475,7 @@ export interface KeelAPI {
   onThinkingStep: (callback: (event: { requestId: string; step: string }) => void) => () => void;
   onThinkingDelta: (callback: (event: { requestId: string; text: string }) => void) => () => void;
   getSettings: () => Promise<Settings>;
+  getAppVersion: () => Promise<string>;
   saveSettings: (settings: Settings) => Promise<void>;
   ensureBrain: () => Promise<void>;
   capture: (input: string) => Promise<string>;
@@ -432,6 +488,9 @@ export interface KeelAPI {
   getLatestSession: () => Promise<string | null>;
   listSessions: () => Promise<Array<{ id: string; title: string; updatedAt: number }>>;
   pickFolder: (defaultPath?: string) => Promise<string | null>;
+  scanFolder: (folderPath: string) => Promise<ScanFolderResult>;
+  onboardingIngest: (input: OnboardingIngestInput) => Promise<OnboardingIngestResult>;
+  pickFiles: () => Promise<string[]>;
   pickChatDocuments: () => Promise<ChatDocumentAttachment[]>;
   pickWikiFiles: () => Promise<WikiFileImport[]>;
   createWikiBase: (title: string, description?: string) => Promise<WikiBaseCreateResult>;
@@ -447,6 +506,9 @@ export interface KeelAPI {
   startWikiHealthCheck: (basePath: string) => Promise<WikiJob>;
   listWikiJobs: (basePath?: string) => Promise<WikiJob[]>;
   listWikiBases: () => Promise<WikiBaseSummary[]>;
+  getProjectKbStatus: (projectSlug: string) => Promise<ProjectKBStatus>;
+  createProjectKb: (projectName: string) => Promise<ProjectKBRefreshResult & { projectSlug: string }>;
+  refreshProjectKb: (projectName: string) => Promise<ProjectKBRefreshResult & { projectSlug: string }>;
   onScheduledNotification: (callback: (notification: ScheduledNotification) => void) => void;
   removeScheduledNotificationListener: () => void;
   onAutoCaptureDone: (callback: (event: { requestId: string; summary: string }) => void) => () => void;
@@ -498,6 +560,7 @@ export interface KeelAPI {
   getDailyQuote: () => Promise<{ text: string; author: string }>;
   // Meeting Transcription
   transcribeMeeting: (audioBuffer: ArrayBuffer) => Promise<MeetingTranscriptionResult>;
+  transcribeAudio: (audioBuffer: ArrayBuffer) => Promise<{ ok: true; text: string } | { ok: false; error: string }>;
   synthesizeMeeting: (transcript: string) => Promise<MeetingTranscriptionResult>;
   onMeetingProgress: (callback: (payload: { step: string }) => void) => () => void;
   onTranscriptionProgress: (callback: (payload: { percent: number }) => void) => () => void;

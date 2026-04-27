@@ -10,6 +10,7 @@ import type {
 } from '../../shared/types';
 import { applyTheme } from '../theme';
 import { BUILT_IN_PERSONALITIES } from '../../core/personalities';
+import { BetaBadge } from './BetaBadge';
 
 const isElectron = typeof window !== 'undefined' && !!(window as any).keelMigrate;
 
@@ -51,7 +52,8 @@ export type SettingsSectionId =
   | 'general-personality'
   | 'general-scheduled-jobs'
   | 'ai-setup'
-  | 'integrations';
+  | 'integrations'
+  | 'help-feedback';
 
 const SETTINGS_SECTION_IDS: SettingsSectionId[] = [
   'general-personal',
@@ -59,6 +61,7 @@ const SETTINGS_SECTION_IDS: SettingsSectionId[] = [
   'general-scheduled-jobs',
   'ai-setup',
   'integrations',
+  'help-feedback',
 ];
 
 const SECTION_META: Record<SettingsSectionId, { title: string; description: string }> = {
@@ -82,6 +85,10 @@ const SECTION_META: Record<SettingsSectionId, { title: string; description: stri
     title: 'Integrations',
     description: 'Connect external services to sync data and extend what Keel can do.',
   },
+  'help-feedback': {
+    title: 'Help & Feedback',
+    description: 'Keel is in beta. We read every request and bug report.',
+  },
 };
 
 const NAV_ITEMS: Array<{ id: SettingsSectionId; label: string }> = [
@@ -90,7 +97,11 @@ const NAV_ITEMS: Array<{ id: SettingsSectionId; label: string }> = [
   { id: 'general-scheduled-jobs', label: 'Scheduled Jobs' },
   { id: 'ai-setup', label: 'Model' },
   { id: 'integrations', label: 'Integrations' },
+  { id: 'help-feedback', label: 'Help & Feedback' },
 ];
+
+// Feedback destination
+const FEEDBACK_BOARD_URL = 'https://keel.fider.io';
 
 const TIMEZONES = [
   'America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles',
@@ -170,6 +181,7 @@ export default function Settings({ onBack, navigation }: Props) {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [showApiKey, setShowApiKey] = useState<Record<string, boolean>>({});
+  const [appVersion, setAppVersion] = useState<string>('');
   const [googleConnected, setGoogleConnected] = useState(false);
   const [googleConfigured, setGoogleConfigured] = useState(false);
   const [googleSyncing, setGoogleSyncing] = useState(false);
@@ -245,6 +257,7 @@ export default function Settings({ onBack, navigation }: Props) {
       setGoogleConfigured(s.configured ?? false);
     }).catch(() => {});
     refreshXStatus().catch(() => {});
+    window.keel.getAppVersion?.().then(setAppVersion).catch(() => {});
   }, [fetchOllamaModels, fetchOpenAIModels, refreshXStatus]);
 
   useEffect(() => {
@@ -635,6 +648,50 @@ export default function Settings({ onBack, navigation }: Props) {
           <InlineNote>
             Install a model with <code style={inlineCodeStyle}>ollama pull llama3.2</code>.
           </InlineNote>
+        </SectionCard>
+      </>
+    );
+  };
+
+  const renderHelpFeedback = () => {
+    const versionLabel = appVersion ? `v${appVersion}` : '…';
+
+    const openBoard = () => {
+      window.keel.openPath?.(FEEDBACK_BOARD_URL);
+    };
+
+    const linkButtonStyle: React.CSSProperties = {
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      width: '100%', padding: '14px 16px', borderRadius: 12,
+      background: 'var(--surface-muted)', border: '1px solid var(--panel-border)',
+      color: 'var(--text-primary)', fontSize: 14, cursor: 'pointer',
+      fontFamily: 'inherit', textAlign: 'left' as const, textDecoration: 'none',
+    };
+
+    return (
+      <>
+        <SectionCard
+          title="Share feedback or report a bug"
+          description="Submit feature requests, vote on what others have asked for, or report bugs — all on our public Fider board."
+        >
+          <button type="button" onClick={openBoard} style={linkButtonStyle}>
+            <span>
+              <strong style={{ color: 'var(--text-primary)' }}>Open feedback board</strong>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
+                {FEEDBACK_BOARD_URL.replace(/^https?:\/\//, '')} — opens in your browser
+              </div>
+            </span>
+            <span style={{ color: 'var(--text-tertiary)' }}>→</span>
+          </button>
+        </SectionCard>
+
+        <SectionCard
+          title="About"
+          description="Keel is in beta. Thanks for being early."
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 13, color: 'var(--text-muted)' }}>
+            <div><strong style={{ color: 'var(--text-primary)' }}>Version:</strong> {versionLabel}</div>
+          </div>
         </SectionCard>
       </>
     );
@@ -1082,6 +1139,9 @@ export default function Settings({ onBack, navigation }: Props) {
           </>
         );
 
+      case 'help-feedback':
+        return renderHelpFeedback();
+
       default:
         return null;
     }
@@ -1117,6 +1177,7 @@ export default function Settings({ onBack, navigation }: Props) {
             ←
           </button>
           <span style={{ fontSize: 'var(--text-lg)', fontWeight: 600, color: 'var(--text-primary)' }}>Settings</span>
+          <BetaBadge size="sm" />
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>

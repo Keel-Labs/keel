@@ -1,4 +1,5 @@
 import React from 'react';
+import { BetaBadge } from './BetaBadge';
 
 type DesktopMode = 'chat' | 'wiki' | 'home';
 
@@ -148,7 +149,8 @@ export default function DesktopTopBar({
         })}
       </div>
 
-      <div className="desktop-topbar__trailing">
+      <div className="desktop-topbar__trailing" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <BetaBadge size="sm" />
         {activeMode === 'wiki' && (
           <ChromeButton
             title={isContextOpen ? 'Hide page context' : 'Show page context'}
