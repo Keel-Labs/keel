@@ -232,7 +232,7 @@ Questions about these Terms? Reach out:
 
 - **GitHub Issues:** [Keel Repository](https://github.com/Keel-Labs/keel/issues)
 - **Feedback:** [Keel Fider Board](https://keel.fider.io)
-- **Email:** medha.ghati@gmail.com
+- **Email:** medhaforcebewithyou@gmail.com
 
 ---
 

@@ -80,7 +80,7 @@ If you connect your Google account:
 
 ### To Keel
 
-**Keel does not operate a server and does not collect telemetry.** Your usage, settings, and data are not sent to medha.ghati@gmail.com or any third party unless you explicitly choose to share something (e.g., exporting a doc, creating feedback on the Fider board).
+**Keel does not operate a server and does not collect telemetry.** Your usage, settings, and data are not sent to medhaforcebewithyou@gmail.com or any third party unless you explicitly choose to share something (e.g., exporting a doc, creating feedback on the Fider board).
 
 ---
 
@@ -174,7 +174,7 @@ Questions about this policy or your privacy? Reach out:
 
 - **GitHub Issues:** [Keel repository](https://github.com/Keel-Labs/keel/issues)
 - **Feedback Board:** [Keel Fider](https://keel.fider.io)
-- **Email:** medha.ghati@gmail.com
+- **Email:** medhaforcebewithyou@gmail.com
 
 ---
 

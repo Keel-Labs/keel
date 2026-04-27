@@ -51,7 +51,7 @@ Examples of unacceptable behavior include:
 
 ### Reporting
 
-If you experience or witness unacceptable behavior, please report it by emailing **medha.ghati@gmail.com** with:
+If you experience or witness unacceptable behavior, please report it by emailing **medhaforcebewithyou@gmail.com** with:
 
 - A clear description of what happened
 - When it occurred
@@ -95,7 +95,7 @@ This Code of Conduct is adapted from the [Contributor Covenant](https://www.cont
 ## Questions?
 
 If you have questions about this Code of Conduct, feel free to reach out:
-- **Email:** medha.ghati@gmail.com
+- **Email:** medhaforcebewithyou@gmail.com
 - **GitHub:** [Create a discussion](https://github.com/Keel-Labs/keel/discussions)
 
 Thank you for helping make Keel a welcoming community for everyone!
