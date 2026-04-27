@@ -312,7 +312,7 @@ describe('FileManager', () => {
 - **Questions?** [GitHub Discussions](https://github.com/Keel-Labs/keel/discussions)
 - **Bug report?** [GitHub Issues](https://github.com/Keel-Labs/keel/issues)
 - **Feature request?** [Fider Board](https://keel.fider.io)
-- **Contact:** medha.ghati@gmail.com
+- **Contact:** medhaforcebewithyou@gmail.com
 
 ---
 
