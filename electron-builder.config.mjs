@@ -34,7 +34,7 @@ export default {
     icon: 'build/icon.icns',
     target: ['dmg'],
     artifactName,
-    x64ArchFiles: '**/*.darwin-arm64.node',
+    x64ArchFiles: '**/{*.darwin-arm64.node,ffmpeg-static/ffmpeg}',
     hardenedRuntime: true,
     gatekeeperAssess: false,
     entitlements: 'build/entitlements.mac.plist',
