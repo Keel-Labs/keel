@@ -546,11 +546,13 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
   const justLoadedRef = useRef(false);
   const [availableProviders, setAvailableProviders] = useState<Set<string>>(new Set());
   const [openrouterModelName, setOpenrouterModelName] = useState<string>('');
+  const [userName, setUserName] = useState<string>('');
 
   // Load settings (timezone, model, provider) and detect all available providers
   useEffect(() => {
     window.keel.getSettings().then((s) => {
       setUserTimezone(s.timezone || '');
+      setUserName(s.userName || '');
       setCurrentProvider(s.provider);
       switch (s.provider) {
         case 'claude': setCurrentModel(s.claudeModel || 'claude-sonnet-4-20250514'); break;
@@ -1031,7 +1033,9 @@ export default function Chat({ newChatSignal, loadSessionId, onSessionChange }: 
               <div style={{ margin: '0 auto 24px', width: 52 }}>
                 <KeelIcon size={52} />
               </div>
-              <h2 style={{ fontSize: 26, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 10, letterSpacing: '-0.01em', fontFamily: "'Playfair Display', Georgia, serif" }}>Good to see you</h2>
+              <h2 style={{ fontSize: 26, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 10, letterSpacing: '-0.01em', fontFamily: "'Playfair Display', Georgia, serif" }}>
+                Good to see you{userName ? `, ${userName}` : ''}
+              </h2>
               <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)', marginBottom: 28, lineHeight: 1.7 }}>
                 I'm Keel, your AI chief of staff. I know your projects, priorities, and people.
               </p>

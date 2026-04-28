@@ -40,7 +40,12 @@ export default function Onboarding({ initialSettings, onComplete }: Props) {
 
   const finish = async () => {
     try {
-      await window.keel.saveSettings(settings);
+      // Save user name to settings if provided
+      const updatedSettings = { ...settings };
+      if (name) {
+        updatedSettings.userName = name;
+      }
+      await window.keel.saveSettings(updatedSettings);
       await window.keel.ensureBrain();
 
       // Write initial profile if user provided info
