@@ -20,7 +20,6 @@ export default {
   asar: true,
   asarUnpack: [
     'node_modules/**/*.node',
-    'node_modules/ffmpeg-static/ffmpeg',
   ],
   // Bundle pre-compiled whisper binary outside ASAR so it can be executed
   extraResources: [
