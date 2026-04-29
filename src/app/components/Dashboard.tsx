@@ -57,19 +57,19 @@ function getTodayKey(): string {
 }
 
 function parseEodTomorrow(content: string): string[] {
-  // Find ## EOD Summary section
-  const eodMatch = content.match(/## EOD Summary\s*\n([\s\S]*?)(?=\n## |$)/);
-  if (!eodMatch) return [];
+  // Find the LAST ## EOD Summary section (file may have multiple from re-runs)
+  const lastIdx = content.lastIndexOf('## EOD Summary');
+  if (lastIdx === -1) return [];
+  const eodSection = content.slice(lastIdx);
 
-  const eodSection = eodMatch[1];
-
-  // Find **Tomorrow** block
-  const tomorrowMatch = eodSection.match(/\*\*Tomorrow\*\*[^\n]*\n([\s\S]*?)(?=\n\*\*|$)/);
+  // Match **Tomorrow** (bold) or ## Tomorrow (heading)
+  const tomorrowMatch = eodSection.match(/(?:\*\*Tomorrow\*\*|##+ Tomorrow)[^\n]*\n([\s\S]*?)(?=\n\*\*|\n##|$)/);
   if (!tomorrowMatch) return [];
 
   return tomorrowMatch[1]
     .split('\n')
-    .map((line) => line.replace(/^[-*]\s*/, '').trim())
+    .filter((line) => /^[-*]\s+/.test(line.trim()))  // only bullet lines
+    .map((line) => line.replace(/^[-*]\s*/, '').replace(/\*\*/g, '').trim())
     .filter((line) => line.length > 0);
 }
 
@@ -424,11 +424,11 @@ async function loadEodItems(): Promise<string[]> {
     // Yesterday's log doesn't exist — try most recent
   }
 
-  // Fallback: find most recent daily-log
+  // Fallback: find most recent daily-log (including today)
   try {
     const files = await window.keel.listFiles('daily-log');
     const mdFiles = files
-      .filter((f) => f.name.endsWith('.md') && f.name !== `${getTodayKey()}.md`)
+      .filter((f) => f.name.endsWith('.md'))
       .sort((a, b) => b.updatedAt - a.updatedAt);
 
     for (const file of mdFiles.slice(0, 3)) {
