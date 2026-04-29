@@ -39,6 +39,9 @@ export default {
     gatekeeperAssess: false,
     entitlements: 'build/entitlements.mac.plist',
     entitlementsInherit: 'build/entitlements.mac.inherit.plist',
+    extendInfo: {
+      NSMicrophoneUsageDescription: 'Keel uses your microphone to transcribe meetings and voice notes locally on your device.',
+    },
   },
   dmg: {
     artifactName,
