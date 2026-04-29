@@ -81,7 +81,7 @@ If you can live with them, Keel is genuinely useful right now.
 
 ## Roadmap
 
-This is where Keel is going. Order is rough; nothing here is a promise.
+This is where Keel is going — focused on memory and context, not a general productivity suite. Order is rough; nothing here is a promise.
 
 **Near-term (next few months)**
 - **LLM-maintained knowledge bases** — the core product direction. You collect source material (URLs, PDFs, docs, notes); Keel compiles it into a living wiki, runs health checks to keep it fresh, and answers questions by writing durable markdown artifacts back into your workspace. The wiki gets better every time you use it.
@@ -90,7 +90,6 @@ This is where Keel is going. Order is rough; nothing here is a promise.
 - **Multi-machine workspace sync** — opt-in, end-to-end encrypted
 - **Mobile companion** — read your workspace and add quick notes on the go
 - **Windows build**
-- More integrations (Obsidian, Linear, GitHub issues)
 
 **Medium-term**
 - **People graph** — Keel extracts entities from your workspace and builds `people/*.md` automatically; surfaces things like "haven't talked to X in 3 weeks" in your daily brief
@@ -98,10 +97,6 @@ This is where Keel is going. Order is rough; nothing here is a promise.
 - **Team workspaces** — optional and paid; the local-first single-user mode stays free and open source forever
 - **Linux build**
 - **Plugin/extension API** — so the community can add integrations without forking
-- **Better long-term memory** — automatic summarization across years of context
-
-**Things I'm explicitly not doing**
-- Becoming a general productivity suite. Keel stays focused on memory and context.
 
 ---
 
