@@ -502,6 +502,22 @@ const WELCOME_SUGGESTIONS: Array<{ label: string; icon: React.ReactNode }> = [
   { label: '/reminders', icon: <BellIcon /> },
 ];
 
+// Recognize the shape of messages Keel itself emits during a Google Doc
+// export — used to skip them when looking up "the last substantive
+// assistant response," so retries don't accidentally re-export the
+// previous error/confirmation instead of the actual content.
+function looksLikeExportArtifact(content: string): boolean {
+  const t = content.trim();
+  if (/^Done — (exported|I wrote)/i.test(t)) return true;
+  if (/^Exporting your document/i.test(t)) return true;
+  if (/^Nothing to export yet/i.test(t)) return true;
+  if (/^You're not connected to Google/i.test(t)) return true;
+  if (/^I couldn't export to Google Docs/i.test(t)) return true;
+  // Legacy raw IPC error string from before the formatter existed
+  if (/^Error invoking remote method '[^']*google[^']*'/i.test(t)) return true;
+  return false;
+}
+
 function formatGoogleExportError(err: unknown): string {
   const raw = err instanceof Error ? err.message : String(err ?? '');
   // Electron wraps IPC errors as: Error invoking remote method 'keel:foo': Error: <real message>
@@ -1162,14 +1178,14 @@ export default function Chat({
             resetStreamingUi();
             setMessages([
               ...stream.baseMessages,
-              { role: 'assistant' as const, content: 'Exporting your document...', timestamp: Date.now() },
+              { role: 'assistant' as const, content: 'Exporting your document...', timestamp: Date.now(), kind: 'status' },
             ]);
           }
 
           window.keel.googleExportDoc(fullContent, title).then((url: string) => {
             const doneMessages = [
               ...stream.baseMessages,
-              { role: 'assistant' as const, content: `Done — I wrote "${title}" for you.\n\n<!-- gdoc:${url} -->`, timestamp: Date.now() },
+              { role: 'assistant' as const, content: `Done — I wrote "${title}" for you.\n\n<!-- gdoc:${url} -->`, timestamp: Date.now(), kind: 'export-result' as const },
             ];
             sessionMessagesCacheRef.current.set(targetSessionId, doneMessages);
             sessionMetadataCacheRef.current.set(targetSessionId, stream.sessionMetadata);
@@ -1182,7 +1198,7 @@ export default function Chat({
             const errMsg = formatGoogleExportError(err);
             const errorMessages = [
               ...stream.baseMessages,
-              { role: 'assistant' as const, content: errMsg, timestamp: Date.now() },
+              { role: 'assistant' as const, content: errMsg, timestamp: Date.now(), kind: 'error' as const },
             ];
             sessionMessagesCacheRef.current.set(targetSessionId, errorMessages);
             sessionMetadataCacheRef.current.set(targetSessionId, stream.sessionMetadata);
@@ -1243,11 +1259,16 @@ export default function Chat({
 
   const getLastAssistantMessage = (): string | null => {
     for (let i = messages.length - 1; i >= 0; i--) {
-      if (messages[i].role === 'assistant') {
-        const content = messages[i].content;
-        if (content.length < 20) continue;
-        return content;
-      }
+      const msg = messages[i];
+      if (msg.role !== 'assistant') continue;
+      // Skip transient/system messages tagged as such
+      if (msg.kind === 'error' || msg.kind === 'status' || msg.kind === 'export-result') continue;
+      // Backward-compat for chats saved before `kind` existed: skip messages
+      // that match the known shape of export errors/results so we don't
+      // re-export the wrong thing on retry.
+      if (looksLikeExportArtifact(msg.content)) continue;
+      if (msg.content.length < 20) continue;
+      return msg.content;
     }
     return null;
   };
@@ -1626,7 +1647,7 @@ export default function Chat({
       if (!lastContent) {
         setMessages((prev) => [
           ...prev,
-          { role: 'assistant', content: 'Nothing to export yet — ask me something first.', timestamp: Date.now() },
+          { role: 'assistant', content: 'Nothing to export yet — ask me something first.', timestamp: Date.now(), kind: 'status' },
         ]);
       } else {
         try {
@@ -1636,13 +1657,13 @@ export default function Chat({
           const url = await window.keel.googleExportDoc(lastContent, title);
           setMessages((prev) => [
             ...prev,
-            { role: 'assistant', content: `Done — exported your response.\n\n<!-- gdoc:${url} -->`, timestamp: Date.now() },
+            { role: 'assistant', content: `Done — exported your response.\n\n<!-- gdoc:${url} -->`, timestamp: Date.now(), kind: 'export-result' },
           ]);
         } catch (error) {
           const msg = formatGoogleExportError(error);
           setMessages((prev) => [
             ...prev,
-            { role: 'assistant', content: msg, timestamp: Date.now() },
+            { role: 'assistant', content: msg, timestamp: Date.now(), kind: 'error' },
           ]);
         }
       }
