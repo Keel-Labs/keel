@@ -101,8 +101,6 @@ This is where Keel is going. Order is rough; nothing here is a promise.
 - **Better long-term memory** — automatic summarization across years of context
 
 **Things I'm explicitly not doing**
-- A web-only version. Keel is local-first by design.
-- Hosting your data by default. Sync will be opt-in and encrypted.
 - Becoming a general productivity suite. Keel stays focused on memory and context.
 
 ---
