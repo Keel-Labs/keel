@@ -668,8 +668,86 @@ export default function Settings({ onBack, navigation }: Props) {
       fontFamily: 'inherit', textAlign: 'left' as const, textDecoration: 'none',
     };
 
+    const README_URL = 'https://github.com/Keel-Labs/keel#readme';
+    const openReadme = () => { window.keel.openPath?.(README_URL); };
+
+    const sectionHeading: React.CSSProperties = {
+      fontSize: 13, fontWeight: 700, color: 'var(--text-primary)',
+      margin: '14px 0 6px',
+    };
+    const bodyText: React.CSSProperties = {
+      fontSize: 13, lineHeight: 1.55, color: 'var(--text-muted)',
+    };
+    const featureItem: React.CSSProperties = {
+      ...bodyText, marginBottom: 8,
+    };
+
     return (
       <>
+        <SectionCard
+          title="What is Keel?"
+          description="Your personal AI chief of staff — a local-first desktop assistant that owns its own memory."
+        >
+          <div style={bodyText}>
+            <p style={{ margin: 0 }}>
+              Keel captures what matters from your conversations, organizes it into projects and wikis,
+              and stays available through a fast chat interface powered by the AI model of your choice.
+              Everything lives on your machine in plain markdown — your context travels with you,
+              provider to provider, year to year.
+            </p>
+
+            <div style={sectionHeading}>Key features</div>
+            <ul style={{ margin: 0, paddingLeft: 20 }}>
+              <li style={featureItem}><strong style={{ color: 'var(--text-primary)' }}>Local-first workspace.</strong> A folder of markdown files you fully own and can edit anywhere.</li>
+              <li style={featureItem}><strong style={{ color: 'var(--text-primary)' }}>Context-aware chat.</strong> Every reply draws on your projects, captures, tasks, and search hits.</li>
+              <li style={featureItem}><strong style={{ color: 'var(--text-primary)' }}>Multiple AI providers.</strong> Claude, OpenAI, OpenRouter, or local Ollama — swap any time.</li>
+              <li style={featureItem}><strong style={{ color: 'var(--text-primary)' }}>Voice input.</strong> Dictate into chat with local Whisper or OpenAI's API.</li>
+              <li style={featureItem}><strong style={{ color: 'var(--text-primary)' }}>Per-project knowledge bases.</strong> Use <code>/create-kb</code> and <code>/refresh-kb</code> to turn any project into a queryable wiki.</li>
+              <li style={featureItem}><strong style={{ color: 'var(--text-primary)' }}>Auto-capture.</strong> Decisions and facts from chat flow back into your workspace automatically.</li>
+              <li style={featureItem}><strong style={{ color: 'var(--text-primary)' }}>Daily briefs &amp; EOD summaries.</strong> Morning brief, end-of-day wrap-up, pulled from your own data.</li>
+              <li style={featureItem}><strong style={{ color: 'var(--text-primary)' }}>Tasks &amp; reminders.</strong> Markdown-backed tasks with a dedicated inbox view.</li>
+              <li style={featureItem}><strong style={{ color: 'var(--text-primary)' }}>Google &amp; X integrations.</strong> Calendar, Docs, X bookmarks, and posting from chat.</li>
+            </ul>
+
+            <div style={sectionHeading}>How it works</div>
+            <ol style={{ margin: 0, paddingLeft: 20 }}>
+              <li style={featureItem}>Point Keel at a folder for your workspace (defaults to <code>~/Keel</code>).</li>
+              <li style={featureItem}>Chat — Keel streams responses while pulling context from your markdown files.</li>
+              <li style={featureItem}>Substantial moments from chat capture back into your projects.</li>
+              <li style={featureItem}>Build wikis from source material; Keel compiles and runs health checks.</li>
+              <li style={featureItem}>Every note stays on your machine, in plain markdown, forever portable.</li>
+            </ol>
+
+            <div style={sectionHeading}>FAQ</div>
+            <div style={{ ...featureItem }}>
+              <strong style={{ color: 'var(--text-primary)' }}>Where is my data stored?</strong>
+              <div>In the brain folder you chose during setup (default <code>~/Keel</code>). Plain markdown files plus a small SQLite db at <code>.config/keel.db</code>.</div>
+            </div>
+            <div style={featureItem}>
+              <strong style={{ color: 'var(--text-primary)' }}>Can I switch AI providers?</strong>
+              <div>Yes — Settings → Model. Your context stays the same regardless of which provider answers.</div>
+            </div>
+            <div style={featureItem}>
+              <strong style={{ color: 'var(--text-primary)' }}>How do I move my workspace?</strong>
+              <div>Settings → Personal Settings → Brain Path → Browse. Keel will reload pointing at the new folder.</div>
+            </div>
+            <div style={featureItem}>
+              <strong style={{ color: 'var(--text-primary)' }}>Does Keel work offline?</strong>
+              <div>Mostly — local Whisper and Ollama work offline. Cloud providers (Claude, OpenAI) and Google integrations need internet.</div>
+            </div>
+          </div>
+
+          <button type="button" onClick={openReadme} style={{ ...linkButtonStyle, marginTop: 12 }}>
+            <span>
+              <strong style={{ color: 'var(--text-primary)' }}>Read the full README on GitHub</strong>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
+                Architecture, contributing guide, and roadmap
+              </div>
+            </span>
+            <span style={{ color: 'var(--text-tertiary)' }}>→</span>
+          </button>
+        </SectionCard>
+
         <SectionCard
           title="Share feedback or report a bug"
           description="Submit feature requests, vote on what others have asked for, or report bugs — all on our public Fider board."
@@ -759,7 +837,17 @@ export default function Settings({ onBack, navigation }: Props) {
                 <button
                   onClick={async () => {
                     const picked = await window.keel.pickFolder(settings.brainPath);
-                    if (picked) update({ brainPath: picked });
+                    if (!picked || picked === settings.brainPath) return;
+                    const confirmed = window.confirm(
+                      `Switch your Keel brain to:\n\n${picked}\n\n` +
+                      `Keel will reload and show only the data in this new folder. ` +
+                      `Your existing data stays in ${settings.brainPath}.`
+                    );
+                    if (!confirmed) return;
+                    // Persist directly so we can relaunch immediately, bypassing
+                    // the debounced parent update.
+                    await window.keel.saveSettings({ ...settings, brainPath: picked });
+                    await window.keel.relaunch();
                   }}
                   style={secondaryButtonStyle(false)}
                 >
