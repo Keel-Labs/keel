@@ -84,16 +84,21 @@ If you can live with them, Keel is genuinely useful right now.
 This is where Keel is going. Order is rough; nothing here is a promise.
 
 **Near-term (next few months)**
-- Windows build
-- Multi-machine workspace sync (opt-in, end-to-end encrypted)
-- Mobile companion (read your workspace, add quick notes)
+- **LLM-maintained knowledge bases** — the core product direction. You collect source material (URLs, PDFs, docs, notes); Keel compiles it into a living wiki, runs health checks to keep it fresh, and answers questions by writing durable markdown artifacts back into your workspace. The wiki gets better every time you use it.
+- **Auto-refresh KBs** — knowledge bases update automatically as files change, no `/refresh-kb` needed
+- **Natural language for actions** — "build a KB for my project" works without slash commands; real tool-calling so the agent does things, not just describes them
+- **Multi-machine workspace sync** — opt-in, end-to-end encrypted
+- **Mobile companion** — read your workspace and add quick notes on the go
+- **Windows build**
 - More integrations (Obsidian, Linear, GitHub issues)
 
 **Medium-term**
-- Team workspaces (optional, paid; the local-first single-user mode stays free and open source forever)
-- Linux build
-- Plugin/extension API so the community can add integrations without forking
-- Better long-term memory — automatic summarization across years of context
+- **People graph** — Keel extracts entities from your workspace and builds `people/*.md` automatically; surfaces things like "haven't talked to X in 3 weeks" in your daily brief
+- **Smarter onboarding** — folder scanning, project clustering, PARA proposals; Keel comprehends an existing workspace instead of starting from scratch
+- **Team workspaces** — optional and paid; the local-first single-user mode stays free and open source forever
+- **Linux build**
+- **Plugin/extension API** — so the community can add integrations without forking
+- **Better long-term memory** — automatic summarization across years of context
 
 **Things I'm explicitly not doing**
 - A web-only version. Keel is local-first by design.
