@@ -83,6 +83,7 @@ const api: KeelAPI = {
   ingestWikiSource: (basePath, input) => ipcRenderer.invoke('keel:wiki-ingest-source', basePath, input),
   deleteWikiSource: (basePath: string, sourceSlug: string) => ipcRenderer.invoke('keel:delete-wiki-source', basePath, sourceSlug),
   deleteWikiBase: (basePath: string) => ipcRenderer.invoke('keel:delete-wiki-base', basePath),
+  relaunch: () => ipcRenderer.invoke('keel:relaunch'),
   startWikiCompile: (basePath) => ipcRenderer.invoke('keel:start-wiki-compile', basePath),
   startWikiHealthCheck: (basePath) => ipcRenderer.invoke('keel:start-wiki-health-check', basePath),
   listWikiJobs: (basePath) => ipcRenderer.invoke('keel:list-wiki-jobs', basePath),
