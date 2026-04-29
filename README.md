@@ -36,6 +36,8 @@ Windows and Linux builds are not yet shipped. See the [roadmap](#roadmap) below.
 2. **First launch will be blocked by macOS** with an "Apple could not verify Keel is free of malware" dialog. The build is ad-hoc signed but not yet notarized, so Gatekeeper requires an extra step.
 <img width=20% height=auto alt="Screenshot 2026-04-29 at 4 09 02 PM" src="https://github.com/user-attachments/assets/e22f9d82-faac-42c7-af79-c8a73eb20635" />
 
+   **If you're on macOS 15 (Sequoia) or newer** — Apple removed the "Open Anyway" button from this dialog, so you need one of these:
+
    **Option A — Terminal one-liner (always works, recommended):**
    ```sh
    xattr -cr /Applications/Keel.app
@@ -50,7 +52,8 @@ Windows and Linux builds are not yet shipped. See the [roadmap](#roadmap) below.
    c. You'll see *"Keel was blocked from use because it is not from an identified developer"* — click **Open Anyway** and authenticate.
    d. Try opening Keel again. A second dialog will now have an **Open** button — click it.
 
-   On older macOS (pre-Sequoia / pre-15), right-click Keel.app → **Open** and the first dialog itself will offer an "Open" button. On macOS 15+ that button was removed; use Option A or B above.
+   **If you're on macOS 14 (Sonoma) or earlier** — the classic flow still works:
+   - Right-click **Keel.app** → **Open**. The first dialog will now have an **Open** button — click it. You're done.
 
 3. After launch, you'll need an API key from at least one provider (Anthropic, OpenAI, or OpenRouter), or [Ollama](https://ollama.com) installed locally. Keel walks you through this on first launch.
 
