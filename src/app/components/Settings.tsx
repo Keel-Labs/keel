@@ -737,15 +737,20 @@ export default function Settings({ onBack, navigation }: Props) {
             </div>
           </div>
 
-          <button type="button" onClick={openReadme} style={{ ...linkButtonStyle, marginTop: 12 }}>
-            <span>
-              <strong style={{ color: 'var(--text-primary)' }}>Read the full README on GitHub</strong>
-              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
-                Architecture, contributing guide, and roadmap
-              </div>
-            </span>
-            <span style={{ color: 'var(--text-tertiary)' }}>→</span>
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 12, gap: 12 }}>
+            <button type="button" onClick={openReadme} style={{ ...linkButtonStyle, flex: 1 }}>
+              <span>
+                <strong style={{ color: 'var(--text-primary)' }}>Read the full README on GitHub</strong>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
+                  Architecture, contributing guide, and roadmap
+                </div>
+              </span>
+              <span style={{ color: 'var(--text-tertiary)' }}>→</span>
+            </button>
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 10 }}>
+            Version {versionLabel}
+          </div>
         </SectionCard>
 
         <SectionCard
@@ -761,15 +766,6 @@ export default function Settings({ onBack, navigation }: Props) {
             </span>
             <span style={{ color: 'var(--text-tertiary)' }}>→</span>
           </button>
-        </SectionCard>
-
-        <SectionCard
-          title="About"
-          description="Keel is in beta. Thanks for being early."
-        >
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 13, color: 'var(--text-muted)' }}>
-            <div><strong style={{ color: 'var(--text-primary)' }}>Version:</strong> {versionLabel}</div>
-          </div>
         </SectionCard>
       </>
     );
