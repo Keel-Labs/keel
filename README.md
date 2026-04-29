@@ -34,6 +34,7 @@ Windows and Linux builds are not yet shipped. See the [roadmap](#roadmap) below.
 
 1. Open the DMG and drag **Keel** to **Applications**.
 2. **First launch will be blocked by macOS** with an "Apple could not verify Keel is free of malware" dialog. The build is ad-hoc signed but not yet notarized, so Gatekeeper requires an extra step.
+<img width=20% height=auto alt="Screenshot 2026-04-29 at 4 09 02 PM" src="https://github.com/user-attachments/assets/e22f9d82-faac-42c7-af79-c8a73eb20635" />
 
    **Option A — Terminal one-liner (always works, recommended):**
    ```sh
@@ -42,10 +43,12 @@ Windows and Linux builds are not yet shipped. See the [roadmap](#roadmap) below.
    Then double-click Keel as normal.
 
    **Option B — System Settings (GUI):**
-   1. Try to open Keel. The "could not verify" dialog appears — click **Done** to dismiss it.
-   2. Open **System Settings → Privacy & Security** and scroll to the **Security** section.
-   3. You'll see *"Keel was blocked from use because it is not from an identified developer"* — click **Open Anyway** and authenticate.
-   4. Try opening Keel again. A second dialog will now have an **Open** button — click it.
+   a. Try to open Keel. The "could not verify" dialog appears — click **Done** to dismiss it.
+   b. Open **System Settings → Privacy & Security** and scroll to the **Security** section.
+   <img width=45% height=auto alt="Screenshot 2026-04-29 at 4 13 42 PM" src="https://github.com/user-attachments/assets/72238783-331d-45ea-a3d9-b36ff8765cbc" />
+   
+   c. You'll see *"Keel was blocked from use because it is not from an identified developer"* — click **Open Anyway** and authenticate.
+   d. Try opening Keel again. A second dialog will now have an **Open** button — click it.
 
    On older macOS (pre-Sequoia / pre-15), right-click Keel.app → **Open** and the first dialog itself will offer an "Open" button. On macOS 15+ that button was removed; use Option A or B above.
 
