@@ -26,11 +26,32 @@ The model is the part that's interchangeable. Claude today, GPT tomorrow, a loca
 
 ## Download
 
-**[⬇ Download Keel for macOS](https://github.com/Keel-Labs/keel/releases/latest)** — universal DMG (Apple Silicon and Intel), ad-hoc signed. **First launch requires right-click → Open** because the build isn't notarized yet — see install steps below.
+**[⬇ Download Keel for macOS](https://github.com/Keel-Labs/keel/releases/latest)** — universal DMG (Apple Silicon and Intel).
 
 Windows and Linux builds are not yet shipped. See the [roadmap](#roadmap) below.
 
-After installing, you'll need an API key from at least one provider (Anthropic, OpenAI, or OpenRouter), or [Ollama](https://ollama.com) installed locally. Keel walks you through this on first launch.
+### Install
+
+1. Open the DMG and drag **Keel** to **Applications**.
+2. **First launch will be blocked by macOS** with an "Apple could not verify Keel is free of malware" dialog. The build is ad-hoc signed but not yet notarized, so Gatekeeper requires an extra step.
+
+   **Option A — Terminal one-liner (always works, recommended):**
+   ```sh
+   xattr -cr /Applications/Keel.app
+   ```
+   Then double-click Keel as normal.
+
+   **Option B — System Settings (GUI):**
+   1. Try to open Keel. The "could not verify" dialog appears — click **Done** to dismiss it.
+   2. Open **System Settings → Privacy & Security** and scroll to the **Security** section.
+   3. You'll see *"Keel was blocked from use because it is not from an identified developer"* — click **Open Anyway** and authenticate.
+   4. Try opening Keel again. A second dialog will now have an **Open** button — click it.
+
+   On older macOS (pre-Sequoia / pre-15), right-click Keel.app → **Open** and the first dialog itself will offer an "Open" button. On macOS 15+ that button was removed; use Option A or B above.
+
+3. After launch, you'll need an API key from at least one provider (Anthropic, OpenAI, or OpenRouter), or [Ollama](https://ollama.com) installed locally. Keel walks you through this on first launch.
+
+Notarization is on the roadmap; once it ships, the Gatekeeper dance goes away.
 
 ---
 
