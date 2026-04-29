@@ -26,7 +26,7 @@ The model is the part that's interchangeable. Claude today, GPT tomorrow, a loca
 
 ## Download
 
-**[⬇ Download Keel for macOS](https://github.com/Keel-Labs/keel/releases/latest)** — signed DMG, Apple Silicon and Intel.
+**[⬇ Download Keel for macOS](https://github.com/Keel-Labs/keel/releases/latest)** — universal DMG (Apple Silicon and Intel), ad-hoc signed. **First launch requires right-click → Open** because the build isn't notarized yet — see install steps below.
 
 Windows and Linux builds are not yet shipped. See the [roadmap](#roadmap) below.
 
@@ -208,7 +208,7 @@ You can move, back up, or version-control any of this yourself.
 
 ## Contributing
 
-See [CONTRIBUTING.md](./CONTRIBUTING.md) for code style, branch discipline, and PR process. See [ARCHITECTURE.md](./ARCHITECTURE.md) for the runtime map, repository layout, and notes for AI agents working in this codebase.
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for code style, branch discipline, and PR process. See [specs/repository-architecture.md](./specs/repository-architecture.md) for the runtime map and repository layout.
 
 Please read [the note on this being a one-person project](#a-note-on-this-being-a-one-person-project) above before opening a large PR.
 
