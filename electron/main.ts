@@ -1153,6 +1153,11 @@ function registerIpcHandlers() {
 
   // Lightweight transcribe — returns raw text only. Used by the chat mic button.
   ipcMain.handle('keel:transcribe-audio', async (_event, audioBuffer: ArrayBuffer) => {
+    // Reject empty / near-empty buffers up front so we never feed malformed
+    // webm to ffmpeg (which dumps a multi-line stderr trace as the error).
+    if (!audioBuffer || audioBuffer.byteLength < 4096) {
+      return { ok: false, error: 'no_audio' };
+    }
     try {
       if (isWhisperAvailable() && isModelDownloaded('base.en')) {
         const text = await transcribeAudioBuffer(audioBuffer, 'base.en', () => {});
@@ -1174,7 +1179,13 @@ function registerIpcHandlers() {
       }
       return { ok: false, error: 'no_transcription_available' };
     } catch (error) {
-      return { ok: false, error: error instanceof Error ? error.message : 'Transcription failed' };
+      const message = error instanceof Error ? error.message : 'Transcription failed';
+      // ffmpeg dumps its full stderr into the error message when it can't parse
+      // the webm (e.g. empty/silent recording). Surface a clean error instead.
+      if (/EBML header parsing failed|Invalid data found when processing input|matroska,webm/i.test(message)) {
+        return { ok: false, error: 'no_audio' };
+      }
+      return { ok: false, error: message };
     }
   });
 
@@ -1694,6 +1705,27 @@ function registerIpcHandlers() {
     })();
 
     return result;
+  });
+
+  ipcMain.handle('keel:delete-wiki-base', async (_event, basePath: string) => {
+    if (!basePath || basePath.includes('..') || basePath.startsWith('.config') || basePath.startsWith('/')) {
+      throw new Error('Access denied');
+    }
+    if (!basePath.startsWith('knowledge-bases/')) {
+      throw new Error('Only knowledge-bases/* paths can be deleted');
+    }
+
+    const fullPath = path.join(settings.brainPath, basePath);
+    if (!fs.existsSync(fullPath)) {
+      throw new Error('Base not found');
+    }
+
+    const { shell } = await import('electron');
+    // Send to system Trash so it's recoverable
+    await shell.trashItem(fullPath);
+
+    logActivity(settings.brainPath, 'wiki-base-delete', basePath);
+    return { deleted: basePath };
   });
 
   ipcMain.handle('keel:delete-wiki-source', async (_event, basePath: string, sourceSlug: string) => {
