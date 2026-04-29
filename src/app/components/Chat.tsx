@@ -1366,6 +1366,8 @@ export default function Chat({
             });
           } else if (result.error === 'no_transcription_available') {
             setVoiceError('No transcription available. Install whisper or add an OpenAI key in Settings.');
+          } else if (result.error === 'no_audio') {
+            setVoiceError("Didn't catch any audio — try again and speak a bit longer.");
           } else {
             setVoiceError(result.error || 'Transcription failed.');
           }
@@ -2029,7 +2031,7 @@ export default function Chat({
               <div className="chat-empty-state__glyph">✦</div>
               <h2 className="chat-empty-state__title">{emptyStateGreeting}</h2>
               <p className="chat-empty-state__description">
-                Keel can help you review active work, pull a daily brief, capture context, or turn scattered notes into a clear next step.
+                How can I help?
               </p>
               <div className="chat-empty-state__suggestions">
                 {WELCOME_SUGGESTIONS.map((s) => (
@@ -2263,7 +2265,7 @@ export default function Chat({
               {voiceState === 'recording' && (
                 <>
                   <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#e35d5d', display: 'inline-block', animation: 'pulse 1.2s infinite' }} />
-                  Recording… click the mic again to stop.
+                  Recording…
                 </>
               )}
               {voiceState === 'transcribing' && 'Transcribing…'}
@@ -2496,6 +2498,10 @@ export default function Chat({
                 {voiceState === 'transcribing' ? (
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                  </svg>
+                ) : voiceState === 'recording' ? (
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+                    <rect x="6" y="6" width="12" height="12" rx="2" />
                   </svg>
                 ) : (
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
