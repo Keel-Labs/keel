@@ -13,7 +13,7 @@
  */
 
 export const GOOGLE_CLIENT_ID = '937899536084-5dl8cvucr9n5blaocbrdqhafktm702dc.apps.googleusercontent.com';
-export const GOOGLE_CLIENT_SECRET = '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';
+export const GOOGLE_CLIENT_SECRET = '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';
 
 export const GOOGLE_SCOPES = [
   'https://www.googleapis.com/auth/calendar',

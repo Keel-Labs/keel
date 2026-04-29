@@ -502,6 +502,19 @@ const WELCOME_SUGGESTIONS: Array<{ label: string; icon: React.ReactNode }> = [
   { label: '/reminders', icon: <BellIcon /> },
 ];
 
+function formatGoogleExportError(err: unknown): string {
+  const raw = err instanceof Error ? err.message : String(err ?? '');
+  // Electron wraps IPC errors as: Error invoking remote method 'keel:foo': Error: <real message>
+  const cleaned = raw
+    .replace(/^Error invoking remote method '[^']+':\s*/i, '')
+    .replace(/^Error:\s*/i, '')
+    .trim();
+  if (/not connected to google/i.test(cleaned)) {
+    return "You're not connected to Google yet. Open **Settings → Integrations → Google** to connect, then try again.";
+  }
+  return cleaned || "I couldn't export to Google Docs. Try again in a moment.";
+}
+
 function isPdfCommand(text: string): boolean {
   const t = text.trim().toLowerCase();
   if (/^(make|export|save|create|generate|give me|get me|download)\s.*(pdf)$/i.test(t)) return true;
@@ -1166,7 +1179,7 @@ export default function Chat({
               setSessionMetadata(stream.sessionMetadata);
             }
           }).catch((err: unknown) => {
-            const errMsg = err instanceof Error ? err.message : 'Google Doc export failed';
+            const errMsg = formatGoogleExportError(err);
             const errorMessages = [
               ...stream.baseMessages,
               { role: 'assistant' as const, content: errMsg, timestamp: Date.now() },
@@ -1626,7 +1639,7 @@ export default function Chat({
             { role: 'assistant', content: `Done — exported your response.\n\n<!-- gdoc:${url} -->`, timestamp: Date.now() },
           ]);
         } catch (error) {
-          const msg = error instanceof Error ? error.message : 'Google Doc export failed';
+          const msg = formatGoogleExportError(error);
           setMessages((prev) => [
             ...prev,
             { role: 'assistant', content: msg, timestamp: Date.now() },
