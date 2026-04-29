@@ -1,5 +1,6 @@
 import React, { useCallback, useMemo } from 'react';
 import { marked } from 'marked';
+import DOMPurify from 'dompurify';
 import type { Message as MessageType } from '../../shared/types';
 import { formatWikiChatCitations } from './wikiChatCitations';
 
@@ -25,7 +26,10 @@ function renderMessageMarkdown(content: string): string {
     return `<a href="${href}" target="_blank" rel="noopener noreferrer">${text}</a>`;
   };
 
-  return marked.parse(content, { breaks: true, gfm: true, renderer }) as string;
+  const rawHtml = marked.parse(content, { breaks: true, gfm: true, renderer }) as string;
+  // Sanitize: model output and wiki-ingested content are untrusted and could contain
+  // <script> or on* handlers that would execute inside the renderer.
+  return DOMPurify.sanitize(rawHtml, { ADD_ATTR: ['target'] });
 }
 
 export default function Message({ message, onOpenWikiPage }: Props) {
