@@ -20,6 +20,9 @@ export interface Message {
   images?: MessageImage[];
   documents?: MessageDocument[];
   timestamp: number;
+  // Transient/system messages that should not be treated as substantive responses
+  // (e.g., when looking up "the last thing you wrote" for a Google Doc export).
+  kind?: 'error' | 'status' | 'export-result';
 }
 
 export interface ChatSessionMetadata {
