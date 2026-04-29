@@ -842,6 +842,41 @@ select {
   color: var(--accent);
 }
 
+.wiki-shell__action-trash {
+  all: unset;
+  cursor: pointer;
+  color: var(--text-disabled);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  border-radius: 6px;
+  margin-left: auto;
+  transition: var(--transition-base);
+}
+
+.wiki-shell__action-trash:hover {
+  color: #c14a4a;
+  background: var(--surface-hover, rgba(0, 0, 0, 0.04));
+}
+
+.wiki-synthesis__card-delete {
+  all: unset;
+  cursor: pointer;
+  color: var(--text-disabled);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  border-radius: 6px;
+  transition: var(--transition-base);
+}
+
+.wiki-synthesis__card-delete:hover {
+  color: #c14a4a;
+  background: var(--surface-hover, rgba(0, 0, 0, 0.04));
+}
+
 .wiki-shell__action-separator {
   color: var(--text-disabled);
   margin: 0 8px;

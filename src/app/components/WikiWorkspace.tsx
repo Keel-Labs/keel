@@ -393,6 +393,25 @@ export default function WikiWorkspace({
     return enriched;
   }, []);
 
+  const handleDeleteBase = useCallback(async (base: WikiBaseSummary) => {
+    const confirmed = window.confirm(
+      `Move "${base.title}" to Trash?\n\n` +
+      `${base.sourceCount} sources · ${base.conceptCount} concepts · ${base.questionCount} questions\n\n` +
+      `The base folder will be moved to your system Trash and can be restored from there.`
+    );
+    if (!confirmed) return;
+
+    try {
+      await window.keel.deleteWikiBase(base.basePath);
+      // If the deleted base was the active one, return to home
+      setCurrentBasePath((previous) => (previous === base.basePath ? '' : previous));
+      setActiveNav('home');
+      await loadBases();
+    } catch (err) {
+      window.alert(`Failed to delete base: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    }
+  }, [loadBases]);
+
   const loadCurrentBase = useCallback(async () => {
     if (!currentBasePath) {
       setPages([]);
@@ -1099,6 +1118,23 @@ export default function WikiWorkspace({
                   </span>
                 </>
               )}
+              <button
+                type="button"
+                className="wiki-shell__action-trash"
+                title="Move this base to Trash"
+                aria-label={`Delete ${currentBase?.title || 'base'}`}
+                onClick={() => {
+                  if (currentBase) handleDeleteBase(currentBase);
+                }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M3 6h18" />
+                  <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                  <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                  <path d="M10 11v6" />
+                  <path d="M14 11v6" />
+                </svg>
+              </button>
             </div>
           )}
           {notice && <div className="wiki-shell__notice">{notice}</div>}
@@ -1141,6 +1177,24 @@ export default function WikiWorkspace({
                             <span>Updated {formatRelativeTime(base.updatedAt)}</span>
                           </div>
                         </div>
+                        <button
+                          type="button"
+                          className="wiki-synthesis__card-delete"
+                          title="Move base to Trash"
+                          aria-label={`Delete ${base.title}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteBase(base);
+                          }}
+                        >
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                            <path d="M3 6h18" />
+                            <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                            <path d="M10 11v6" />
+                            <path d="M14 11v6" />
+                          </svg>
+                        </button>
                       </div>
                       <div className="wiki-synthesis__card-text">
                         {base.description || 'This base is ready for synthesis and source-backed browsing.'}
