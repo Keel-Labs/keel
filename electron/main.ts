@@ -841,6 +841,11 @@ function registerIpcHandlers() {
     contextAssembler.setPersonality(newSettings.personality || 'default');
   });
 
+  ipcMain.handle('keel:relaunch', async () => {
+    app.relaunch();
+    app.quit();
+  });
+
   // Enrich messages: auto-fetch Google Docs and Calendar events
   async function enrichMessages(
     messages: Message[],
