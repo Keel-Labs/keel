@@ -6,9 +6,9 @@ Keel is a local-first Mac app that captures what matters from your conversations
 
 Open source (MIT). No telemetry. No account required. Bring your own API key.
 
-<img width=80% height=auto alt="Screenshot 2026-04-29 at 12 35 27 PM" src="https://github.com/user-attachments/assets/afdce370-2210-45a0-8008-f078bb893000" />
-<img width=80% height=auto alt="Screenshot 2026-04-29 at 12 40 13 PM" src="https://github.com/user-attachments/assets/a76c2ea4-1f7d-4ede-aa19-86aacbf0a1f6" />
-<img width=80% height=auto alt="Screenshot 2026-04-29 at 12 43 46 PM" src="https://github.com/user-attachments/assets/dbdbb413-8cb3-4764-81cb-f7933bb3e717" />
+<img width=80% height=auto alt="Screenshot 2026-04-29 at 12 35 27 PM" src="https://github.com/user-attachments/assets/afdce370-2210-45a0-8008-f078bb893000" />
+<img width=80% height=auto alt="Screenshot 2026-04-29 at 12 40 13 PM" src="https://github.com/user-attachments/assets/a76c2ea4-1f7d-4ede-aa19-86aacbf0a1f6" />
+<img width=80% height=auto alt="Screenshot 2026-04-29 at 12 43 46 PM" src="https://github.com/user-attachments/assets/dbdbb413-8cb3-4764-81cb-f7933bb3e717" />
 
 ---
 
@@ -38,50 +38,49 @@ After installing, you'll need an API key from at least one provider (Anthropic, 
 
 **A local-first workspace you fully own.** Keel maintains a folder on your disk — typically `~/Keel` — made up of markdown files, project folders, daily logs, and wiki bases. Edit it in any editor. Back it up yourself. Move it between machines. Keel reads and writes it in the background as you work.
 
-<img width=70% height=auto alt="Screenshot 2026-04-29 at 12 40 27 PM" src="https://github.com/user-attachments/assets/72ddaf82-9bdf-44ab-b86c-cb370c45a7dd" />
+<img width=70% height=auto alt="Screenshot 2026-04-29 at 12 40 27 PM" src="https://github.com/user-attachments/assets/72ddaf82-9bdf-44ab-b86c-cb370c45a7dd" />
 
 **Context-aware chat.** Every conversation draws on a system prompt assembled from your workspace: relevant project context, recent captures, open tasks, and search hits. Ask about a project and Keel already knows who's involved, where you left off, and what's open.
 
 **Bring your own model.** Keel speaks to Claude, OpenAI, OpenRouter, and local models via Ollama. Swap providers in settings; fall back automatically when one is unavailable.
 
-<img width=70% height=auto alt="Screenshot 2026-04-29 at 12 40 13 PM" src="https://github.com/user-attachments/assets/a76c2ea4-1f7d-4ede-aa19-86aacbf0a1f6" />
+<img width=70% height=auto alt="Screenshot 2026-04-29 at 12 40 13 PM" src="https://github.com/user-attachments/assets/a76c2ea4-1f7d-4ede-aa19-86aacbf0a1f6" />
 
 **Auto-capture.** When a chat produces something worth keeping — a decision, a fact about a project, a new task — Keel quietly saves it back into your workspace so tomorrow's conversation starts with today's progress baked in.
 
-**Per-project knowledge bases.** Turn any project folder into a queryable wiki with `/create-kb` and `/refresh-kb`. Keel ingests markdown and PDFs, compiles them into a structured knowledge base, and keeps it in sync as files change. 
-<img width=80% height=auto alt="Screenshot 2026-04-29 at 12 43 58 PM" src="https://github.com/user-attachments/assets/d6cb5cf0-147c-46ab-8254-fad2facec1de" />
-<img width=80% height=auto alt="Screenshot 2026-04-29 at 12 46 59 PM" src="https://github.com/user-attachments/assets/90293f2a-8e92-4118-882a-4ee977f07676" />
+**Per-project knowledge bases.** Turn any project folder into a queryable wiki with `/create-kb` and `/refresh-kb`. Keel ingests markdown and PDFs, compiles them into a structured knowledge base, and keeps it in sync as files change.
+<img width=80% height=auto alt="Screenshot 2026-04-29 at 12 43 58 PM" src="https://github.com/user-attachments/assets/d6cb5cf0-147c-46ab-8254-fad2facec1de" />
+<img width=80% height=auto alt="Screenshot 2026-04-29 at 12 46 59 PM" src="https://github.com/user-attachments/assets/90293f2a-8e92-4118-882a-4ee977f07676" />
+
+**Dashboard.** A home view that surfaces your day at a glance — open tasks and reminders, recent activity, the morning brief, weather, and news — so you land somewhere useful instead of an empty chat.
+<img width=80% height=auto alt="Dashboard" src="https://github.com/user-attachments/assets/c4e0c2a4-b86b-49ee-8000-2468c01784a8" />
+
+**Tasks and reminders.** First-class to-dos backed by markdown, with due dates, projects, and time-based reminders that fire as desktop notifications.
+<img width=80% height=auto alt="Tasks" src="https://github.com/user-attachments/assets/08684877-9d91-4a1d-aa48-a1677e19f8da" />
+
+**Meeting transcription.** Record a meeting (or import audio) and Keel transcribes it locally with Whisper, then writes a structured summary — decisions, action items, attendees — back into the relevant project.
 
 **Voice input.** Speak instead of type, using local Whisper or OpenAI's API.
-<img width=80% height=auto alt="Screenshot 2026-04-29 at 12 45 49 PM" src="https://github.com/user-attachments/assets/80d6ffa3-a3ce-44f5-800c-93e13aa79936" />
+<img width=80% height=auto alt="Screenshot 2026-04-29 at 12 45 49 PM" src="https://github.com/user-attachments/assets/80d6ffa3-a3ce-44f5-800c-93e13aa79936" />
 
+**Daily briefs and end-of-day wraps.** Keel generates a morning brief and an EOD summary from your workspace, and "pick up where you left off" pulls yesterday's loose ends into today.
+<img width=80% height=auto alt="Screenshot 2026-04-29 at 12 44 46 PM" src="https://github.com/user-attachments/assets/cc734629-f1bc-46ef-b438-a73d2da4f815" />
+<img width=80% height=auto alt="Screenshot 2026-04-29 at 12 45 33 PM" src="https://github.com/user-attachments/assets/e9f38e6d-7f00-424b-9512-849cdcd1858f" />
 
-**Daily briefs.** Keel generates a morning brief and end-of-day wrap-up from your workspace. 
-<img width=80% height=auto alt="Screenshot 2026-04-29 at 12 44 46 PM" src="https://github.com/user-attachments/assets/cc734629-f1bc-46ef-b438-a73d2da4f815" />
-<img width=80% height=auto alt="Screenshot 2026-04-29 at 12 45 33 PM" src="https://github.com/user-attachments/assets/e9f38e6d-7f00-424b-9512-849cdcd1858f" />
+**Scheduled jobs.** Run any prompt or workflow on a recurring schedule — daily digests, weekly reviews, custom check-ins — with results captured back into your workspace.
+<img width=80% height=auto alt="Scheduled Jobs" src="https://github.com/user-attachments/assets/79211140-4472-4259-9926-adff5cf35722" />
+
+**Personalities.** Pick the voice your assistant speaks in — default, Butler, Hype Friend, Captain, or Documentary Narrator — or define your own.
+<img width=80% height=auto alt="Select a personality for your assistant" src="https://github.com/user-attachments/assets/b8e3e03d-eb81-44b6-8e83-224db4e82a85" />
+
+**Dark mode.** System-aware, with a manual override.
+<img width=80% height=auto alt="Dark mode" src="https://github.com/user-attachments/assets/3201e9bc-7d3d-497e-81f7-fb1c5c359ee5" />
 
 **Google Workspace and X integrations.** Sync Calendar events into context, read Google Docs into chat, export results back to Docs. Sync your X bookmarks into a searchable wiki, or publish posts directly from chat.
-<img width=80% height=auto alt="Screenshot 2026-04-29 at 12 52 13 PM" src="https://github.com/user-attachments/assets/f0babd41-4c84-42c9-922c-d00b8ba8a281" />
-
+<img width=80% height=auto alt="Screenshot 2026-04-29 at 12 52 13 PM" src="https://github.com/user-attachments/assets/f0babd41-4c84-42c9-922c-d00b8ba8a281" />
 
 A full feature list and configuration details live in the in-app help.
-<img width=80% height=auto alt="Screenshot 2026-04-29 at 12 45 11 PM" src="https://github.com/user-attachments/assets/35135158-5e05-48a3-820b-a3bca7c625ba" />
-
-Tasks: <img width=80% height=auto alt="Screenshot 2026-04-29 at 12 46 08 PM" src="https://github.com/user-attachments/assets/08684877-9d91-4a1d-aa48-a1677e19f8da" />
-
-Dashboard: <img width=80% height=auto alt="Screenshot 2026-04-29 at 1 04 27 PM" src="https://github.com/user-attachments/assets/c4e0c2a4-b86b-49ee-8000-2468c01784a8" />
-
-Dark mode: <img width=80% height=auto alt="Screenshot 2026-04-29 at 12 51 49 PM" src="https://github.com/user-attachments/assets/3201e9bc-7d3d-497e-81f7-fb1c5c359ee5" />
-
-Scheduled Jobs: <img width=80% height=auto alt="Screenshot 2026-04-29 at 12 52 03 PM" src="https://github.com/user-attachments/assets/79211140-4472-4259-9926-adff5cf35722" />
-
-
-Select a personality for your assistant: <img width=80% height=auto alt="Screenshot 2026-04-29 at 12 52 48 PM" src="https://github.com/user-attachments/assets/b8e3e03d-eb81-44b6-8e83-224db4e82a85" />
-
-
-
-
-
+<img width=80% height=auto alt="Screenshot 2026-04-29 at 12 45 11 PM" src="https://github.com/user-attachments/assets/35135158-5e05-48a3-820b-a3bca7c625ba" />
 
 ---
 
@@ -92,10 +91,16 @@ Keel is a working beta and stable enough for daily use on macOS, but it's early.
 **What works today**
 - Chat with Claude, OpenAI, OpenRouter, and Ollama
 - Local markdown workspace with auto-capture
+- Dashboard with tasks, reminders, brief, weather, and activity
 - Wiki bases with ingestion, compile, and health checks
-- Tasks, daily briefs, end-of-day summaries
+- Tasks and reminders with desktop notifications
+- Meeting recording and local transcription with structured summaries
+- Daily briefs, end-of-day wraps, and "pick up where you left off"
+- Scheduled jobs for recurring prompts and workflows
+- Selectable assistant personalities (and custom)
 - Voice input via Whisper or OpenAI
 - Google Calendar, Google Docs, and X integrations
+- Light and dark mode
 - SQLite full-text search; optional LanceDB vector search
 
 **What doesn't work yet**
