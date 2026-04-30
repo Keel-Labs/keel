@@ -6,6 +6,10 @@ Keel is a local-first Mac app that captures what matters from your conversations
 
 Open source (MIT). No telemetry. No account required. You can bring your own API key.
 
+▶ **[Watch the walkthrough on Loom](https://www.loom.com/share/29c1407fc2944b1fb5c6c1bbc953831b)**
+
+[![Keel walkthrough video](https://cdn.loom.com/sessions/thumbnails/29c1407fc2944b1fb5c6c1bbc953831b-with-play.gif)](https://www.loom.com/share/29c1407fc2944b1fb5c6c1bbc953831b)
+
 <img width=80% height=auto alt="Screenshot 2026-04-29 at 12 35 27 PM" src="https://github.com/user-attachments/assets/afdce370-2210-45a0-8008-f078bb893000" />
 <img width=80% height=auto alt="Screenshot 2026-04-29 at 12 40 13 PM" src="https://github.com/user-attachments/assets/a76c2ea4-1f7d-4ede-aa19-86aacbf0a1f6" />
 <img width=80% height=auto alt="Screenshot 2026-04-29 at 12 43 46 PM" src="https://github.com/user-attachments/assets/dbdbb413-8cb3-4764-81cb-f7933bb3e717" />
