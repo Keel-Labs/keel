@@ -55,13 +55,13 @@ Operationally, this means:
 
 Relevant existing surfaces:
 
-- Local markdown brain structure via [src/core/fileManager.ts](/Users/djsam/.codex/worktrees/e0cb/Keel/src/core/fileManager.ts)
-- Local indexing and file watching via [electron/main.ts](/Users/djsam/.codex/worktrees/e0cb/Keel/electron/main.ts)
-- URL capture and filing via [src/core/workflows/capture.ts](/Users/djsam/.codex/worktrees/e0cb/Keel/src/core/workflows/capture.ts)
-- Context assembly and semantic search via [src/core/contextAssembler.ts](/Users/djsam/.codex/worktrees/e0cb/Keel/src/core/contextAssembler.ts)
-- Local search/index storage via [src/core/db.ts](/Users/djsam/.codex/worktrees/e0cb/Keel/src/core/db.ts) and [src/core/vectorStore.ts](/Users/djsam/.codex/worktrees/e0cb/Keel/src/core/vectorStore.ts)
-- Current knowledge UI via [src/app/components/KnowledgeBrowser.tsx](/Users/djsam/.codex/worktrees/e0cb/Keel/src/app/components/KnowledgeBrowser.tsx)
-- Cloud brain file model via [server/src/db/schema.ts](/Users/djsam/.codex/worktrees/e0cb/Keel/server/src/db/schema.ts) and [server/src/routes/brain.ts](/Users/djsam/.codex/worktrees/e0cb/Keel/server/src/routes/brain.ts)
+- Local markdown brain structure via [src/core/fileManager.ts](src/core/fileManager.ts)
+- Local indexing and file watching via [electron/main.ts](electron/main.ts)
+- URL capture and filing via [src/core/workflows/capture.ts](src/core/workflows/capture.ts)
+- Context assembly and semantic search via [src/core/contextAssembler.ts](src/core/contextAssembler.ts)
+- Local search/index storage via [src/core/db.ts](src/core/db.ts) and [src/core/vectorStore.ts](src/core/vectorStore.ts)
+- Current knowledge UI via [src/app/components/KnowledgeBrowser.tsx](src/app/components/KnowledgeBrowser.tsx)
+- Cloud brain file model via [server/src/db/schema.ts](server/src/db/schema.ts) and [server/src/routes/brain.ts](server/src/routes/brain.ts)
 
 Current gaps:
 
@@ -147,7 +147,7 @@ Rules:
 
 Karpathy's gist adds an important architectural point: the wiki is not enough by itself. The agent also needs a schema document that tells it how to behave as a disciplined maintainer.
 
-For Keel, that should be a per-base [AGENTS.md](/Users/djsam/.codex/worktrees/e0cb/Keel/AGENTS.md)-style file stored at `knowledge-bases/<base>/AGENTS.md`.
+For Keel, that should be a per-base [AGENTS.md](AGENTS.md)-style file stored at `knowledge-bases/<base>/AGENTS.md`.
 
 This file should define:
 
@@ -731,11 +731,11 @@ The default should be "write a markdown artifact and show it in chat".
 
 Desktop and local-first changes:
 
-- extend [src/core/fileManager.ts](/Users/djsam/.codex/worktrees/e0cb/Keel/src/core/fileManager.ts) to create and manage `knowledge-bases/`
-- extend [electron/main.ts](/Users/djsam/.codex/worktrees/e0cb/Keel/electron/main.ts) indexing rules so base markdown files are watched and indexed
+- extend [src/core/fileManager.ts](src/core/fileManager.ts) to create and manage `knowledge-bases/`
+- extend [electron/main.ts](electron/main.ts) indexing rules so base markdown files are watched and indexed
 - add knowledge-base workflow modules under `src/core/workflows/`
-- extend [src/shared/types.ts](/Users/djsam/.codex/worktrees/e0cb/Keel/src/shared/types.ts) with knowledge-base, source, job, and artifact types
-- extend [src/app/components/KnowledgeBrowser.tsx](/Users/djsam/.codex/worktrees/e0cb/Keel/src/app/components/KnowledgeBrowser.tsx) to expose bases as first-class navigable objects
+- extend [src/shared/types.ts](src/shared/types.ts) with knowledge-base, source, job, and artifact types
+- extend [src/app/components/KnowledgeBrowser.tsx](src/app/components/KnowledgeBrowser.tsx) to expose bases as first-class navigable objects
 - add per-base schema bootstrapping so every new base gets an agent instruction file
 
 Cloud parity changes:

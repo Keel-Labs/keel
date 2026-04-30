@@ -3,9 +3,10 @@
 from PIL import Image
 import os
 
-SOURCE = "/Users/medha/Keel/Logo Badge - source.png"
-OUTPUT_1024 = "/Users/medha/Keel/build/icon_1024.png"
-ICONSET_DIR = "/Users/medha/Keel/AppIcon.iconset"
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+SOURCE = os.path.join(REPO_ROOT, "Logo Badge - source.png")
+OUTPUT_1024 = os.path.join(REPO_ROOT, "build", "icon_1024.png")
+ICONSET_DIR = os.path.join(REPO_ROOT, "AppIcon.iconset")
 
 CREAM = (250, 246, 236, 255)
 

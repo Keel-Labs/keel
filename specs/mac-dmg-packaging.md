@@ -16,9 +16,9 @@ For this project, "easy to use" means:
 
 Keel already has an Electron desktop surface:
 
-- Electron main process in [electron/main.ts](/Users/djsam/.codex/worktrees/20fe/Keel/electron/main.ts)
-- Electron preload bridge in [electron/preload.ts](/Users/djsam/.codex/worktrees/20fe/Keel/electron/preload.ts)
-- Desktop entrypoint and build scripts in [package.json](/Users/djsam/.codex/worktrees/20fe/Keel/package.json)
+- Electron main process in [electron/main.ts](electron/main.ts)
+- Electron preload bridge in [electron/preload.ts](electron/preload.ts)
+- Desktop entrypoint and build scripts in [package.json](package.json)
 
 What is missing today:
 

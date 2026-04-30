@@ -51,9 +51,9 @@ Primary changes:
 
 Likely files:
 
-- [src/shared/types.ts](/Users/djsam/codex/Keel/src/shared/types.ts)
-- [electron/main.ts](/Users/djsam/codex/Keel/electron/main.ts)
-- [electron/preload.ts](/Users/djsam/codex/Keel/electron/preload.ts)
+- [src/shared/types.ts](src/shared/types.ts)
+- [electron/main.ts](electron/main.ts)
+- [electron/preload.ts](electron/preload.ts)
 - `src/core/integrations/x/xClient.ts`
 - `src/core/integrations/x/xAuth.ts`
 - `src/core/integrations/x/xBookmarkSync.ts`
@@ -81,10 +81,10 @@ Primary changes:
 
 Likely files:
 
-- [src/app/components/Settings.tsx](/Users/djsam/codex/Keel/src/app/components/Settings.tsx)
-- [electron/main.ts](/Users/djsam/codex/Keel/electron/main.ts)
-- [electron/preload.ts](/Users/djsam/codex/Keel/electron/preload.ts)
-- [src/shared/types.ts](/Users/djsam/codex/Keel/src/shared/types.ts)
+- [src/app/components/Settings.tsx](src/app/components/Settings.tsx)
+- [electron/main.ts](electron/main.ts)
+- [electron/preload.ts](electron/preload.ts)
+- [src/shared/types.ts](src/shared/types.ts)
 
 Data needed:
 
@@ -114,11 +114,11 @@ Primary changes:
 
 Likely files:
 
-- [src/app/components/WikiWorkspace.tsx](/Users/djsam/codex/Keel/src/app/components/WikiWorkspace.tsx)
-- [src/app/styles.css](/Users/djsam/codex/Keel/src/app/styles.css)
-- [src/core/workflows/wikiIngest.ts](/Users/djsam/codex/Keel/src/core/workflows/wikiIngest.ts)
-- [src/core/workflows/wikiBase.ts](/Users/djsam/codex/Keel/src/core/workflows/wikiBase.ts)
-- [src/shared/types.ts](/Users/djsam/codex/Keel/src/shared/types.ts)
+- [src/app/components/WikiWorkspace.tsx](src/app/components/WikiWorkspace.tsx)
+- [src/app/styles.css](src/app/styles.css)
+- [src/core/workflows/wikiIngest.ts](src/core/workflows/wikiIngest.ts)
+- [src/core/workflows/wikiBase.ts](src/core/workflows/wikiBase.ts)
+- [src/shared/types.ts](src/shared/types.ts)
 
 Definition of done:
 
@@ -143,8 +143,8 @@ Primary changes:
 Likely files:
 
 - `src/core/integrations/x/xBookmarkSync.ts`
-- [electron/main.ts](/Users/djsam/codex/Keel/electron/main.ts)
-- [src/shared/types.ts](/Users/djsam/codex/Keel/src/shared/types.ts)
+- [electron/main.ts](electron/main.ts)
+- [src/shared/types.ts](src/shared/types.ts)
 
 Definition of done:
 
@@ -169,9 +169,9 @@ Primary changes:
 Likely files:
 
 - `src/core/integrations/x/xTopicRouter.ts`
-- [src/core/wikiBaseSummaries.ts](/Users/djsam/codex/Keel/src/core/wikiBaseSummaries.ts)
-- [src/core/workflows/wikiBase.ts](/Users/djsam/codex/Keel/src/core/workflows/wikiBase.ts)
-- [src/app/App.tsx](/Users/djsam/codex/Keel/src/app/App.tsx)
+- [src/core/wikiBaseSummaries.ts](src/core/wikiBaseSummaries.ts)
+- [src/core/workflows/wikiBase.ts](src/core/workflows/wikiBase.ts)
+- [src/app/App.tsx](src/app/App.tsx)
 
 Definition of done:
 
@@ -195,9 +195,9 @@ Primary changes:
 
 Likely files:
 
-- [src/app/components/Chat.tsx](/Users/djsam/codex/Keel/src/app/components/Chat.tsx)
-- [src/app/styles.css](/Users/djsam/codex/Keel/src/app/styles.css)
-- [src/shared/types.ts](/Users/djsam/codex/Keel/src/shared/types.ts)
+- [src/app/components/Chat.tsx](src/app/components/Chat.tsx)
+- [src/app/styles.css](src/app/styles.css)
+- [src/shared/types.ts](src/shared/types.ts)
 
 Recommended UX details:
 
@@ -226,11 +226,11 @@ Primary changes:
 
 Likely files:
 
-- [src/app/components/Chat.tsx](/Users/djsam/codex/Keel/src/app/components/Chat.tsx)
-- [src/app/App.tsx](/Users/djsam/codex/Keel/src/app/App.tsx)
-- [src/app/styles.css](/Users/djsam/codex/Keel/src/app/styles.css)
+- [src/app/components/Chat.tsx](src/app/components/Chat.tsx)
+- [src/app/App.tsx](src/app/App.tsx)
+- [src/app/styles.css](src/app/styles.css)
 - `src/core/integrations/x/xPublisher.ts`
-- [electron/main.ts](/Users/djsam/codex/Keel/electron/main.ts)
+- [electron/main.ts](electron/main.ts)
 
 Definition of done:
 
@@ -252,9 +252,9 @@ Primary changes:
 
 Likely files:
 
-- [src/app/components/WikiWorkspace.tsx](/Users/djsam/codex/Keel/src/app/components/WikiWorkspace.tsx)
-- [src/app/styles.css](/Users/djsam/codex/Keel/src/app/styles.css)
-- [src/shared/types.ts](/Users/djsam/codex/Keel/src/shared/types.ts)
+- [src/app/components/WikiWorkspace.tsx](src/app/components/WikiWorkspace.tsx)
+- [src/app/styles.css](src/app/styles.css)
+- [src/shared/types.ts](src/shared/types.ts)
 
 Definition of done:
 
@@ -277,7 +277,7 @@ Primary changes:
 
 Likely files:
 
-- [src/app/App.tsx](/Users/djsam/codex/Keel/src/app/App.tsx)
+- [src/app/App.tsx](src/app/App.tsx)
 - inbox surface components once they are implemented
 - X integration persistence modules
 

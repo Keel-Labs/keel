@@ -55,8 +55,8 @@ Outcome:
 
 Inputs:
 
-- [specs/llm-knowledge-bases.md](/Users/djsam/.codex/worktrees/e0cb/Keel/specs/llm-knowledge-bases.md)
-- [specs/wiki-ux.md](/Users/djsam/.codex/worktrees/e0cb/Keel/specs/wiki-ux.md)
+- [specs/llm-knowledge-bases.md](specs/llm-knowledge-bases.md)
+- [specs/wiki-ux.md](specs/wiki-ux.md)
 
 Exit criteria:
 
@@ -79,9 +79,9 @@ Primary changes:
 
 Likely files:
 
-- [src/app/components/Sidebar.tsx](/Users/djsam/.codex/worktrees/e0cb/Keel/src/app/components/Sidebar.tsx)
-- [src/app/components/DesktopTopBar.tsx](/Users/djsam/.codex/worktrees/e0cb/Keel/src/app/components/DesktopTopBar.tsx)
-- [src/app/App.tsx](/Users/djsam/.codex/worktrees/e0cb/Keel/src/app/App.tsx)
+- [src/app/components/Sidebar.tsx](src/app/components/Sidebar.tsx)
+- [src/app/components/DesktopTopBar.tsx](src/app/components/DesktopTopBar.tsx)
+- [src/app/App.tsx](src/app/App.tsx)
 
 Definition of done:
 
@@ -104,10 +104,10 @@ Primary changes:
 
 Likely files:
 
-- [src/core/fileManager.ts](/Users/djsam/.codex/worktrees/e0cb/Keel/src/core/fileManager.ts)
-- [src/shared/types.ts](/Users/djsam/.codex/worktrees/e0cb/Keel/src/shared/types.ts)
-- [electron/main.ts](/Users/djsam/.codex/worktrees/e0cb/Keel/electron/main.ts)
-- [electron/preload.ts](/Users/djsam/.codex/worktrees/e0cb/Keel/electron/preload.ts)
+- [src/core/fileManager.ts](src/core/fileManager.ts)
+- [src/shared/types.ts](src/shared/types.ts)
+- [electron/main.ts](electron/main.ts)
+- [electron/preload.ts](electron/preload.ts)
 
 New concepts:
 
@@ -136,9 +136,9 @@ Primary changes:
 
 Likely files:
 
-- [src/app/components/KnowledgeBrowser.tsx](/Users/djsam/.codex/worktrees/e0cb/Keel/src/app/components/KnowledgeBrowser.tsx)
-- [src/app/App.tsx](/Users/djsam/.codex/worktrees/e0cb/Keel/src/app/App.tsx)
-- [src/app/styles.css](/Users/djsam/.codex/worktrees/e0cb/Keel/src/app/styles.css)
+- [src/app/components/KnowledgeBrowser.tsx](src/app/components/KnowledgeBrowser.tsx)
+- [src/app/App.tsx](src/app/App.tsx)
+- [src/app/styles.css](src/app/styles.css)
 
 Suggested approach:
 
@@ -198,8 +198,8 @@ Primary changes:
 
 Likely modules:
 
-- [src/app/components/WikiWorkspace.tsx](/Users/djsam/.codex/worktrees/e0cb/Keel/src/app/components/WikiWorkspace.tsx)
-- [src/app/styles.css](/Users/djsam/.codex/worktrees/e0cb/Keel/src/app/styles.css)
+- [src/app/components/WikiWorkspace.tsx](src/app/components/WikiWorkspace.tsx)
+- [src/app/styles.css](src/app/styles.css)
 
 Definition of done:
 
@@ -264,9 +264,9 @@ Primary changes:
 
 Likely files:
 
-- [src/core/db.ts](/Users/djsam/.codex/worktrees/e0cb/Keel/src/core/db.ts)
-- [src/core/vectorStore.ts](/Users/djsam/.codex/worktrees/e0cb/Keel/src/core/vectorStore.ts)
-- [src/core/contextAssembler.ts](/Users/djsam/.codex/worktrees/e0cb/Keel/src/core/contextAssembler.ts)
+- [src/core/db.ts](src/core/db.ts)
+- [src/core/vectorStore.ts](src/core/vectorStore.ts)
+- [src/core/contextAssembler.ts](src/core/contextAssembler.ts)
 
 Definition of done:
 

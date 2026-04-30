@@ -1,0 +1,5 @@
+# Show a Sponsor button on the repo. The `github:` line lights up once the
+# GitHub Sponsors application is approved; until then the BMC link is the
+# active fallback.
+github: [medha]
+custom: ['https://buymeacoffee.com/medha']
