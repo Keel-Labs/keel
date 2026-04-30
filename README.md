@@ -262,8 +262,8 @@ Please read [the note on this being a one-person project](#a-note-on-this-being-
 
 If Keel is useful to you and you want to chip in:
 
+- 💖 [Sponsor on GitHub](https://github.com/sponsors/medha)
 - ☕ [Buy Me a Coffee](https://buymeacoffee.com/medha)
-- 💖 GitHub Sponsors — [the **Sponsor** button at the top of this repo](https://github.com/sponsors/medha) (active once GitHub approves the application)
 
 Keel is a one-person project. Every coffee covers a little more time spent shipping.
 
