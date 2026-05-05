@@ -56,6 +56,7 @@ import { capture } from '../src/core/workflows/capture';
 import { synthesizeMeeting, formatMeetingNote, formatDailyLogEntry } from '../src/core/workflows/meetingTranscription';
 import { isWhisperAvailable, getWhisperBinary, transcribeAudioBuffer } from './transcriptionService';
 import { initLogger, logger, buildDiagnostics } from './logger';
+import { autoUpdater } from 'electron-updater';
 import { isModelDownloaded, getAvailableModels, downloadModel } from './modelManager';
 import { autoCapture } from '../src/core/workflows/autoCapture';
 import { dailyBrief } from '../src/core/workflows/dailyBrief';
@@ -2531,6 +2532,21 @@ app.whenReady().then(async () => {
   createTray();
   registerShortcuts();
   registerIpcHandlers();
+
+  // Auto-update via electron-updater. Only when packaged — skip in dev.
+  // Reads release metadata from GitHub (publish target in
+  // electron-builder.config.mjs). On finding a newer release the updater
+  // downloads the DMG in the background and shows a native macOS
+  // notification when ready; install happens on next quit.
+  if (app.isPackaged) {
+    // Route updater logs through electron-log so failures land in
+    // ~/Library/Logs/Keel/main.log and show up in Copy diagnostic info.
+    // electron-updater accepts any object with the standard log methods.
+    (autoUpdater as unknown as { logger: typeof logger }).logger = logger;
+    autoUpdater.checkForUpdatesAndNotify().catch((err) => {
+      logger.error('autoUpdater check failed:', err);
+    });
+  }
 
   // Start file watcher
   startFileWatcher();

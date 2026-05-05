@@ -11,6 +11,16 @@ export default {
     output: 'dist-packages',
     buildResources: 'build',
   },
+  // Auto-update via electron-updater reads from GitHub releases. Setting this
+  // here also makes electron-builder generate latest-mac.yml in dist-packages
+  // during dist:mac, which we upload as a release asset alongside the DMG.
+  publish: [
+    {
+      provider: 'github',
+      owner: 'Keel-Labs',
+      repo: 'keel',
+    },
+  ],
   files: [
     'dist/**/*',
     'package.json',
