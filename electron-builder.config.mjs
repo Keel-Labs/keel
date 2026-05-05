@@ -22,10 +22,25 @@ export default {
     },
   ],
   files: [
-    'dist/**/*',
+    'dist/electron/**/*',
+    'dist/renderer/**/*',
+    'dist/mobile/**/*',
     'package.json',
-    '!dist-packages/**/*',
     '!**/*.map',
+    // Belt-and-suspenders: per-arch builds (electron-builder's universal
+    // staging) and electron-builder metadata must never end up inside the
+    // asar. The original 'dist/**/*' glob silently slurped these in,
+    // producing a recursive 1.4 GB leak.
+    '!dist/mac-*/**',
+    '!dist/builder-*',
+    '!dist-packages/**/*',
+    // better-sqlite3 ships ~9 MB of C source we don't need at runtime.
+    '!**/node_modules/better-sqlite3/deps/**',
+    '!**/node_modules/better-sqlite3/src/**',
+    // Generic dead weight inside transitive node_modules.
+    '!**/node_modules/*/{test,tests,__tests__,docs,doc,example,examples}/**',
+    '!**/node_modules/**/*.md',
+    '!**/node_modules/*/{.eslintrc*,.prettierrc*,.editorconfig,.npmignore,tsconfig*.json}',
   ],
   asar: true,
   asarUnpack: [
@@ -44,6 +59,9 @@ export default {
     icon: 'build/icon.icns',
     target: ['dmg'],
     artifactName,
+    // App is English-only; drop the ~30–40 MB of other-language locale paks
+    // that the Electron Framework ships by default.
+    electronLanguages: ['en'],
     // @electron/universal merges the per-arch slices into a universal .app.
     // For native binaries that are identical in both slices it requires an
     // explicit declaration via x64ArchFiles, otherwise it aborts. Three
@@ -75,7 +93,6 @@ export default {
   },
   dmg: {
     artifactName,
-    writeUpdateInfo: false,
     // dmg-builder under-sizes the RW image (bytes / 1000 + "K" suffix gives
     // ~2.4% headroom) and HFS+ catalog overhead pushes us over for ~1.9GB+
     // payloads. ditto then exits with "no space" mid-copy and dmgbuild
