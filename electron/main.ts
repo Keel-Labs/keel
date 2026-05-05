@@ -55,6 +55,7 @@ import { listAllTasks, toggleTask, moveTask, acceptIncomingTask, appendTask, cre
 import { capture } from '../src/core/workflows/capture';
 import { synthesizeMeeting, formatMeetingNote, formatDailyLogEntry } from '../src/core/workflows/meetingTranscription';
 import { isWhisperAvailable, getWhisperBinary, transcribeAudioBuffer } from './transcriptionService';
+import { initLogger, logger, buildDiagnostics } from './logger';
 import { isModelDownloaded, getAvailableModels, downloadModel } from './modelManager';
 import { autoCapture } from '../src/core/workflows/autoCapture';
 import { dailyBrief } from '../src/core/workflows/dailyBrief';
@@ -831,6 +832,15 @@ function registerIpcHandlers() {
 
   ipcMain.handle('keel:get-app-version', () => {
     return app.getVersion();
+  });
+
+  ipcMain.handle('keel:get-diagnostics', () => {
+    return buildDiagnostics();
+  });
+
+  ipcMain.handle('keel:log-renderer-error', (_event, payload: { message?: string; stack?: string; componentStack?: string }) => {
+    const { message, stack, componentStack } = payload || {};
+    logger.error('renderer error:', message || '(no message)', stack || '', componentStack ? `\ncomponentStack:${componentStack}` : '');
   });
 
   ipcMain.handle('keel:save-settings', async (_event, newSettings: Settings) => {
@@ -2501,6 +2511,7 @@ function startScheduler(): void {
 // --- App Lifecycle ---
 
 app.setName('Keel');
+initLogger();
 
 app.whenReady().then(async () => {
   // Set dock icon in dev mode

@@ -182,6 +182,7 @@ export default function Settings({ onBack, navigation }: Props) {
   const [saved, setSaved] = useState(false);
   const [showApiKey, setShowApiKey] = useState<Record<string, boolean>>({});
   const [appVersion, setAppVersion] = useState<string>('');
+  const [copyDiagnosticStatus, setCopyDiagnosticStatus] = useState<'idle' | 'copied' | 'error'>('idle');
   const [googleConnected, setGoogleConnected] = useState(false);
   const [googleConfigured, setGoogleConfigured] = useState(false);
   const [googleSyncing, setGoogleSyncing] = useState(false);
@@ -765,6 +766,36 @@ export default function Settings({ onBack, navigation }: Props) {
               </div>
             </span>
             <span style={{ color: 'var(--text-tertiary)' }}>→</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={async () => {
+              try {
+                const blob = await window.keel.getDiagnostics();
+                await navigator.clipboard.writeText(blob);
+                setCopyDiagnosticStatus('copied');
+                setTimeout(() => setCopyDiagnosticStatus('idle'), 2500);
+              } catch {
+                setCopyDiagnosticStatus('error');
+                setTimeout(() => setCopyDiagnosticStatus('idle'), 2500);
+              }
+            }}
+            style={{ ...linkButtonStyle, marginTop: 10 }}
+          >
+            <span>
+              <strong style={{ color: 'var(--text-primary)' }}>
+                {copyDiagnosticStatus === 'copied'
+                  ? 'Copied — paste into your GitHub issue'
+                  : copyDiagnosticStatus === 'error'
+                  ? 'Couldn’t copy — try again'
+                  : 'Copy diagnostic info'}
+              </strong>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
+                App version, OS, configured providers, and the last 100 log lines. Stays on your machine until you paste it.
+              </div>
+            </span>
+            <span style={{ color: 'var(--text-tertiary)' }}>📋</span>
           </button>
         </SectionCard>
       </>

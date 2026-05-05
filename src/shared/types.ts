@@ -575,6 +575,9 @@ export interface KeelAPI {
   downloadWhisperBinary: () => Promise<{ ok: boolean; error?: string }>;
   onBinaryDownloadProgress: (callback: (payload: { percent: number }) => void) => () => void;
   downloadWhisperModel: (model?: string) => Promise<{ ok: boolean; error?: string }>;
+  // Diagnostics
+  getDiagnostics: () => Promise<string>;
+  logRendererError: (payload: { message?: string; stack?: string; componentStack?: string }) => Promise<void>;
 }
 
 declare global {

@@ -42,6 +42,10 @@ const api: KeelAPI = {
 
   getAppVersion: () => ipcRenderer.invoke('keel:get-app-version'),
 
+  getDiagnostics: () => ipcRenderer.invoke('keel:get-diagnostics'),
+
+  logRendererError: (payload) => ipcRenderer.invoke('keel:log-renderer-error', payload),
+
   saveSettings: (settings) => ipcRenderer.invoke('keel:save-settings', settings),
 
   ensureBrain: () => ipcRenderer.invoke('keel:ensure-brain'),
