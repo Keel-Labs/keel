@@ -1,0 +1,120 @@
+name: Intel macOS smoke test
+
+# Builds the universal Keel.app on an Apple Silicon runner, then launches it
+# on an Intel runner and asserts it stays alive long enough to prove the x64
+# slice loads its native modules without crashing. Catches the v0.1.1 class
+# of bug where universal builds shipped arm64-only .node files and silently
+# crashed on Intel Macs the first time anything called them.
+#
+# Triggered on changes to packaging/native-dep config, and manually.
+
+on:
+  pull_request:
+    paths:
+      - 'electron-builder.config.mjs'
+      - 'scripts/install-universal-mac-deps.mjs'
+      - 'scripts/verify-dmg.sh'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/intel-smoke-test.yml'
+  workflow_dispatch:
+
+jobs:
+  build-universal:
+    name: Build universal .app (arm64 host)
+    runs-on: macos-14
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
+
+      - run: npm ci
+
+      - name: Download whisper binary
+        run: node scripts/download-whisper-binary.js
+
+      - name: Build desktop bundles
+        run: npm run build:desktop
+
+      - name: Rebuild native deps for Electron
+        run: npm run electron:install-app-deps
+
+      - name: Stage x64 native deps + universal ffmpeg
+        run: node scripts/install-universal-mac-deps.mjs
+
+      - name: Pack universal .app (skip signing)
+        env:
+          KEEL_SKIP_SIGNING: '1'
+        run: npx electron-builder --config electron-builder.config.mjs --mac dir --universal
+
+      - name: Verify lipo arches inside .app
+        run: |
+          set -euo pipefail
+          UNPACKED=dist-packages/mac-universal/Keel.app/Contents/Resources/app.asar.unpacked
+          must_be_universal=(
+            "$UNPACKED/node_modules/ffmpeg-static/ffmpeg"
+            "$UNPACKED/node_modules/better-sqlite3/build/Release/better_sqlite3.node"
+            "dist-packages/mac-universal/Keel.app/Contents/MacOS/Keel"
+          )
+          for f in "${must_be_universal[@]}"; do
+            archs=$(lipo -archs "$f")
+            echo "$f -> $archs"
+            [[ "$archs" == *x86_64* && "$archs" == *arm64* ]] || { echo "FAIL: $f is not universal" >&2; exit 1; }
+          done
+          test -f "$UNPACKED/node_modules/@napi-rs/canvas-darwin-x64/skia.darwin-x64.node" \
+            || { echo "FAIL: canvas-darwin-x64 platform package missing" >&2; exit 1; }
+          test -f "$UNPACKED/node_modules/@napi-rs/canvas-darwin-arm64/skia.darwin-arm64.node" \
+            || { echo "FAIL: canvas-darwin-arm64 platform package missing" >&2; exit 1; }
+
+      - name: Tar .app for artifact upload
+        run: tar -C dist-packages/mac-universal -cf /tmp/Keel-app.tar Keel.app
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: keel-universal-app
+          path: /tmp/Keel-app.tar
+          retention-days: 3
+
+  smoke-test-intel:
+    name: Launch on Intel and assert alive
+    needs: build-universal
+    runs-on: macos-13
+    timeout-minutes: 10
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: keel-universal-app
+          path: /tmp
+
+      - name: Untar
+        run: |
+          mkdir -p /tmp/run
+          tar -xf /tmp/Keel-app.tar -C /tmp/run
+          ls -la /tmp/run/Keel.app/Contents/MacOS
+
+      - name: Launch and verify it stays alive 15s on real Intel hardware
+        run: |
+          set -euo pipefail
+          BIN=/tmp/run/Keel.app/Contents/MacOS/Keel
+          "$BIN" > /tmp/keel-stdout.log 2> /tmp/keel-stderr.log &
+          PID=$!
+          echo "Launched pid=$PID"
+          for i in $(seq 1 15); do
+            sleep 1
+            if ! kill -0 $PID 2>/dev/null; then
+              echo "FAIL: Keel exited at second $i" >&2
+              echo "--- stderr ---" >&2
+              cat /tmp/keel-stderr.log >&2
+              echo "--- stdout ---" >&2
+              cat /tmp/keel-stdout.log >&2
+              exit 1
+            fi
+          done
+          echo "PASS: Keel stayed alive 15s on Intel."
+          kill $PID 2>/dev/null || true
+          sleep 2
+          kill -9 $PID 2>/dev/null || true
