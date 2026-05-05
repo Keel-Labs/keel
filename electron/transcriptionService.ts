@@ -1,11 +1,9 @@
-import { app } from 'electron'
+import { app, net } from 'electron'
 import { spawn, execFile } from 'child_process'
 import { promisify } from 'util'
 import * as path from 'path'
 import * as fs from 'fs'
 import * as os from 'os'
-import * as https from 'https'
-import * as http from 'http'
 import { getModelPath } from './modelManager'
 
 const execFileAsync = promisify(execFile)
@@ -65,36 +63,66 @@ export function isWhisperAvailable(): boolean {
 // Runtime binary download (for users without the packaged .app)
 // ---------------------------------------------------------------------------
 
+// Use Electron's `net` module instead of Node `https`: it routes through
+// Chromium's network stack and the OS trust store, so users behind corporate
+// MITM proxies / VPNs (Zscaler etc.) don't trip "unable to get local issuer
+// certificate". `net.request` follows redirects by default.
+function describeNetError(err: Error): Error {
+  const msg = err.message || ''
+  if (/ERR_CERT|certificate|issuer/i.test(msg)) {
+    return new Error(
+      `Network is intercepting HTTPS (${msg}). If you're on a corporate VPN or behind an antivirus that inspects traffic, try a different network or set NODE_EXTRA_CA_CERTS to your org's root certificate.`
+    )
+  }
+  return err
+}
+
 function fetchJson(url: string): Promise<any> {
   return new Promise((resolve, reject) => {
-    https.get(url, { headers: { 'User-Agent': 'keel-app' } }, (res) => {
+    const req = net.request({ method: 'GET', url })
+    req.setHeader('User-Agent', 'keel-app')
+    req.on('response', (res) => {
       let data = ''
-      res.on('data', (c) => (data += c))
-      res.on('end', () => { try { resolve(JSON.parse(data)) } catch (e) { reject(e) } })
-    }).on('error', reject)
+      res.on('data', (c) => (data += c.toString()))
+      res.on('end', () => { try { resolve(JSON.parse(data)) } catch (e) { reject(e as Error) } })
+      res.on('error', (e: Error) => reject(describeNetError(e)))
+    })
+    req.on('error', (e) => reject(describeNetError(e)))
+    req.end()
   })
 }
 
-function downloadFile(url: string, dest: string, onProgress?: (pct: number) => void, redirects = 0): Promise<void> {
+function downloadFile(url: string, dest: string, onProgress?: (pct: number) => void): Promise<void> {
   return new Promise((resolve, reject) => {
-    if (redirects > 5) return reject(new Error('Too many redirects'))
-    const mod = url.startsWith('https') ? https : http
-    mod.get(url, { headers: { 'User-Agent': 'keel-app' } }, (res) => {
-      if (res.statusCode === 301 || res.statusCode === 302 || res.statusCode === 307) {
-        return resolve(downloadFile(res.headers.location!, dest, onProgress, redirects + 1))
-      }
+    const req = net.request({ method: 'GET', url, redirect: 'follow' })
+    req.setHeader('User-Agent', 'keel-app')
+    req.on('response', (res) => {
       if (res.statusCode !== 200) return reject(new Error(`HTTP ${res.statusCode}`))
-      const total = parseInt(res.headers['content-length'] || '0', 10)
+      const total = parseInt((res.headers['content-length'] as string) || '0', 10)
       let received = 0
       const file = fs.createWriteStream(dest + '.partial')
       res.on('data', (chunk: Buffer) => {
         received += chunk.length
         if (total && onProgress) onProgress(Math.round((received / total) * 100))
+        file.write(chunk)
       })
-      res.pipe(file)
-      file.on('finish', () => { file.close(); fs.renameSync(dest + '.partial', dest); resolve() })
-      file.on('error', (err) => { fs.unlink(dest + '.partial', () => {}); reject(err) })
-    }).on('error', reject)
+      res.on('end', () => {
+        file.end()
+        file.on('close', () => {
+          try { fs.renameSync(dest + '.partial', dest); resolve() } catch (e) { reject(e as Error) }
+        })
+      })
+      res.on('error', (e: Error) => {
+        file.destroy()
+        fs.unlink(dest + '.partial', () => {})
+        reject(describeNetError(e))
+      })
+    })
+    req.on('error', (e) => {
+      fs.unlink(dest + '.partial', () => {})
+      reject(describeNetError(e))
+    })
+    req.end()
   })
 }
 
