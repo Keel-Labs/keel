@@ -89,10 +89,35 @@ This is the right default because the product requirement is ease of use, not sm
 
 Keel currently depends on native or architecture-sensitive modules, including:
 
-- `better-sqlite3`
-- `@lancedb/lancedb`
+- `better-sqlite3` — rebuilt per-arch by `electron-builder install-app-deps`.
+- `@lancedb/lancedb` — see "LanceDB on Intel" below.
+- `ffmpeg-static` — single `ffmpeg` binary; we lipo a universal Mach-O into
+  `node_modules/ffmpeg-static/ffmpeg` before packing (see
+  [scripts/install-universal-mac-deps.mjs](../scripts/install-universal-mac-deps.mjs)).
+- `@napi-rs/canvas` (transitive via `pdf-parse`) — ships per-arch platform
+  packages; the same script stages `@napi-rs/canvas-darwin-x64` into
+  `node_modules` so the universal merge has both arches available.
 
 These are the main risk to universal packaging.
+
+### LanceDB on Intel
+
+LanceDB stopped publishing `@lancedb/lancedb-darwin-x64` after 0.22.x. Keel
+depends on `@lancedb/lancedb@^0.27.1`, so there is no x64 prebuilt to bundle
+and the universal `.app` cannot include LanceDB on the Intel slice.
+
+Rather than block universal packaging on this, [vectorStore.ts](../src/core/vectorStore.ts)
+catches the failed dynamic import and every public function resolves to a
+no-op when LanceDB is unavailable. The retrieval pipeline in
+[contextAssembler.ts](../src/core/contextAssembler.ts) combines vector search
+with FTS5 keyword search, so on Intel Macs vector search is silently dark and
+keyword retrieval carries the load. Recall quality is degraded but the app
+launches and answers — the user-visible failure mode is "search finds fewer
+relevant chunks", not a crash.
+
+Revisit if LanceDB resumes Intel prebuilds, or swap to a vector store with
+universal macOS support (e.g. `sqlite-vec`) when the embedding pipeline gets
+its next overhaul.
 
 Universal DMG is only acceptable if:
 

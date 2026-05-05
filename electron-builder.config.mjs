@@ -44,7 +44,11 @@ export default {
     icon: 'build/icon.icns',
     target: ['dmg'],
     artifactName,
-    x64ArchFiles: '**/{*.darwin-arm64.node,ffmpeg-static/ffmpeg}',
+    // Per-arch native deps are pre-staged into node_modules by
+    // scripts/install-universal-mac-deps.mjs (see dist:mac), so the universal
+    // merge sees identical, already-universal binaries in both arch slices.
+    // No x64ArchFiles / arm64ArchFiles overrides are needed; the previous
+    // pattern here was inverted and effectively did nothing.
     hardenedRuntime: true,
     gatekeeperAssess: false,
     // Sign with the Developer ID Application certificate when available; fall
