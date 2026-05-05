@@ -40,11 +40,10 @@ export default {
     // Sign with the Developer ID Application certificate when available; fall
     // back to ad-hoc signing for local dev builds (no cert installed).
     identity: process.env.KEEL_SKIP_SIGNING ? null : 'Medha Ghatikesh (L77FWJRVLZ)',
-    // Notarize with Apple when APPLE_ID + APPLE_APP_SPECIFIC_PASSWORD are set
-    // in the environment. Skipped automatically if creds are absent.
-    notarize: process.env.APPLE_ID && process.env.APPLE_APP_SPECIFIC_PASSWORD
-      ? { teamId: 'L77FWJRVLZ' }
-      : false,
+    // Notarize with Apple when APPLE_ID + APPLE_APP_SPECIFIC_PASSWORD +
+    // APPLE_TEAM_ID are set in the environment. electron-builder@26.x requires
+    // `notarize` to be a boolean; team id comes from APPLE_TEAM_ID env var.
+    notarize: !!(process.env.APPLE_ID && process.env.APPLE_APP_SPECIFIC_PASSWORD && process.env.APPLE_TEAM_ID),
     entitlements: 'build/entitlements.mac.plist',
     entitlementsInherit: 'build/entitlements.mac.inherit.plist',
     extendInfo: {
