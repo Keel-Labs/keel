@@ -44,11 +44,20 @@ export default {
     icon: 'build/icon.icns',
     target: ['dmg'],
     artifactName,
-    // Per-arch native deps are pre-staged into node_modules by
-    // scripts/install-universal-mac-deps.mjs (see dist:mac), so the universal
-    // merge sees identical, already-universal binaries in both arch slices.
-    // No x64ArchFiles / arm64ArchFiles overrides are needed; the previous
-    // pattern here was inverted and effectively did nothing.
+    // @electron/universal merges the per-arch slices into a universal .app.
+    // For native binaries that are identical in both slices it requires an
+    // explicit declaration via x64ArchFiles, otherwise it aborts. Three
+    // categories show up here:
+    //   - *.darwin-arm64.node — lancedb (no x64 prebuilt; gracefully
+    //     degrades on Intel via vectorStore.ts) and canvas's arm64 platform
+    //     package, both pre-staged so they land in both slices.
+    //   - *.darwin-x64.node — canvas's x64 platform package, staged by
+    //     scripts/install-universal-mac-deps.mjs.
+    //   - ffmpeg-static/ffmpeg — lipo'd universal binary, identical in both
+    //     slices.
+    // better-sqlite3.node is intentionally NOT in this list: @electron/rebuild
+    // runs per-arch and the merger lipos the two results into a universal .node.
+    x64ArchFiles: '**/{*.darwin-arm64.node,*.darwin-x64.node,ffmpeg-static/ffmpeg}',
     hardenedRuntime: true,
     gatekeeperAssess: false,
     // Sign with the Developer ID Application certificate when available; fall
