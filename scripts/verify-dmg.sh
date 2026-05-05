@@ -85,6 +85,42 @@ for dmg in "${dmgs[@]}"; do
     exit 4
   fi
 
+  # Universal DMGs must contain Intel slices for every native binary that we
+  # actually call into at runtime. v0.1.1 silently shipped arm64-only ffmpeg
+  # and @napi-rs/canvas; this check makes that class of regression loud.
+  if [[ "$arch_suffix" == "universal" || "$arch_suffix" == "" ]]; then
+    asar_root="$mount_point/Keel.app/Contents/Resources/app.asar.unpacked"
+    declare -a required_universal=(
+      "$asar_root/node_modules/ffmpeg-static/ffmpeg"
+    )
+    declare -a required_present=(
+      "$asar_root/node_modules/@napi-rs/canvas-darwin-x64/skia.darwin-x64.node"
+      "$asar_root/node_modules/@napi-rs/canvas-darwin-arm64/skia.darwin-arm64.node"
+    )
+
+    for f in "${required_universal[@]}"; do
+      if [[ ! -f "$f" ]]; then
+        echo "verify-dmg: FAIL — missing $f in $(basename "$dmg")" >&2
+        hdiutil detach "$mount_point" -quiet >/dev/null 2>&1 || true
+        exit 5
+      fi
+      archs="$(lipo -archs "$f" 2>/dev/null || echo "")"
+      if [[ "$archs" != *"x86_64"* || "$archs" != *"arm64"* ]]; then
+        echo "verify-dmg: FAIL — $f is not a universal Mach-O (archs: $archs)" >&2
+        hdiutil detach "$mount_point" -quiet >/dev/null 2>&1 || true
+        exit 6
+      fi
+    done
+
+    for f in "${required_present[@]}"; do
+      if [[ ! -f "$f" ]]; then
+        echo "verify-dmg: FAIL — missing $f in $(basename "$dmg")" >&2
+        hdiutil detach "$mount_point" -quiet >/dev/null 2>&1 || true
+        exit 7
+      fi
+    done
+  fi
+
   hdiutil detach "$mount_point" -quiet >/dev/null 2>&1 || true
   rm -rf "$mount_point"
   trap - EXIT
