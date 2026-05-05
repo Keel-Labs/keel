@@ -210,6 +210,8 @@ knowledge-bases/{slug}/    # Wiki bases
 
 **Logs** — `~/Library/Logs/Keel/main.log` on macOS. Rotated at 10 MB. Local-only — no telemetry. To attach context to a bug report, open Settings → Help & Feedback → **Copy diagnostic info**, then paste into your GitHub issue. The blob is app version, OS, configured providers (names only, no keys), and the last 100 log lines with your home path replaced by `~`.
 
+**Updates** — Keel checks GitHub for new releases on launch and downloads them in the background. You'll see a native macOS notification when an update is ready; the new version installs the next time you quit and reopen Keel. No telemetry — the only thing sent off your machine is a request for the latest release manifest from `github.com`.
+
 You can move, back up, or version-control any of this yourself.
 
 ---
