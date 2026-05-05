@@ -772,11 +772,15 @@ export default function Settings({ onBack, navigation }: Props) {
             type="button"
             onClick={async () => {
               try {
+                if (typeof window.keel?.getDiagnostics !== 'function') {
+                  throw new Error('Diagnostics IPC not available — running an older build that lacks the v0.1.1 main process');
+                }
                 const blob = await window.keel.getDiagnostics();
                 await navigator.clipboard.writeText(blob);
                 setCopyDiagnosticStatus('copied');
                 setTimeout(() => setCopyDiagnosticStatus('idle'), 2500);
-              } catch {
+              } catch (err) {
+                console.error('[diagnostics] copy failed:', err);
                 setCopyDiagnosticStatus('error');
                 setTimeout(() => setCopyDiagnosticStatus('idle'), 2500);
               }
