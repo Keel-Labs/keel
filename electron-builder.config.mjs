@@ -80,7 +80,6 @@ export default {
   },
   dmg: {
     artifactName,
-    writeUpdateInfo: false,
     // dmg-builder under-sizes the RW image (bytes / 1000 + "K" suffix gives
     // ~2.4% headroom) and HFS+ catalog overhead pushes us over for ~1.9GB+
     // payloads. ditto then exits with "no space" mid-copy and dmgbuild
