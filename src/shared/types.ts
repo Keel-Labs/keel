@@ -416,6 +416,8 @@ export interface MeetingTranscriptionResult {
   ok: boolean;
   title?: string;
   summary?: string;
+  keyPoints?: string[];
+  decisions?: string[];
   actionItems?: string[];
   myActionItems?: string[];
   othersActionItems?: string[];

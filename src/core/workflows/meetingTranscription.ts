@@ -4,6 +4,7 @@ import type { Message } from '../../shared/types';
 export interface MeetingSynthesis {
   title: string;
   summary: string;
+  keyPoints: string[];          // main topics, context, info shared (not decisions, not actions)
   decisions: string[];
   actionItems: string[];        // combined (for saved note)
   myActionItems: string[];      // assigned to the speaker/recorder
@@ -20,15 +21,17 @@ ${transcript}
 Extract the following and return as JSON:
 {
   "title": "A short title for this meeting (5-10 words)",
-  "summary": "A 2-3 sentence summary of what was discussed",
-  "decisions": ["Key decision made", "Another decision (may be empty array)"],
+  "summary": "A substantive 3-5 sentence overview of what was discussed and why it mattered. Don't just restate the title — describe the actual content.",
+  "keyPoints": ["The main topics, facts, and context shared during the meeting that aren't decisions and aren't action items. Examples: 'Compensation: base salary $180-220k plus equity', 'Role is leveled as L5 senior IC', 'Team reports into VP of Product', 'Hiring timeline targets Q3 close'. Aim for 4-8 specific bullets that capture what was actually said — concrete details, numbers, names, constraints. Skip generic filler."],
+  "decisions": ["Concrete decisions or conclusions reached during the meeting (may be empty array)"],
   "myActionItems": ["action items assigned to the person speaking/recording (the 'Speaker', 'I', 'me', or 'you' — first-person perspective)"],
   "othersActionItems": ["Name: action item — tasks assigned to other named people"]
 }
 
-If no clear decisions or action items exist, use empty arrays.
+For keyPoints: think of it as the notes a careful attendee would jot down — what was discussed, what was learned, what context was shared. Include specific details (numbers, names, dates, levels) when they appear in the transcript. Don't repeat content that's already in summary, decisions, or actionItems.
 For myActionItems: include anything the speaker committed to doing themselves.
-For othersActionItems: include tasks explicitly assigned to other named people.`;
+For othersActionItems: include tasks explicitly assigned to other named people.
+Use empty arrays when a category genuinely has nothing to capture.`;
 
 export async function synthesizeMeeting(
   transcript: string,
@@ -53,6 +56,7 @@ export async function synthesizeMeeting(
     return {
       title: parsed.title || 'Meeting',
       summary: parsed.summary || '',
+      keyPoints: Array.isArray(parsed.keyPoints) ? parsed.keyPoints : [],
       decisions: Array.isArray(parsed.decisions) ? parsed.decisions : [],
       myActionItems: myItems,
       othersActionItems: othersItems,
@@ -63,6 +67,7 @@ export async function synthesizeMeeting(
     return {
       title: 'Meeting',
       summary: transcript.slice(0, 200),
+      keyPoints: [],
       decisions: [],
       myActionItems: [],
       othersActionItems: [],
@@ -89,6 +94,15 @@ export function formatMeetingNote(
   lines.push('');
   lines.push(synthesis.summary);
   lines.push('');
+
+  if (synthesis.keyPoints.length > 0) {
+    lines.push('## Key Points');
+    lines.push('');
+    for (const point of synthesis.keyPoints) {
+      lines.push(`- ${point}`);
+    }
+    lines.push('');
+  }
 
   if (synthesis.actionItems.length > 0) {
     lines.push('## Action Items');

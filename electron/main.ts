@@ -1102,7 +1102,7 @@ function registerIpcHandlers() {
       try {
         synthesis = await synthesizeMeeting(transcript.trim(), llmClient);
       } catch {
-        synthesis = { title: 'Meeting', summary: '', decisions: [], actionItems: [], myActionItems: [], othersActionItems: [] };
+        synthesis = { title: 'Meeting', summary: '', keyPoints: [], decisions: [], actionItems: [], myActionItems: [], othersActionItems: [] };
       }
 
       event.sender.send('keel:meeting-progress', { step: 'Saving to brain…' });
@@ -1132,6 +1132,8 @@ function registerIpcHandlers() {
         ok: true,
         title: synthesis.title,
         summary: synthesis.summary,
+        keyPoints: synthesis.keyPoints,
+        decisions: synthesis.decisions,
         actionItems: synthesis.actionItems,
         myActionItems: synthesis.myActionItems,
         othersActionItems: synthesis.othersActionItems,
@@ -1251,7 +1253,7 @@ function registerIpcHandlers() {
       try {
         synthesis = await synthesizeMeeting(transcript, llmClient);
       } catch {
-        synthesis = { title: 'Meeting', summary: '', decisions: [], actionItems: [], myActionItems: [], othersActionItems: [] };
+        synthesis = { title: 'Meeting', summary: '', keyPoints: [], decisions: [], actionItems: [], myActionItems: [], othersActionItems: [] };
       }
 
       // ── Save ──────────────────────────────────────────────────────────────
@@ -1281,6 +1283,8 @@ function registerIpcHandlers() {
         ok: true,
         title: synthesis.title,
         summary: synthesis.summary,
+        keyPoints: synthesis.keyPoints,
+        decisions: synthesis.decisions,
         actionItems: synthesis.actionItems,
         myActionItems: synthesis.myActionItems,
         othersActionItems: synthesis.othersActionItems,

@@ -437,6 +437,32 @@ export default function MeetingRecorder({ onOpenSettings }: Props) {
                 </div>
               )}
 
+              {result.keyPoints && result.keyPoints.length > 0 && (
+                <div style={{ marginBottom: 20 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 10 }}>
+                    Key Points
+                  </div>
+                  <ul style={{ margin: 0, paddingLeft: 20, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {result.keyPoints.map((point, i) => (
+                      <li key={i} style={{ fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.55 }}>{point}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {result.decisions && result.decisions.length > 0 && (
+                <div style={{ marginBottom: 20 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 10 }}>
+                    Key Decisions
+                  </div>
+                  <ul style={{ margin: 0, paddingLeft: 20, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {result.decisions.map((decision, i) => (
+                      <li key={i} style={{ fontSize: 14, color: 'var(--text-primary)', lineHeight: 1.55 }}>{decision}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
               {/* My action items — with add-to-tasks */}
               {result.myActionItems && result.myActionItems.length > 0 && (
                 <div style={{ marginBottom: 20 }}>
