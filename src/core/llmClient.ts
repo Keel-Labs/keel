@@ -61,10 +61,13 @@ export class LLMClient {
     this.ollama = new Ollama();
 
     if (settings.anthropicApiKey) {
-      this.anthropic = new Anthropic({ apiKey: settings.anthropicApiKey });
+      this.anthropic = new Anthropic({
+        apiKey: settings.anthropicApiKey,
+        ...(settings.anthropicBaseUrl ? { baseURL: settings.anthropicBaseUrl } : {}),
+      });
     }
     if (settings.openaiApiKey) {
-      this.openai = createOpenAIClient(settings.openaiApiKey);
+      this.openai = createOpenAIClient(settings.openaiApiKey, settings.openaiBaseUrl || undefined);
     }
     if (settings.openrouterApiKey) {
       this.openrouter = createOpenAIClient(
@@ -87,12 +90,15 @@ export class LLMClient {
     this.ollamaModel = settings.ollamaModel || 'llama3.2';
 
     if (settings.anthropicApiKey) {
-      this.anthropic = new Anthropic({ apiKey: settings.anthropicApiKey });
+      this.anthropic = new Anthropic({
+        apiKey: settings.anthropicApiKey,
+        ...(settings.anthropicBaseUrl ? { baseURL: settings.anthropicBaseUrl } : {}),
+      });
     } else {
       this.anthropic = null;
     }
     if (settings.openaiApiKey) {
-      this.openai = createOpenAIClient(settings.openaiApiKey);
+      this.openai = createOpenAIClient(settings.openaiApiKey, settings.openaiBaseUrl || undefined);
     } else {
       this.openai = null;
     }

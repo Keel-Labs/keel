@@ -1185,7 +1185,7 @@ function registerIpcHandlers() {
         const tmpPath = path.join(os.tmpdir(), `keel-voice-${Date.now()}.webm`);
         try {
           fs.writeFileSync(tmpPath, Buffer.from(audioBuffer));
-          const openaiClient = new OpenAI({ apiKey: settings.openaiApiKey, fetch: getElectronAwareFetch() });
+          const openaiClient = new OpenAI({ apiKey: settings.openaiApiKey, baseURL: settings.openaiBaseUrl || undefined, fetch: getElectronAwareFetch() });
           const result = await openaiClient.audio.transcriptions.create({
             file: await toFile(fs.createReadStream(tmpPath), 'voice.webm', { type: 'audio/webm' }),
             model: 'whisper-1',
@@ -1225,7 +1225,7 @@ function registerIpcHandlers() {
         const tmpPath = path.join(os.tmpdir(), `keel-meeting-${Date.now()}.webm`);
         try {
           fs.writeFileSync(tmpPath, Buffer.from(audioBuffer));
-          const openaiClient = new OpenAI({ apiKey: settings.openaiApiKey, fetch: getElectronAwareFetch() });
+          const openaiClient = new OpenAI({ apiKey: settings.openaiApiKey, baseURL: settings.openaiBaseUrl || undefined, fetch: getElectronAwareFetch() });
           const result = await openaiClient.audio.transcriptions.create({
             file: await toFile(fs.createReadStream(tmpPath), 'recording.webm', { type: 'audio/webm' }),
             model: 'whisper-1',
@@ -2271,6 +2271,7 @@ function registerIpcHandlers() {
     try {
       const client = new OpenAI({
         apiKey: settings.openaiApiKey,
+        baseURL: settings.openaiBaseUrl || undefined,
         fetch: getElectronAwareFetch(),
       });
       const page = await client.models.list();

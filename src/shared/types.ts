@@ -60,9 +60,11 @@ export interface Settings {
   // Claude
   anthropicApiKey: string;
   claudeModel: string;
+  anthropicBaseUrl: string;  // Optional override; empty = SDK default (https://api.anthropic.com).
   // OpenAI
   openaiApiKey: string;
   openaiModel: string;
+  openaiBaseUrl: string;     // Optional override; empty = SDK default (https://api.openai.com/v1).
   // OpenRouter / custom OpenAI-compatible endpoint
   openrouterApiKey: string;
   openrouterModel: string;
