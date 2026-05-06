@@ -119,6 +119,28 @@ Codex should explicitly call out:
 - infra or deployment impact
 - backward compatibility concerns
 
+## Git hygiene — never use blanket staging
+**NEVER** use `git add -A`, `git add .`, or `git commit -a` in this repository.
+**ALWAYS** stage files by explicit name (`git add path/to/file.ts`).
+
+This repository's checkout has historically overlapped with the maintainer's
+personal workspace folders (`projects/`, `meetings/`, `daily-log/`, `inbox/`,
+`knowledge-bases/`, plus `pulse.md`, `tasks.md`, `keel.md`). Those paths are
+gitignored as a defense, but agents must not rely on `.gitignore` as the only
+line of defense. If `git status` shows more files than the agent intended to
+modify, the agent must stop and surface the discrepancy before staging.
+
+This rule exists because in May 2026 a Claude session used `git add -A` and
+inadvertently pushed personal documents (including a private interview
+transcript) to a public branch. The branch was deleted within minutes but
+the cached commit required a GitHub Support ticket to fully purge. Don't
+repeat it.
+
+Never use `git push --force`, `git push --force-with-lease`, or any
+history-rewriting operation (`git rebase` of pushed branches, `git commit
+--amend` of pushed commits, `git reset --hard` followed by push) without
+explicit user authorization in the same conversation.
+
 ## Refactors And Dependencies
 - Refactors should preserve behavior unless behavior changes are explicitly requested.
 - Separate refactor commits from behavior changes when practical.

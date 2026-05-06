@@ -234,8 +234,9 @@ Please read [the note on this being a one-person project](#a-note-on-this-being-
 
 ## Support
 
-- **Bugs and feature requests:** [Fider board](https://keel.fider.io) or [GitHub issues](https://github.com/Keel-Labs/keel/issues)
+- **Bugs and feature requests:** [Fider board](https://keel.fider.io) or [GitHub issues](https://github.com/Keel-Labs/keel/issues) — preferred, so other users hitting the same thing can find the discussion
 - **General questions:** open a GitHub issue
+- **Security disclosures:** see [SECURITY.md](SECURITY.md). Email is reserved for security reports; everything else should go through Issues so it's discoverable.
 
 ---
 

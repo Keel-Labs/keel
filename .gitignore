@@ -11,3 +11,20 @@ archive/
 
 # Maintainer-only specs that must never be committed to the public repo.
 specs/gbrain-gap-analysis.md
+
+# Personal workspace data — when Keel runs from this checkout, the user's
+# brain folder lives here as untracked files. These must NEVER be committed.
+# (This is what ~/Keel becomes when the maintainer runs the dev build from
+# this directory.) If you add new workspace folder names in fileManager.ts,
+# add them here too.
+daily-log/
+meetings/
+inbox/
+knowledge-bases/
+projects/
+pulse.md
+tasks.md
+keel.md
+
+# Local agent worktrees — created by Claude Code / similar tools. Never source.
+.claude/worktrees/
