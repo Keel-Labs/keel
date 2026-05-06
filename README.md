@@ -129,22 +129,20 @@ If you can live with them, Keel is genuinely useful right now.
 
 ## Roadmap
 
-This is where Keel is going — focused on memory and context, not a general productivity suite. Order is rough; nothing here is a promise.
+Keel's roadmap lives as labeled issues so it's discoverable, commentable, and rankable in one place alongside incoming requests:
 
-**Near-term (next few months)**
-- **LLM-maintained knowledge bases** — the core product direction. You collect source material (URLs, PDFs, docs, notes); Keel compiles it into a living wiki, runs health checks to keep it fresh, and answers questions by writing durable markdown artifacts back into your workspace. The wiki gets better every time you use it.
-- **Auto-refresh KBs** — knowledge bases update automatically as files change, no `/refresh-kb` needed
-- **Natural language for actions** — "build a KB for my project" works without slash commands; real tool-calling so the agent does things, not just describes them
-- **Multi-machine workspace sync** — opt-in, end-to-end encrypted
-- **Mobile companion** — read your workspace and add quick notes on the go
-- **Windows build**
+**[→ View the full roadmap](https://github.com/Keel-Labs/keel/issues?q=is%3Aissue+is%3Aopen+label%3Aroadmap)**
 
-**Medium-term**
-- **People graph** — Keel extracts entities from your workspace and builds `people/*.md` automatically; surfaces things like "haven't talked to X in 3 weeks" in your daily brief
-- **Smarter onboarding** — folder scanning, project clustering, PARA proposals; Keel comprehends an existing workspace instead of starting from scratch
-- **Team workspaces** — optional and paid; the local-first single-user mode stays free and open source forever
-- **Linux build**
-- **Plugin/extension API** — so the community can add integrations without forking
+Items are stack-ranked into four tiers (filter by label):
+
+- **[`tier-1`](https://github.com/Keel-Labs/keel/issues?q=is%3Aissue+is%3Aopen+label%3Atier-1)** - ship next
+- **[`tier-2`](https://github.com/Keel-Labs/keel/issues?q=is%3Aissue+is%3Aopen+label%3Atier-2)** - high value, next few months
+- **[`tier-3`](https://github.com/Keel-Labs/keel/issues?q=is%3Aissue+is%3Aopen+label%3Atier-3)** - bigger commitments after the above
+- **[`tier-4`](https://github.com/Keel-Labs/keel/issues?q=is%3Aissue+is%3Aopen+label%3Atier-4)** - someday
+
+Order is rough. The product's center is **memory and context**, not a general productivity suite.
+
+Want something that isn't there? **[Open an issue](https://github.com/Keel-Labs/keel/issues/new)** — feature requests and bug reports both go through the same channel, so other users hitting the same thing can find the discussion.
 
 ---
 
