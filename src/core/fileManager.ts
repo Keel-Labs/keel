@@ -88,16 +88,25 @@ export class FileManager {
   }
 
   async ensureDirectoryStructure(): Promise<void> {
+    // Snapshot whether this brain is brand-new BEFORE we create anything.
+    // Used downstream to decide whether to seed the sample wiki base — we
+    // only seed for genuinely new brains, not on every re-init.
+    const keelPath = this.resolve('keel.md');
+    let brainIsNew: boolean;
+    try {
+      await fs.access(keelPath);
+      brainIsNew = false;
+    } catch {
+      brainIsNew = true;
+    }
+
     // Ensure core directories exist
     for (const dir of BRAIN_DIRS) {
       await fs.mkdir(this.resolve(dir), { recursive: true });
     }
 
     // Create keel.md if it doesn't exist
-    const keelPath = this.resolve('keel.md');
-    try {
-      await fs.access(keelPath);
-    } catch {
+    if (brainIsNew) {
       await fs.writeFile(keelPath, KEEL_MD_TEMPLATE, 'utf-8');
     }
 
@@ -109,17 +118,16 @@ export class FileManager {
       await fs.writeFile(tasksPath, TASKS_MD_TEMPLATE, 'utf-8');
     }
 
-    // Create example project if it doesn't exist
-    const exampleDir = this.resolve('projects/example-project');
-    const exampleContext = path.join(exampleDir, 'context.md');
-    try {
-      await fs.access(exampleContext);
-    } catch {
+    // Create example project ONLY for brand-new brains. Otherwise users who
+    // intentionally delete the example would see it respawn on every init.
+    if (brainIsNew) {
+      const exampleDir = this.resolve('projects/example-project');
+      const exampleContext = path.join(exampleDir, 'context.md');
       await fs.mkdir(exampleDir, { recursive: true });
       await fs.writeFile(exampleContext, EXAMPLE_PROJECT_CONTEXT, 'utf-8');
     }
 
-    await this.ensureSampleWikiBase();
+    await this.ensureSampleWikiBase(brainIsNew);
   }
 
   async resetProfile(): Promise<void> {
@@ -193,18 +201,45 @@ export class FileManager {
     return this.brainPath;
   }
 
-  private async ensureSampleWikiBase(): Promise<void> {
-    const sampleFiles = getStarWarsWikiFiles();
+  // Marker file recording that the sample wiki base has been seeded (or
+  // explicitly skipped because the brain wasn't new). Without this, an
+  // existing user who deletes the sample wiki from the UI would see it
+  // respawn on the next FileManager init.
+  private sampleSeededMarkerPath(): string {
+    return this.resolve('.config/.sample-wiki-seeded');
+  }
 
-    for (const sample of sampleFiles) {
-      const fullPath = this.resolve(sample.path);
-      try {
-        await fs.access(fullPath);
-      } catch {
+  private async ensureSampleWikiBase(brainIsNew: boolean): Promise<void> {
+    const markerPath = this.sampleSeededMarkerPath();
+    try {
+      await fs.access(markerPath);
+      // Marker exists — sample was seeded (or skipped) previously. Do not
+      // re-create it. Honors the user's deletion if they removed it later.
+      return;
+    } catch {
+      // No marker yet; fall through.
+    }
+
+    if (brainIsNew) {
+      // Brand-new brain: seed the sample so the first launch isn't empty.
+      const sampleFiles = getStarWarsWikiFiles();
+      for (const sample of sampleFiles) {
+        const fullPath = this.resolve(sample.path);
         await fs.mkdir(path.dirname(fullPath), { recursive: true });
         await fs.writeFile(fullPath, sample.content, 'utf-8');
       }
     }
+    // Else: existing brain. Do not seed — the user may have deliberately
+    // deleted the sample at some point, and we don't want to override that
+    // decision retroactively.
+
+    // Write the marker either way so future inits skip this entirely.
+    await fs.mkdir(path.dirname(markerPath), { recursive: true });
+    await fs.writeFile(
+      markerPath,
+      'Sample wiki base was handled on first init. Delete this file to allow re-seeding.\n',
+      'utf-8',
+    );
   }
 }
 
