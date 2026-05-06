@@ -3,8 +3,36 @@ import OpenAI from 'openai';
 import { Ollama } from 'ollama';
 import type { Message } from '../shared/types';
 import { loadSettings } from './settings';
+import type { ToolDefinition } from './tools/schemas';
+import { toAnthropicTools, toOpenAITools } from './tools/format';
 
 type Provider = 'claude' | 'openai' | 'openrouter' | 'ollama';
+
+export interface ToolCallInvocation {
+  id: string;
+  name: string;
+  input: Record<string, unknown>;
+}
+
+export interface ToolCallResult {
+  toolUseId: string;
+  content: string;
+  isError: boolean;
+}
+
+export type ToolExecutor = (call: ToolCallInvocation) => Promise<ToolCallResult>;
+
+export interface ChatWithToolsOptions {
+  tools: ToolDefinition[];
+  executeTool: ToolExecutor;
+  onChunk?: (chunk: string) => void;
+  onToolStart?: (call: ToolCallInvocation) => void;
+  onToolEnd?: (result: ToolCallResult & { name: string }) => void;
+  signal?: AbortSignal;
+  maxIterations?: number;
+}
+
+const DEFAULT_MAX_TOOL_ITERATIONS = 5;
 
 function getDesktopFetch(): typeof fetch {
   if (!process.versions.electron) {
@@ -38,6 +66,17 @@ function createOpenAIClient(apiKey: string, baseURL?: string): OpenAI {
     baseURL,
     fetch: getDesktopFetch(),
   });
+}
+
+function emitTextAsChunks(text: string, onChunk?: (chunk: string) => void): void {
+  if (!onChunk || !text) return;
+  // Emit in modest chunks so the UI feels responsive even though the
+  // underlying call wasn't true SSE streaming. Using ~80-char windows
+  // matches the streaming flush threshold used elsewhere.
+  const SIZE = 80;
+  for (let i = 0; i < text.length; i += SIZE) {
+    onChunk(text.slice(i, i + SIZE));
+  }
 }
 
 export class LLMClient {
@@ -112,6 +151,15 @@ export class LLMClient {
     }
   }
 
+  // For tests / dependency injection.
+  _setAnthropicForTesting(client: Anthropic | null): void {
+    this.anthropic = client;
+  }
+
+  _setOpenAIForTesting(client: OpenAI | null): void {
+    this.openai = client;
+  }
+
   async chat(messages: Message[], systemPrompt: string): Promise<string> {
     const attempts: Provider[] = [this.provider];
     // Add fallbacks
@@ -158,6 +206,61 @@ export class LLMClient {
       }
     }
     throw new Error('AI provider unavailable. Check Settings to configure your AI engine.');
+  }
+
+  /**
+   * Chat with tool-calling. Runs an inner loop: send messages + tools,
+   * execute any tool_use blocks the model emits, append tool_result back,
+   * and repeat until the model produces a text-only response. Final text
+   * is emitted via onChunk to preserve streaming UX.
+   *
+   * Tool calling is a Claude / OpenAI capability; for Ollama we still pass
+   * the tool list because some local models (llama3.1+, qwen2.5+) honor it,
+   * but we degrade to plain chatStream if the model never emits a tool_call.
+   */
+  async chatWithTools(
+    messages: Message[],
+    systemPrompt: string,
+    options: ChatWithToolsOptions
+  ): Promise<string> {
+    if (options.tools.length === 0) {
+      // No tools to expose — the orchestration loop is unnecessary. Use the
+      // existing streaming path so we keep real SSE for plain-text chat.
+      let buffer = '';
+      const sink = (chunk: string) => {
+        buffer += chunk;
+        options.onChunk?.(chunk);
+      };
+      await this.chatStream(messages, systemPrompt, sink, options.signal);
+      return buffer;
+    }
+
+    const attempts: Provider[] = [this.provider];
+    for (const p of ['claude', 'openai', 'openrouter', 'ollama'] as Provider[]) {
+      if (!attempts.includes(p)) attempts.push(p);
+    }
+
+    let lastError: unknown;
+    for (const provider of attempts) {
+      try {
+        switch (provider) {
+          case 'claude':
+            return await this.chatClaudeWithTools(messages, systemPrompt, options);
+          case 'openai':
+            return await this.chatOpenAIWithTools(this.openai, this.openaiModel, messages, systemPrompt, options);
+          case 'openrouter':
+            return await this.chatOpenAIWithTools(this.openrouter, this.openrouterModel, messages, systemPrompt, options);
+          case 'ollama':
+            return await this.chatOllamaWithTools(messages, systemPrompt, options);
+        }
+      } catch (err) {
+        lastError = err;
+        continue;
+      }
+    }
+    throw lastError instanceof Error
+      ? lastError
+      : new Error('AI provider unavailable. Check Settings to configure your AI engine.');
   }
 
   // --- Claude ---
@@ -230,6 +333,75 @@ export class LLMClient {
     }
   }
 
+  private async chatClaudeWithTools(
+    messages: Message[],
+    systemPrompt: string,
+    options: ChatWithToolsOptions
+  ): Promise<string> {
+    if (!this.anthropic) throw new Error('Anthropic API key not configured');
+    const maxIter = options.maxIterations ?? DEFAULT_MAX_TOOL_ITERATIONS;
+    const apiMessages: any[] = this.formatClaudeMessages(messages);
+    const anthropicTools = toAnthropicTools(options.tools);
+
+    for (let iter = 0; iter < maxIter; iter++) {
+      if (options.signal?.aborted) throw new Error('aborted');
+
+      const response = await this.anthropic.messages.create({
+        model: this.claudeModel,
+        max_tokens: 4096,
+        system: systemPrompt,
+        tools: anthropicTools as any,
+        messages: apiMessages,
+      });
+
+      const toolUses = response.content.filter((b: any) => b.type === 'tool_use') as Array<{
+        type: 'tool_use';
+        id: string;
+        name: string;
+        input: Record<string, unknown>;
+      }>;
+
+      if (response.stop_reason !== 'tool_use' || toolUses.length === 0) {
+        const textParts = response.content
+          .filter((b: any) => b.type === 'text')
+          .map((b: any) => b.text as string);
+        const finalText = textParts.join('');
+        emitTextAsChunks(finalText, options.onChunk);
+        return finalText;
+      }
+
+      // Append the assistant turn (containing the tool_use blocks) and a
+      // single user message with one tool_result per tool_use, in order.
+      apiMessages.push({ role: 'assistant', content: response.content });
+
+      const toolResults: any[] = [];
+      for (const tu of toolUses) {
+        const call: ToolCallInvocation = { id: tu.id, name: tu.name, input: tu.input || {} };
+        options.onToolStart?.(call);
+        let result: ToolCallResult;
+        try {
+          result = await options.executeTool(call);
+        } catch (err) {
+          result = {
+            toolUseId: tu.id,
+            content: err instanceof Error ? err.message : 'Tool execution failed.',
+            isError: true,
+          };
+        }
+        options.onToolEnd?.({ ...result, name: tu.name });
+        toolResults.push({
+          type: 'tool_result',
+          tool_use_id: tu.id,
+          content: result.content,
+          is_error: result.isError,
+        });
+      }
+      apiMessages.push({ role: 'user', content: toolResults });
+    }
+
+    throw new Error(`Tool-calling loop exceeded ${maxIter} iterations.`);
+  }
+
   // --- OpenAI / OpenRouter (shared implementation) ---
 
   private async chatOpenAI(
@@ -269,6 +441,83 @@ export class LLMClient {
       const content = chunk.choices[0]?.delta?.content;
       if (content) onChunk(content);
     }
+  }
+
+  private async chatOpenAIWithTools(
+    client: OpenAI | null,
+    model: string,
+    messages: Message[],
+    systemPrompt: string,
+    options: ChatWithToolsOptions
+  ): Promise<string> {
+    if (!client || !model) throw new Error('OpenAI client not configured');
+    const maxIter = options.maxIterations ?? DEFAULT_MAX_TOOL_ITERATIONS;
+    const apiMessages: any[] = this.formatOpenAIMessages(messages, systemPrompt);
+    const openaiTools = toOpenAITools(options.tools);
+
+    for (let iter = 0; iter < maxIter; iter++) {
+      if (options.signal?.aborted) throw new Error('aborted');
+
+      const response = await client.chat.completions.create({
+        model,
+        messages: apiMessages,
+        tools: openaiTools as any,
+      });
+
+      const choice = response.choices[0];
+      const message = choice?.message;
+      if (!message) {
+        return '';
+      }
+
+      const toolCalls = (message.tool_calls || []) as Array<{
+        id: string;
+        type: 'function';
+        function: { name: string; arguments: string };
+      }>;
+
+      if (!toolCalls.length || choice.finish_reason !== 'tool_calls') {
+        const finalText = message.content || '';
+        emitTextAsChunks(finalText, options.onChunk);
+        return finalText;
+      }
+
+      // Echo the assistant message back so the model sees its own tool_calls.
+      apiMessages.push({
+        role: 'assistant',
+        content: message.content ?? null,
+        tool_calls: toolCalls,
+      });
+
+      for (const tc of toolCalls) {
+        let parsedInput: Record<string, unknown> = {};
+        try {
+          parsedInput = tc.function.arguments ? JSON.parse(tc.function.arguments) : {};
+        } catch {
+          parsedInput = { _raw: tc.function.arguments };
+        }
+        const call: ToolCallInvocation = { id: tc.id, name: tc.function.name, input: parsedInput };
+        options.onToolStart?.(call);
+        let result: ToolCallResult;
+        try {
+          result = await options.executeTool(call);
+        } catch (err) {
+          result = {
+            toolUseId: tc.id,
+            content: err instanceof Error ? err.message : 'Tool execution failed.',
+            isError: true,
+          };
+        }
+        options.onToolEnd?.({ ...result, name: tc.function.name });
+        apiMessages.push({
+          role: 'tool',
+          tool_call_id: tc.id,
+          content: result.isError ? `[error] ${result.content}` : result.content,
+        });
+      }
+    }
+
+    throw new Error(`Tool-calling loop exceeded ${maxIter} iterations.`);
   }
 
   // --- Ollama ---
@@ -312,5 +561,91 @@ export class LLMClient {
         onChunk(chunk.message.content);
       }
     }
+  }
+
+  private async chatOllamaWithTools(
+    messages: Message[],
+    systemPrompt: string,
+    options: ChatWithToolsOptions
+  ): Promise<string> {
+    const maxIter = options.maxIterations ?? DEFAULT_MAX_TOOL_ITERATIONS;
+    const apiMessages: any[] = this.formatOllamaMessages(messages, systemPrompt);
+    const ollamaTools = options.tools.map((t) => ({
+      type: 'function',
+      function: {
+        name: t.name,
+        description: t.description,
+        parameters: t.inputSchema,
+      },
+    }));
+
+    for (let iter = 0; iter < maxIter; iter++) {
+      if (options.signal?.aborted) throw new Error('aborted');
+
+      let response: any;
+      try {
+        response = await this.ollama.chat({
+          model: this.ollamaModel,
+          messages: apiMessages,
+          tools: ollamaTools as any,
+        });
+      } catch (err) {
+        // Many local models choke when tools are passed. Drop tools and
+        // retry once — the system prompt still tells the model not to
+        // claim actions it can't perform.
+        if (iter === 0) {
+          response = await this.ollama.chat({
+            model: this.ollamaModel,
+            messages: apiMessages,
+          });
+        } else {
+          throw err;
+        }
+      }
+
+      const toolCalls = (response.message?.tool_calls || []) as Array<{
+        function: { name: string; arguments: Record<string, unknown> };
+      }>;
+
+      if (!toolCalls.length) {
+        const finalText = response.message?.content || '';
+        emitTextAsChunks(finalText, options.onChunk);
+        return finalText;
+      }
+
+      apiMessages.push({
+        role: 'assistant',
+        content: response.message?.content || '',
+        tool_calls: toolCalls,
+      });
+
+      for (let i = 0; i < toolCalls.length; i++) {
+        const tc = toolCalls[i];
+        const id = `ollama-tool-${iter}-${i}`;
+        const call: ToolCallInvocation = {
+          id,
+          name: tc.function.name,
+          input: (tc.function.arguments as Record<string, unknown>) || {},
+        };
+        options.onToolStart?.(call);
+        let result: ToolCallResult;
+        try {
+          result = await options.executeTool(call);
+        } catch (err) {
+          result = {
+            toolUseId: id,
+            content: err instanceof Error ? err.message : 'Tool execution failed.',
+            isError: true,
+          };
+        }
+        options.onToolEnd?.({ ...result, name: tc.function.name });
+        apiMessages.push({
+          role: 'tool',
+          content: result.isError ? `[error] ${result.content}` : result.content,
+        });
+      }
+    }
+
+    throw new Error(`Tool-calling loop exceeded ${maxIter} iterations.`);
   }
 }
