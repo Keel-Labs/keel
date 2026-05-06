@@ -17,6 +17,9 @@ import * as os from 'os';
 // chokidar v5 is ESM-only — loaded via dynamic import in startFileWatcher()
 import { FileManager, TeamFileManager } from '../src/core/fileManager';
 import { LLMClient } from '../src/core/llmClient';
+import { getToolsForContext } from '../src/core/tools/schemas';
+import { toolsSystemAddendum } from '../src/core/tools/format';
+import { makeToolExecutor, googleAvailable, xAvailable } from './toolExecutor';
 import { ContextAssembler } from '../src/core/contextAssembler';
 import { loadSettings, saveSettings as saveSettingsToFile } from '../src/core/settings';
 import { embedFile } from '../src/core/embeddings';
@@ -1142,6 +1145,24 @@ function registerIpcHandlers() {
         emitThinking('Selected wiki base has no strong match');
       }
     }
+    // Expose tools the assistant can invoke. The set depends on which
+    // integrations the user has connected — if Google isn't connected we
+    // don't show export_to_google_doc, which kills that hallucination
+    // class entirely.
+    const toolsForChat = getToolsForContext({
+      googleConnected: googleAvailable(settings.brainPath),
+      xConnected: xAvailable(settings.brainPath),
+    });
+    systemPrompt += '\n' + toolsSystemAddendum(toolsForChat);
+
+    const executeTool = makeToolExecutor({
+      fileManager,
+      llmClient,
+      brainPath: settings.brainPath,
+      timezone: settings.timezone || undefined,
+      onCompileKb: (wikiBaseSlug) => compileProjectKbInBackground(wikiBaseSlug),
+    });
+
     emitThinking('Generating answer');
 
     logActivity(settings.brainPath, 'chat', lastMessage?.slice(0, 200));
@@ -1159,18 +1180,26 @@ function registerIpcHandlers() {
     };
 
     try {
-      await llmClient.chatStream(enrichedMessages, systemPrompt, (chunk: string) => {
-        if (abortController.signal.aborted) return;
-        fullResponse += chunk;
-        buffer += chunk;
-        // Flush immediately if buffer hits 100 chars, otherwise batch at 50ms
-        if (buffer.length >= 100) {
-          if (flushTimer) { clearTimeout(flushTimer); flushTimer = null; }
-          flush();
-        } else if (!flushTimer) {
-          flushTimer = setTimeout(flush, 50);
-        }
-      }, abortController.signal);
+      await llmClient.chatWithTools(enrichedMessages, systemPrompt, {
+        tools: toolsForChat,
+        executeTool,
+        signal: abortController.signal,
+        onToolStart: (call) => emitThinking(`Calling ${call.name}`),
+        onToolEnd: (result) => {
+          emitThinking(result.isError ? `${result.name} failed` : `${result.name} done`);
+        },
+        onChunk: (chunk: string) => {
+          if (abortController.signal.aborted) return;
+          fullResponse += chunk;
+          buffer += chunk;
+          if (buffer.length >= 100) {
+            if (flushTimer) { clearTimeout(flushTimer); flushTimer = null; }
+            flush();
+          } else if (!flushTimer) {
+            flushTimer = setTimeout(flush, 50);
+          }
+        },
+      });
 
       const citationBlock = buildWikiCitationBlock(wikiCitations);
       if (citationBlock) {
