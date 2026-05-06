@@ -136,6 +136,11 @@ export interface ProjectKBManifest {
   wikiBaseSlug: string;
   lastRefreshed: number;
   ingestedFiles: { path: string; mtime: number }[];
+  /** Per-KB auto-refresh toggle. Defaults to true when absent. */
+  autoRefreshEnabled?: boolean;
+  /** Last auto-refresh error message, kept until the next successful auto-refresh. */
+  lastAutoRefreshError?: string;
+  lastAutoRefreshErrorAt?: number;
 }
 
 export interface ProjectKBStatus {
@@ -143,6 +148,20 @@ export interface ProjectKBStatus {
   wikiBaseSlug?: string;
   lastRefreshed?: number;
   ingestedCount?: number;
+  autoRefreshEnabled?: boolean;
+  lastAutoRefreshError?: string;
+  lastAutoRefreshErrorAt?: number;
+}
+
+/** Lightweight summary of a project-backed KB, for the auto-refresh watcher and UI toggles. */
+export interface ProjectKBEntry {
+  projectSlug: string;
+  wikiBaseSlug: string;
+  basePath: string; // knowledge-bases/<wikiBaseSlug>
+  autoRefreshEnabled: boolean;
+  lastRefreshed: number;
+  lastAutoRefreshError?: string;
+  lastAutoRefreshErrorAt?: number;
 }
 
 export interface ProjectKBRefreshResult {
@@ -518,6 +537,8 @@ export interface KeelAPI {
   getProjectKbStatus: (projectSlug: string) => Promise<ProjectKBStatus>;
   createProjectKb: (projectName: string) => Promise<ProjectKBRefreshResult & { projectSlug: string }>;
   refreshProjectKb: (projectName: string) => Promise<ProjectKBRefreshResult & { projectSlug: string }>;
+  listProjectKbs: () => Promise<ProjectKBEntry[]>;
+  setKbAutoRefresh: (basePath: string, enabled: boolean) => Promise<{ projectSlug: string; enabled: boolean }>;
   onScheduledNotification: (callback: (notification: ScheduledNotification) => void) => void;
   removeScheduledNotificationListener: () => void;
   onAutoCaptureDone: (callback: (event: { requestId: string; summary: string }) => void) => () => void;

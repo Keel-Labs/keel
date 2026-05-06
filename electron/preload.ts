@@ -95,6 +95,8 @@ const api: KeelAPI = {
   getProjectKbStatus: (projectSlug: string) => ipcRenderer.invoke('keel:project-kb-status', projectSlug),
   createProjectKb: (projectName: string) => ipcRenderer.invoke('keel:project-kb-create', projectName),
   refreshProjectKb: (projectName: string) => ipcRenderer.invoke('keel:project-kb-refresh', projectName),
+  listProjectKbs: () => ipcRenderer.invoke('keel:list-project-kbs'),
+  setKbAutoRefresh: (basePath, enabled) => ipcRenderer.invoke('keel:set-kb-auto-refresh', basePath, enabled),
 
   onScheduledNotification: (callback) => {
     ipcRenderer.on('keel:scheduled-notification', (_event, notification) => callback(notification));

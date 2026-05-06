@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { marked } from 'marked';
 import { useIsMobile } from '../../lib/useIsMobile';
 import type {
+  ProjectKBEntry,
   WikiBaseSummary as SharedWikiBaseSummary,
   WikiFileImport,
   WikiIngestResult,
@@ -324,6 +325,7 @@ export default function WikiWorkspace({
   const [pages, setPages] = useState<WikiPage[]>([]);
   const [jobs, setJobs] = useState<WikiJob[]>([]);
   const [jobError, setJobError] = useState('');
+  const [projectKbs, setProjectKbs] = useState<ProjectKBEntry[]>([]);
   const [sourceDetails, setSourceDetails] = useState<Record<string, SourceDetail>>({});
   const [activeSynthesisSection, setActiveSynthesisSection] = useState<SynthesisSectionId>('summary');
   const [baseSearch, setBaseSearch] = useState('');
@@ -390,6 +392,14 @@ export default function WikiWorkspace({
     setCurrentBasePath((previous) => (
       previous && enriched.some((base) => base.basePath === previous) ? previous : ''
     ));
+
+    try {
+      const kbs = await window.keel.listProjectKbs();
+      setProjectKbs(kbs);
+    } catch {
+      // listing project KBs is best-effort; the toggle just hides if missing.
+    }
+
     return enriched;
   }, []);
 
@@ -995,6 +1005,33 @@ export default function WikiWorkspace({
     setJobs((prev) => [job, ...prev.filter((candidate) => candidate.id !== job.id)]);
   }, [activeJob, currentBasePath]);
 
+  const currentProjectKb = useMemo(
+    () => projectKbs.find((entry) => entry.basePath === currentBasePath) || null,
+    [projectKbs, currentBasePath]
+  );
+
+  const toggleAutoRefresh = useCallback(async () => {
+    if (!currentProjectKb) return;
+    const next = !currentProjectKb.autoRefreshEnabled;
+    // Optimistic update so the click feels instant; reconcile on response.
+    setProjectKbs((prev) => prev.map((entry) =>
+      entry.basePath === currentProjectKb.basePath
+        ? { ...entry, autoRefreshEnabled: next }
+        : entry
+    ));
+    try {
+      await window.keel.setKbAutoRefresh(currentProjectKb.basePath, next);
+    } catch (err) {
+      // Roll back on failure.
+      setProjectKbs((prev) => prev.map((entry) =>
+        entry.basePath === currentProjectKb.basePath
+          ? { ...entry, autoRefreshEnabled: !next }
+          : entry
+      ));
+      setJobError(err instanceof Error ? err.message : 'Failed to update auto-refresh.');
+    }
+  }, [currentProjectKb]);
+
   const openRawSource = useCallback(async (filePath: string) => {
     try {
       const errorMessage = await window.keel.openPath(filePath);
@@ -1102,6 +1139,27 @@ export default function WikiWorkspace({
               >
                 Add Sources
               </button>
+              {currentProjectKb && (
+                <>
+                  <span className="wiki-shell__action-separator">·</span>
+                  <button
+                    type="button"
+                    className="wiki-shell__action-link"
+                    title={
+                      currentProjectKb.autoRefreshEnabled
+                        ? 'Auto-refresh is on. Files added or edited in the project folder will be re-ingested automatically.'
+                        : 'Auto-refresh is off. Use /refresh-kb or the Compile button to update this base.'
+                    }
+                    onClick={() => {
+                      toggleAutoRefresh().catch(() => {
+                        // toggleAutoRefresh handles its own error UI.
+                      });
+                    }}
+                  >
+                    Auto-refresh: {currentProjectKb.autoRefreshEnabled ? 'On' : 'Off'}
+                  </button>
+                </>
+              )}
               {(activeJob || latestJob || jobError) && (
                 <>
                   <span className="wiki-shell__action-separator">·</span>
