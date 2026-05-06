@@ -416,12 +416,42 @@ export default function Settings({ onBack, navigation }: Props) {
     </FieldRow>
   );
 
+  const renderBaseUrlInput = (
+    label: string,
+    value: string,
+    field: 'anthropicBaseUrl' | 'openaiBaseUrl',
+    placeholder: string,
+  ) => (
+    <FieldRow
+      label={label}
+      description="Advanced: route requests through a custom endpoint (proxy, gateway, or self-hosted compatible API). Leave empty to use the provider default."
+    >
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => update({ [field]: e.target.value } as Partial<SettingsType>)}
+        placeholder={placeholder}
+        style={inputStyle}
+      />
+    </FieldRow>
+  );
+
   const renderProviderCredentials = () => {
     if (settings.provider === 'claude') {
-      return renderApiKeyInput('Anthropic API Key', settings.anthropicApiKey, 'anthropicApiKey', 'claude');
+      return (
+        <>
+          {renderApiKeyInput('Anthropic API Key', settings.anthropicApiKey, 'anthropicApiKey', 'claude')}
+          {renderBaseUrlInput('Base URL', settings.anthropicBaseUrl, 'anthropicBaseUrl', 'https://api.anthropic.com')}
+        </>
+      );
     }
     if (settings.provider === 'openai') {
-      return renderApiKeyInput('OpenAI API Key', settings.openaiApiKey, 'openaiApiKey', 'openai');
+      return (
+        <>
+          {renderApiKeyInput('OpenAI API Key', settings.openaiApiKey, 'openaiApiKey', 'openai')}
+          {renderBaseUrlInput('Base URL', settings.openaiBaseUrl, 'openaiBaseUrl', 'https://api.openai.com/v1')}
+        </>
+      );
     }
     if (settings.provider === 'openrouter') {
       return renderApiKeyInput('OpenRouter API Key', settings.openrouterApiKey, 'openrouterApiKey', 'openrouter');
