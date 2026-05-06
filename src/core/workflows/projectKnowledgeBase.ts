@@ -3,7 +3,7 @@ import * as path from 'path';
 import { FileManager } from '../fileManager';
 import { createWikiBase } from './wikiBase';
 import { ingestWikiSource } from './wikiIngest';
-import type { ProjectKBStatus, ProjectKBManifest, WikiSourceInput } from '../../shared/types';
+import type { ProjectKBEntry, ProjectKBStatus, ProjectKBManifest, WikiSourceInput } from '../../shared/types';
 
 const MANIFEST_FILE = '.keel-kb.json';
 const SUPPORTED_EXTENSIONS = new Set(['.md', '.markdown', '.txt', '.pdf', '.docx', '.pptx']);
@@ -23,7 +23,81 @@ export async function getProjectKBStatus(
     wikiBaseSlug: manifest.wikiBaseSlug,
     lastRefreshed: manifest.lastRefreshed,
     ingestedCount: manifest.ingestedFiles.length,
+    autoRefreshEnabled: manifest.autoRefreshEnabled !== false,
+    lastAutoRefreshError: manifest.lastAutoRefreshError,
+    lastAutoRefreshErrorAt: manifest.lastAutoRefreshErrorAt,
   };
+}
+
+/**
+ * Enumerate every project that has a KB manifest. Used by the auto-refresh
+ * watcher to know which folders to watch and by the Wiki UI to render the
+ * per-KB auto-refresh toggle.
+ */
+export async function listProjectKBs(fileManager: FileManager): Promise<ProjectKBEntry[]> {
+  const projectsDir = path.join(fileManager.getBrainPath(), 'projects');
+  let entries;
+  try {
+    entries = await fs.readdir(projectsDir, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+  const out: ProjectKBEntry[] = [];
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    const slug = entry.name;
+    const manifest = await readManifest(slug, fileManager);
+    if (!manifest) continue;
+    out.push({
+      projectSlug: slug,
+      wikiBaseSlug: manifest.wikiBaseSlug,
+      basePath: `knowledge-bases/${manifest.wikiBaseSlug}`,
+      autoRefreshEnabled: manifest.autoRefreshEnabled !== false,
+      lastRefreshed: manifest.lastRefreshed,
+      lastAutoRefreshError: manifest.lastAutoRefreshError,
+      lastAutoRefreshErrorAt: manifest.lastAutoRefreshErrorAt,
+    });
+  }
+  return out;
+}
+
+/** Look up the project slug whose KB manifest references the given wiki base slug. */
+export async function findProjectSlugByWikiBaseSlug(
+  wikiBaseSlug: string,
+  fileManager: FileManager
+): Promise<string | null> {
+  const all = await listProjectKBs(fileManager);
+  return all.find((entry) => entry.wikiBaseSlug === wikiBaseSlug)?.projectSlug ?? null;
+}
+
+export async function setProjectKBAutoRefresh(
+  projectSlug: string,
+  enabled: boolean,
+  fileManager: FileManager
+): Promise<void> {
+  const manifest = await readManifest(projectSlug, fileManager);
+  if (!manifest) {
+    throw new Error(`No knowledge base for project "${projectSlug}".`);
+  }
+  manifest.autoRefreshEnabled = enabled;
+  await writeManifest(projectSlug, manifest, fileManager);
+}
+
+export async function recordAutoRefreshError(
+  projectSlug: string,
+  errorMessage: string | null,
+  fileManager: FileManager
+): Promise<void> {
+  const manifest = await readManifest(projectSlug, fileManager);
+  if (!manifest) return;
+  if (errorMessage) {
+    manifest.lastAutoRefreshError = errorMessage;
+    manifest.lastAutoRefreshErrorAt = Date.now();
+  } else {
+    delete manifest.lastAutoRefreshError;
+    delete manifest.lastAutoRefreshErrorAt;
+  }
+  await writeManifest(projectSlug, manifest, fileManager);
 }
 
 export async function ensureProjectKB(
@@ -116,6 +190,7 @@ export async function refreshProjectKB(
   }
 
   const updatedManifest: ProjectKBManifest = {
+    ...manifest,
     wikiBaseSlug: manifest.wikiBaseSlug,
     lastRefreshed: Date.now(),
     ingestedFiles: updatedEntries,
