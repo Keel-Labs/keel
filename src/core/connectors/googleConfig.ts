@@ -37,4 +37,9 @@ export const GOOGLE_CLIENT_SECRET = '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';
 export const GOOGLE_SCOPES = [
   'https://www.googleapis.com/auth/calendar',
   'https://www.googleapis.com/auth/documents',
+  // Sheets export. Matches the broad-scope pattern used by `auth/documents`
+  // above. The migration plan in maintainer memory tracks moving both Docs
+  // and Sheets to `auth/drive.file` together to limit access to files Keel
+  // created — that's a coordinated change, not a piecemeal one.
+  'https://www.googleapis.com/auth/spreadsheets',
 ];
