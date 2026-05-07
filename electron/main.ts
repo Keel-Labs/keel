@@ -90,6 +90,7 @@ import {
 import { GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_SCOPES } from '../src/core/connectors/googleConfig';
 import { syncCalendar, getUpcomingEventsFormatted, createCalendarEvent } from '../src/core/connectors/googleCalendar';
 import { exportToGoogleDoc, readGoogleDoc, extractDocId } from '../src/core/connectors/googleDocs';
+import { checkExportMarkdown } from '../src/core/tools/exportGuard';
 import {
   startXOAuthFlow,
   saveXTokens,
@@ -2460,6 +2461,13 @@ function registerIpcHandlers() {
   });
 
   ipcMain.handle('keel:google-export-doc', async (_event, markdownContent: string, title?: string) => {
+    // Renderer paths (export-only / write-and-export in Chat.tsx) come
+    // through here, bypassing the LLM tool layer — so this is the only
+    // chokepoint where the guard catches them.
+    const guard = checkExportMarkdown(markdownContent ?? '');
+    if (!guard.ok) {
+      throw new Error(guard.reason || 'Refusing to export this content as a Google Doc.');
+    }
     const config = getGoogleConfig();
     return exportToGoogleDoc(settings.brainPath, config, markdownContent, title);
   });
