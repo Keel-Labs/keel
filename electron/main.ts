@@ -1162,6 +1162,7 @@ function registerIpcHandlers() {
       brainPath: settings.brainPath,
       timezone: settings.timezone || undefined,
       onCompileKb: (wikiBaseSlug) => compileProjectKbInBackground(wikiBaseSlug),
+      exportPdf: (markdown, title) => exportToPdf(markdown, title),
     });
 
     emitThinking('Generating answer');

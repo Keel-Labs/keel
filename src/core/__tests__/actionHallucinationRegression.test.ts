@@ -304,6 +304,7 @@ describe('Issue #62 regression — fabricated action claims', () => {
         'create_task',
         'export_to_google_doc',
         'export_to_google_sheets',
+        'export_to_pdf',
         'publish_x_post',
         'refresh_knowledge_base',
       ]);

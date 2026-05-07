@@ -43,6 +43,7 @@ export interface ToolExecutorContext {
   brainPath: string;
   timezone?: string;
   onCompileKb?: (wikiBaseSlug: string) => void;
+  exportPdf: (markdown: string, title?: string) => Promise<string>;
 }
 
 function googleConfigOrThrow(): { clientId: string; clientSecret: string; scopes: string[] } {
@@ -136,6 +137,14 @@ export function makeToolExecutor(ctx: ToolExecutorContext) {
             : undefined;
           const summary = await captureWorkflow(text, ctx.fileManager, ctx.llmClient, googleConfig);
           return ok(id, summary);
+        }
+
+        case 'export_to_pdf': {
+          const markdown = asString((input as any).markdown);
+          const title = asString((input as any).title).trim() || undefined;
+          if (!markdown.trim()) return fail(id, 'markdown content is required.');
+          const result = await ctx.exportPdf(markdown, title);
+          return ok(id, result);
         }
 
         case 'export_to_google_doc': {
