@@ -1762,10 +1762,13 @@ export default function Chat({
       const projectName = trimmed.slice('/create-kb '.length).trim();
       try {
         const result = await window.keel.createProjectKb(projectName);
-        const lines = [
-          result.created
+        const headline = result.projectCreated
+          ? `**Created project + knowledge base** for *${projectName}* → \`knowledge-bases/${result.wikiBaseSlug}/\``
+          : result.created
             ? `**Knowledge base created** for *${projectName}* → \`knowledge-bases/${result.wikiBaseSlug}/\``
-            : `**Knowledge base already exists** for *${projectName}* → \`knowledge-bases/${result.wikiBaseSlug}/\``,
+            : `**Knowledge base already exists** for *${projectName}* → \`knowledge-bases/${result.wikiBaseSlug}/\``;
+        const lines = [
+          headline,
           `Ingested ${result.added} file${result.added === 1 ? '' : 's'}, skipped ${result.skipped}.`,
         ];
         if (result.errors && result.errors.length > 0) {

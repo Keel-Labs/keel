@@ -170,6 +170,7 @@ export interface ProjectKBRefreshResult {
   skipped: number;
   errors?: string[];
   created?: boolean;
+  projectCreated?: boolean;
 }
 
 export interface WikiIngestResult {
