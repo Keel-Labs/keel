@@ -33,6 +33,34 @@ interface SheetsCreateResponse {
 }
 
 /**
+ * Detect the "user connected Google before Sheets support was added" case and
+ * throw a message the model can relay verbatim. This is a stopgap until we
+ * store granted scopes alongside tokens and gate the tool on scope presence
+ * (see follow-up issue) — the structural fix prevents the call from being
+ * made at all. Until then, the API call goes through and Google rejects it
+ * with 403 + "insufficient authentication scopes".
+ *
+ * Exported for unit testing only.
+ */
+export function explainSheetsApiError(status: number, body: string): string {
+  // Google returns 403 with a message containing "insufficient authentication
+  // scopes" or "ACCESS_TOKEN_SCOPE_INSUFFICIENT" when the bearer token lacks
+  // the required scope. Match defensively on either signal.
+  const insufficientScope =
+    status === 403 &&
+    /insufficient authentication scopes|ACCESS_TOKEN_SCOPE_INSUFFICIENT/i.test(body);
+  if (insufficientScope) {
+    return (
+      'Your Google connection was made before Sheets support was added, ' +
+      'so it does not include the Sheets scope. Open Settings, disconnect ' +
+      'Google, and reconnect to enable Sheets export. In the meantime, I ' +
+      'can save the data as a local .xlsx using create_local_spreadsheet.'
+    );
+  }
+  return `Sheets API error: ${status} ${body}`;
+}
+
+/**
  * Create the spreadsheet shell with a single sheet. We pass the user-supplied
  * title both as the spreadsheet title and the first sheet's title (truncated
  * to Sheets' 100-char limit, sanitized).
@@ -60,7 +88,7 @@ async function createSheet(
 
   if (!response.ok) {
     const err = await response.text();
-    throw new Error(`Sheets API error: ${response.status} ${err}`);
+    throw new Error(explainSheetsApiError(response.status, err));
   }
   return (await response.json()) as SheetsCreateResponse;
 }
@@ -98,7 +126,7 @@ async function populateSheet(
 
   if (!response.ok) {
     const err = await response.text();
-    throw new Error(`Sheets values.update error: ${response.status} ${err}`);
+    throw new Error(explainSheetsApiError(response.status, err));
   }
 }
 
