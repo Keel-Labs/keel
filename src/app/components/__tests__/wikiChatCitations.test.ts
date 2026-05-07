@@ -4,45 +4,45 @@ import { formatWikiChatCitations } from '../wikiChatCitations';
 describe('formatWikiChatCitations', () => {
   it('replaces inline wiki paths with stable numbered references', () => {
     const result = formatWikiChatCitations(
-      'The network becomes the attack surface (knowledge-bases/jeetu-leadership-offsite/wiki/concepts/compiled/network-security-as-the-immediate-attack-surface.md).'
+      'The network becomes the attack surface (knowledge-bases/team-offsite/wiki/concepts/compiled/network-security-as-the-immediate-attack-surface.md).'
     );
 
-    expect(result.content).toContain('The network becomes the attack surface [[1]](knowledge-bases/jeetu-leadership-offsite/wiki/concepts/compiled/network-security-as-the-immediate-attack-surface.md).');
+    expect(result.content).toContain('The network becomes the attack surface [[1]](knowledge-bases/team-offsite/wiki/concepts/compiled/network-security-as-the-immediate-attack-surface.md).');
     expect(result.content).toContain('**References**');
-    expect(result.content).toContain('1. [Concept: Network Security As The Immediate Attack Surface](knowledge-bases/jeetu-leadership-offsite/wiki/concepts/compiled/network-security-as-the-immediate-attack-surface.md)');
+    expect(result.content).toContain('1. [Concept: Network Security As The Immediate Attack Surface](knowledge-bases/team-offsite/wiki/concepts/compiled/network-security-as-the-immediate-attack-surface.md)');
   });
 
   it('deduplicates repeated citations and converts the trailing wiki citation block into references', () => {
     const result = formatWikiChatCitations([
-      'Point one (knowledge-bases/base/wiki/sources/we-have-a-crisis.md).',
-      'Point two (knowledge-bases/base/wiki/sources/we-have-a-crisis.md).',
+      'Point one (knowledge-bases/base/wiki/sources/incident-report.md).',
+      'Point two (knowledge-bases/base/wiki/sources/incident-report.md).',
       '',
       '**Wiki citations**',
-      '- [knowledge-bases/base/wiki/sources/we-have-a-crisis.md]',
+      '- [knowledge-bases/base/wiki/sources/incident-report.md]',
     ].join('\n'));
 
     expect(result.content).toContain('Point one.');
-    expect(result.content).toContain('Point two [[1]](knowledge-bases/base/wiki/sources/we-have-a-crisis.md).');
-    expect(result.content.match(/1\. \[Source: We Have A Crisis]/g)?.length).toBe(1);
+    expect(result.content).toContain('Point two [[1]](knowledge-bases/base/wiki/sources/incident-report.md).');
+    expect(result.content.match(/1\. \[Source: Incident Report]/g)?.length).toBe(1);
   });
 
   it('maps raw source citations to the visible wiki source page', () => {
     const result = formatWikiChatCitations(
-      'The detailed notes are here (knowledge-bases/base/raw/anthropic-crisis/source.md).'
+      'The detailed notes are here (knowledge-bases/base/raw/incident-response/source.md).'
     );
 
-    expect(result.content).toContain('[[1]](knowledge-bases/base/wiki/sources/anthropic-crisis.md)');
-    expect(result.references[0]?.navigationPath).toBe('knowledge-bases/base/wiki/sources/anthropic-crisis.md');
+    expect(result.content).toContain('[[1]](knowledge-bases/base/wiki/sources/incident-response.md)');
+    expect(result.references[0]?.navigationPath).toBe('knowledge-bases/base/wiki/sources/incident-response.md');
   });
 
   it('rewrites inline source lines that use backticked file paths', () => {
     const result = formatWikiChatCitations([
       'Open question remains unresolved.',
-      'Source: `knowledge-bases/cisco-cloud-control/wiki/open-questions/compiled/what-is-the-exact-relationship-between-ai-canvas.md`',
+      'Source: `knowledge-bases/acme-cloud-control/wiki/open-questions/compiled/what-is-the-exact-relationship-between-ai-canvas.md`',
     ].join('\n'));
 
-    expect(result.content).toContain('Source: [[1]](knowledge-bases/cisco-cloud-control/wiki/open-questions/compiled/what-is-the-exact-relationship-between-ai-canvas.md)');
-    expect(result.content).not.toContain('`knowledge-bases/cisco-cloud-control/');
+    expect(result.content).toContain('Source: [[1]](knowledge-bases/acme-cloud-control/wiki/open-questions/compiled/what-is-the-exact-relationship-between-ai-canvas.md)');
+    expect(result.content).not.toContain('`knowledge-bases/acme-cloud-control/');
   });
 
   it('converts plain numbered citations into clickable references', () => {

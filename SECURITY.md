@@ -7,7 +7,7 @@ security issues responsibly.
 
 **Please do not open a public GitHub issue for security vulnerabilities.**
 
-Email **medha.ghati@gmail.com** with:
+Email **medhaforcebewithyou@gmail.com** with:
 
 - A description of the issue and its potential impact
 - Steps to reproduce, or a proof of concept
