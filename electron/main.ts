@@ -1888,11 +1888,17 @@ function registerIpcHandlers() {
   });
 
   ipcMain.handle('keel:project-kb-create', async (_event, projectInput: string) => {
-    const slug = await resolveProjectSlugOrThrow(projectInput);
+    let slug = await resolveProjectSlugByName(projectInput, fileManager);
+    let projectCreated = false;
+    if (!slug) {
+      slug = await createProject(fileManager, projectInput);
+      projectCreated = true;
+      logActivity(settings.brainPath, 'project-created', projectInput);
+    }
     const result = await ensureProjectKB(slug, fileManager);
     logActivity(settings.brainPath, 'project-kb-create', `${slug} -> knowledge-bases/${result.wikiBaseSlug}`);
     if (result.added > 0) compileProjectKbInBackground(result.wikiBaseSlug);
-    return { ...result, projectSlug: slug };
+    return { ...result, projectSlug: slug, projectCreated };
   });
 
   ipcMain.handle('keel:project-kb-refresh', async (_event, projectInput: string) => {
