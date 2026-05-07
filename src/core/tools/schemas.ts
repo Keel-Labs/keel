@@ -170,6 +170,64 @@ export const ALL_TOOLS: readonly ToolDefinition[] = [
       additionalProperties: false,
     },
   },
+  // --- Spreadsheets ---
+  {
+    name: 'create_local_spreadsheet',
+    description:
+      'Write tabular data to a local .xlsx file in the user\'s workspace. Use when the user asks for a spreadsheet, table export, or .xlsx — and either Google Sheets is not connected or the user explicitly wants a local file. Returns the absolute file path.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        title: {
+          type: 'string',
+          description: 'Spreadsheet title. Used for the file name and the first sheet\'s name.',
+        },
+        rows: {
+          type: 'array',
+          description: 'Data rows. Each row is an array of cell strings. Numbers and dates should be passed as strings; the format will preserve them as-is.',
+          items: { type: 'array', items: { type: 'string' } },
+        },
+        headers: {
+          type: 'array',
+          description: 'Optional header row. Rendered bold above the data rows.',
+          items: { type: 'string' },
+        },
+        destination: {
+          type: 'string',
+          description: 'Optional workspace-relative path for the .xlsx file (e.g. "outputs/q3-roadmap.xlsx"). Must stay inside the workspace. Defaults to outputs/spreadsheets/<slug>.xlsx.',
+        },
+      },
+      required: ['title', 'rows'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'export_to_google_sheets',
+    description:
+      'Create a new Google Sheet in the user\'s Drive containing the given tabular data. Returns the Sheet URL. Only call when the user explicitly asks to export to Google Sheets or create a sheet in Google.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string', description: 'Spreadsheet title.' },
+        rows: {
+          type: 'array',
+          description: 'Data rows. Each row is an array of cell strings.',
+          items: { type: 'array', items: { type: 'string' } },
+        },
+        headers: {
+          type: 'array',
+          description: 'Optional header row. Rendered bold.',
+          items: { type: 'string' },
+        },
+        folderId: {
+          type: 'string',
+          description: 'Optional Drive folder ID to place the new sheet in. Omit to create at the root of My Drive.',
+        },
+      },
+      required: ['title', 'rows'],
+      additionalProperties: false,
+    },
+  },
   // --- X ---
   {
     name: 'publish_x_post',
@@ -191,7 +249,11 @@ export const ALL_TOOLS: readonly ToolDefinition[] = [
 
 export function getToolsForContext(availability: ToolAvailability): ToolDefinition[] {
   return ALL_TOOLS.filter((tool) => {
-    if (tool.name === 'export_to_google_doc' || tool.name === 'create_calendar_event') {
+    if (
+      tool.name === 'export_to_google_doc' ||
+      tool.name === 'create_calendar_event' ||
+      tool.name === 'export_to_google_sheets'
+    ) {
       return availability.googleConnected;
     }
     if (tool.name === 'publish_x_post') {

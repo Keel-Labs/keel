@@ -22,7 +22,9 @@ import {
 } from '../src/core/connectors/googleConfig';
 import { isGoogleConnected } from '../src/core/connectors/googleAuth';
 import { exportToGoogleDoc } from '../src/core/connectors/googleDocs';
+import { exportToGoogleSheet } from '../src/core/connectors/googleSheets';
 import { createCalendarEvent } from '../src/core/connectors/googleCalendar';
+import { writeLocalSpreadsheet } from '../src/core/exporters/spreadsheet';
 import { X_CLIENT_ID } from '../src/core/connectors/xConfig';
 import { getXStatus } from '../src/core/connectors/xAuth';
 import { getValidXAccessToken } from '../src/core/connectors/xAuth';
@@ -173,6 +175,59 @@ export function makeToolExecutor(ctx: ToolExecutorContext) {
           });
           logActivity(ctx.brainPath, 'calendar-create', summary);
           return ok(id, `Calendar event created: ${result.htmlLink || result.id}`);
+        }
+
+        case 'create_local_spreadsheet': {
+          const title = asString((input as any).title).trim();
+          const rawRows = (input as any).rows;
+          const rawHeaders = (input as any).headers;
+          const destination = asString((input as any).destination).trim() || undefined;
+          if (!title) return fail(id, 'title is required.');
+          if (!Array.isArray(rawRows)) return fail(id, 'rows must be an array of arrays of strings.');
+          const rows: string[][] = rawRows.map((row) =>
+            Array.isArray(row) ? row.map(asString) : []
+          );
+          const headers: string[] | undefined = Array.isArray(rawHeaders)
+            ? rawHeaders.map(asString)
+            : undefined;
+          const result = await writeLocalSpreadsheet(ctx.fileManager, {
+            title,
+            rows,
+            headers,
+            destination,
+          });
+          logActivity(ctx.brainPath, 'export-xlsx', result.relativePath);
+          return ok(
+            id,
+            `Wrote spreadsheet to ${result.absolutePath} (${rows.length} row(s)${headers ? ', with header row' : ''}).`
+          );
+        }
+
+        case 'export_to_google_sheets': {
+          if (!isGoogleConnected(ctx.brainPath)) {
+            return fail(id, 'Google is not connected. Tell the user to connect Google in Settings.');
+          }
+          const title = asString((input as any).title).trim();
+          const rawRows = (input as any).rows;
+          const rawHeaders = (input as any).headers;
+          const folderId = asString((input as any).folderId).trim() || undefined;
+          if (!title) return fail(id, 'title is required.');
+          if (!Array.isArray(rawRows)) return fail(id, 'rows must be an array of arrays of strings.');
+          const rows: string[][] = rawRows.map((row) =>
+            Array.isArray(row) ? row.map(asString) : []
+          );
+          const headers: string[] | undefined = Array.isArray(rawHeaders)
+            ? rawHeaders.map(asString)
+            : undefined;
+          const config = googleConfigOrThrow();
+          const result = await exportToGoogleSheet(ctx.brainPath, config, {
+            title,
+            rows,
+            headers,
+            folderId,
+          });
+          logActivity(ctx.brainPath, 'google-export-sheet', result.spreadsheetUrl);
+          return ok(id, `Created Google Sheet: ${result.spreadsheetUrl}`);
         }
 
         case 'publish_x_post': {

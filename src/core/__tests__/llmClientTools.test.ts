@@ -94,7 +94,15 @@ describe('LLMClient.chatWithTools — Anthropic', () => {
       throw new Error('executor must NOT be called when the model produces no tool_use');
     });
 
-    const tools: ToolDefinition[] = ALL_TOOLS.filter((t) => t.name !== 'export_to_google_doc');
+    // Simulate the original #62 environment: no spreadsheet capability of any
+    // kind exposed to the model. With the v1/v2 spreadsheet tools now part of
+    // ALL_TOOLS, we have to filter them out to reproduce the regression case.
+    const tools: ToolDefinition[] = ALL_TOOLS.filter(
+      (t) =>
+        t.name !== 'export_to_google_doc' &&
+        t.name !== 'create_local_spreadsheet' &&
+        t.name !== 'export_to_google_sheets'
+    );
     const text = await client.chatWithTools(
       [{ role: 'user', content: 'Export this table to Google Sheets', timestamp: 0 }],
       'system prompt forbidding hallucinated actions',
