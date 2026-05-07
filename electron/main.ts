@@ -70,6 +70,10 @@ import {
   refreshProjectKB,
   getProjectKBStatus,
   resolveProjectSlugByName,
+  listProjectKBs,
+  findProjectSlugByWikiBaseSlug,
+  setProjectKBAutoRefresh,
+  recordAutoRefreshError,
 } from '../src/core/workflows/projectKnowledgeBase';
 import { listWikiBaseSummaries } from '../src/core/wikiBaseSummaries';
 import { assembleWikiChatContext } from '../src/core/wikiChatContext';
@@ -102,6 +106,7 @@ import type {
   ChatDocumentAttachment,
   ChatRequest,
   Message,
+  ProjectKBEntry,
   Settings,
   StoredChatSession,
   UtilityWindowKind,
@@ -607,6 +612,155 @@ async function startFileWatcher(): Promise<void> {
   watcher.on('add', handleFileChange);
   watcher.on('change', handleFileChange);
   watcher.on('unlink', handleFileDelete);
+}
+
+// --- KB Auto-Refresh Watcher ---
+//
+// Watches every project folder that has a `.keel-kb.json` manifest. When files
+// in the source folder change, debounces and then runs the same refresh +
+// compile pipeline that `/refresh-kb` uses. Skips when a manual compile or
+// health job is already in flight for that base, and surfaces failures to the
+// activity feed and the wiki job stream (no notifications, to avoid spam).
+
+const KB_AUTO_REFRESH_DEBOUNCE_MS = 30_000;
+const KB_AUTO_REFRESH_BUSY_RETRY_MS = 15_000;
+const SUPPORTED_KB_EXTS = new Set(['.md', '.markdown', '.txt', '.pdf', '.docx', '.pptx']);
+const kbRefreshTimers = new Map<string, NodeJS.Timeout>();
+const kbRefreshInFlight = new Set<string>();
+
+function isBusyForKB(basePath: string): boolean {
+  for (const job of wikiJobs.values()) {
+    if (job.basePath !== basePath) continue;
+    if (job.status === 'queued' || job.status === 'running') return true;
+  }
+  return false;
+}
+
+function scheduleKBAutoRefresh(projectSlug: string, delayMs: number = KB_AUTO_REFRESH_DEBOUNCE_MS): void {
+  const existing = kbRefreshTimers.get(projectSlug);
+  if (existing) clearTimeout(existing);
+  kbRefreshTimers.set(
+    projectSlug,
+    setTimeout(() => {
+      kbRefreshTimers.delete(projectSlug);
+      void runKBAutoRefresh(projectSlug);
+    }, delayMs)
+  );
+}
+
+async function runKBAutoRefresh(projectSlug: string): Promise<void> {
+  if (kbRefreshInFlight.has(projectSlug)) return;
+
+  // Re-read the manifest each time — toggle state and target slug may have changed.
+  let entry: ProjectKBEntry | undefined;
+  try {
+    const all = await listProjectKBs(fileManager);
+    entry = all.find((e) => e.projectSlug === projectSlug);
+  } catch (error) {
+    console.error('KB auto-refresh: failed to read manifests', error);
+    return;
+  }
+  if (!entry) return;
+  if (!entry.autoRefreshEnabled) return;
+
+  if (isBusyForKB(entry.basePath)) {
+    // A manual compile/health job is in flight; back off and try again later.
+    scheduleKBAutoRefresh(projectSlug, KB_AUTO_REFRESH_BUSY_RETRY_MS);
+    return;
+  }
+
+  kbRefreshInFlight.add(projectSlug);
+  const job = createWikiJob('compile', entry.basePath, 'Auto-refresh: scanning project folder for changes.');
+  updateWikiJob(job.id, { status: 'running', detail: 'Auto-refresh: re-ingesting changed sources.' });
+
+  try {
+    const refresh = await refreshProjectKB(projectSlug, fileManager);
+
+    if (refresh.added === 0) {
+      updateWikiJob(job.id, {
+        status: 'completed',
+        detail: `Auto-refresh: no changes detected (${refresh.skipped} unchanged).`,
+        finishedAt: Date.now(),
+      });
+      await recordAutoRefreshError(projectSlug, null, fileManager);
+      logActivity(settings.brainPath, 'project-kb-auto-refresh', `${projectSlug} no-op (~${refresh.skipped})`);
+      return;
+    }
+
+    updateWikiJob(job.id, { detail: 'Auto-refresh: compiling wiki pages and synthesis outputs.' });
+    const compileResult = await compileWikiBase(entry.basePath, fileManager, llmClient);
+    updateWikiJob(job.id, {
+      status: 'completed',
+      detail: `Auto-refresh: +${refresh.added} ~${refresh.skipped}. ${compileResult.message}`,
+      finishedAt: Date.now(),
+      outputPath: compileResult.synthesisPath,
+    });
+    await recordAutoRefreshError(projectSlug, null, fileManager);
+    logActivity(
+      settings.brainPath,
+      'project-kb-auto-refresh',
+      `${projectSlug} +${refresh.added} ~${refresh.skipped}`
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown auto-refresh error';
+    updateWikiJob(job.id, {
+      status: 'failed',
+      detail: 'Auto-refresh failed.',
+      finishedAt: Date.now(),
+      error: message,
+    });
+    try {
+      await recordAutoRefreshError(projectSlug, message, fileManager);
+    } catch {
+      // best-effort
+    }
+    logActivity(settings.brainPath, 'project-kb-auto-refresh-failed', `${projectSlug}: ${message}`);
+  } finally {
+    kbRefreshInFlight.delete(projectSlug);
+  }
+}
+
+async function startKBAutoRefreshWatcher(): Promise<void> {
+  const chokidar = await import('chokidar');
+  const projectsRoot = path.join(settings.brainPath, 'projects');
+
+  // Watch every file inside every project folder. We filter inside the handler
+  // because (a) chokidar globs over many extensions are awkward to express
+  // safely on different platforms, and (b) we need to look up the manifest for
+  // the matched project anyway.
+  const watcher = chokidar.watch(projectsRoot, {
+    ignoreInitial: true,
+    ignored: [/(^|[/\\])\../, /node_modules/], // dotfiles + node_modules
+    depth: 99,
+  });
+
+  const handle = (fullPath: string) => {
+    if (selfWriting) return;
+    const rel = path.relative(projectsRoot, fullPath);
+    if (!rel || rel.startsWith('..')) return;
+
+    const segments = rel.split(path.sep);
+    if (segments.length < 2) return; // only react to files inside a project, not project dir itself
+    const projectSlug = segments[0];
+
+    // Ignore the manifest itself and other dotfiles.
+    const fileName = segments[segments.length - 1];
+    if (fileName === '.keel-kb.json' || fileName.startsWith('.')) return;
+
+    const ext = path.extname(fileName).toLowerCase();
+    if (!SUPPORTED_KB_EXTS.has(ext)) return;
+
+    // Cheap existence check up front so we don't churn the watcher for projects
+    // without a KB. The full toggle/manifest check happens when the timer fires.
+    const manifestPath = path.join(projectsRoot, projectSlug, '.keel-kb.json');
+    if (!fs.existsSync(manifestPath)) return;
+
+    scheduleKBAutoRefresh(projectSlug);
+  };
+
+  watcher.on('add', handle);
+  watcher.on('change', handle);
+  watcher.on('unlink', handle);
 }
 
 // --- Team Brain Indexing & Watcher ---
@@ -1909,6 +2063,28 @@ function registerIpcHandlers() {
     return { ...result, projectSlug: slug };
   });
 
+  ipcMain.handle('keel:list-project-kbs', async () => {
+    return listProjectKBs(fileManager);
+  });
+
+  ipcMain.handle('keel:set-kb-auto-refresh', async (_event, basePath: string, enabled: boolean) => {
+    if (!basePath || basePath.includes('..') || !basePath.startsWith('knowledge-bases/')) {
+      throw new Error('Access denied');
+    }
+    const wikiBaseSlug = basePath.slice('knowledge-bases/'.length);
+    const projectSlug = await findProjectSlugByWikiBaseSlug(wikiBaseSlug, fileManager);
+    if (!projectSlug) {
+      throw new Error('Auto-refresh is only available for project-backed knowledge bases.');
+    }
+    await setProjectKBAutoRefresh(projectSlug, enabled, fileManager);
+    logActivity(
+      settings.brainPath,
+      'project-kb-auto-refresh-toggle',
+      `${projectSlug} -> ${enabled ? 'on' : 'off'}`
+    );
+    return { projectSlug, enabled };
+  });
+
   ipcMain.handle('keel:list-files', async (_event, dirPath: string) => {
     // Security: reject paths that escape brain directory
     if (dirPath.includes('..') || dirPath.startsWith('.config')) {
@@ -2561,6 +2737,11 @@ app.whenReady().then(async () => {
 
   // Start file watcher
   startFileWatcher();
+
+  // Start KB auto-refresh watcher (per-project source folders)
+  startKBAutoRefreshWatcher().catch((err) => {
+    logger.error('KB auto-refresh watcher failed to start:', err);
+  });
 
   // Team Brain is deprecated — skipping init until feature is rebuilt
 
