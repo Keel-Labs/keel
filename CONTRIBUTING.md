@@ -63,6 +63,7 @@ The repo no longer includes the old server/mobile/cloud-auth runtime as active c
 | Chat shell or message UI | `src/app/App.tsx`, `src/app/components/Chat.tsx` | `electron/main.ts`, `src/core/contextAssembler.ts` |
 | Sidebar or navigation | `src/app/components/Sidebar.tsx` | `src/app/components/DesktopTopBar.tsx`, `src/app/components/WikiWorkspace.tsx` |
 | A new desktop action or command | `src/shared/types.ts` | `electron/preload.ts`, `electron/main.ts`, renderer call sites |
+| A new assistant-invokable action (LLM tool call) | `src/core/tools/schemas.ts` | `electron/toolExecutor.ts`, `src/core/__tests__/actionHallucinationRegression.test.ts` |
 | Settings or provider configuration | `src/app/components/Settings.tsx` | `src/core/settings.ts`, `src/core/llmClient.ts` |
 | Retrieval or search quality | `src/core/contextAssembler.ts` | `src/core/db.ts`, `src/core/embeddings.ts`, `src/core/vectorStore.ts`, `src/core/reranker.ts` |
 | Capture or memory updates | `src/core/workflows/capture.ts` | `src/core/workflows/autoCapture.ts`, `src/core/workflows/memoryExtract.ts` |
@@ -71,6 +72,19 @@ The repo no longer includes the old server/mobile/cloud-auth runtime as active c
 | macOS packaging | `electron-builder.config.mjs` | `build/`, `scripts/build-mac-icon.sh`, `package.json` |
 
 ## Repo-Specific Gotchas
+
+### Assistant capabilities require a matching tool definition
+
+Issue #62 was a class of bug where the chat model would *narrate* actions it had no way to actually perform — "I exported your table to Google Sheets", "I sent that Slack message", "I added it to your calendar" — when nothing of the kind had happened. The fix is structural: the model can only invoke tools that are explicitly declared in `src/core/tools/schemas.ts` and dispatched in `electron/toolExecutor.ts`. If a capability is not in that schema, the model has no way to invoke it, and the system prompt forbids claiming actions it did not invoke.
+
+When you add a new assistant-side capability, you MUST update all of these in the same change:
+
+1. `src/core/tools/schemas.ts` — declare the tool, its description, and its input schema. Description should make it obvious to the model when to call it.
+2. `electron/toolExecutor.ts` — add a `case` that dispatches the tool to the real implementation. A tool declared without a matching executor case will fail at runtime — which is still better than the silent hallucination class this exists to prevent, but is not the bar.
+3. `src/core/__tests__/actionHallucinationRegression.test.ts` — update the pinned tool-name list and, ideally, add a regression scenario for the prompts users would phrase as the new action.
+4. The system-prompt block in `src/core/contextAssembler.ts` — if the action class was previously called out as unsupported (spreadsheets, email, Slack…), remove it from that "specifically unsupported today" list once the tool exists.
+
+Adding a feature without the schema entry will reintroduce the issue-#62 class of bug. Adding a schema entry without an executor case will surface as a hard runtime error, not a fabrication — that is intentional.
 
 ### IPC changes are multi-file changes
 
