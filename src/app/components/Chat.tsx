@@ -515,6 +515,12 @@ function looksLikeExportArtifact(content: string): boolean {
   if (/^I couldn't export to Google Docs/i.test(t)) return true;
   // Legacy raw IPC error string from before the formatter existed
   if (/^Error invoking remote method '[^']*google[^']*'/i.test(t)) return true;
+  // Auto-capture and memory-updated status messages, persisted from before
+  // they were tagged kind: 'status'. Both render as italicized one-liners:
+  //   *Saved to **fun reels**: …*
+  //   *Captured: …*
+  //   *Noted: …*
+  if (/^\*\s*(saved to|captured:|noted:)/i.test(t)) return true;
   return false;
 }
 
