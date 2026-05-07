@@ -9,8 +9,9 @@ build/icon.iconset/
 build/icon.png
 archive/
 
-# Maintainer-only specs that must never be committed to the public repo.
-specs/gbrain-gap-analysis.md
+# Maintainer-only specs and design docs — internal product thinking that
+# shouldn't live in the public repo. Keep them locally; just don't track.
+specs/
 
 # Personal workspace data — when Keel runs from this checkout, the user's
 # brain folder lives here as untracked files. These must NEVER be committed.
