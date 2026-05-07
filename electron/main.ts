@@ -1184,8 +1184,12 @@ function registerIpcHandlers() {
         tools: toolsForChat,
         executeTool,
         signal: abortController.signal,
-        onToolStart: (call) => emitThinking(`Calling ${call.name}`),
+        onToolStart: (call) => {
+          console.log(`[tool] start: ${call.name} input=${JSON.stringify(call.input).slice(0, 300)}`);
+          emitThinking(`Calling ${call.name}`);
+        },
         onToolEnd: (result) => {
+          console.log(`[tool] end: ${result.name} isError=${result.isError} content=${String(result.content).slice(0, 300)}`);
           emitThinking(result.isError ? `${result.name} failed` : `${result.name} done`);
         },
         onChunk: (chunk: string) => {
