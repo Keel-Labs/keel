@@ -1037,7 +1037,10 @@ export default function Chat({
     const cleanup = window.keel.onAutoCaptureDone((event) => {
       setMessages((prev) => [
         ...prev,
-        { role: 'assistant', content: `*${event.summary}*`, timestamp: Date.now() },
+        // kind: 'status' so getLastAssistantMessage skips this when picking
+        // content for a follow-up export. Without it, asking "export the
+        // blurb you wrote" picks up the auto-capture summary instead.
+        { role: 'assistant', content: `*${event.summary}*`, timestamp: Date.now(), kind: 'status' },
       ]);
     });
     return cleanup;
@@ -1048,7 +1051,7 @@ export default function Chat({
     const cleanup = window.keel.onMemoryUpdated((event) => {
       setMessages((prev) => [
         ...prev,
-        { role: 'assistant', content: `*Noted: ${event.summary}*`, timestamp: Date.now() },
+        { role: 'assistant', content: `*Noted: ${event.summary}*`, timestamp: Date.now(), kind: 'status' },
       ]);
     });
     return cleanup;
