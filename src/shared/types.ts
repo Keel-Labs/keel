@@ -135,7 +135,7 @@ export interface WikiSourceInput {
 export interface ProjectKBManifest {
   wikiBaseSlug: string;
   lastRefreshed: number;
-  ingestedFiles: { path: string; mtime: number }[];
+  ingestedFiles: { path: string; mtime: number; sourceSlug?: string }[];
   /** Per-KB auto-refresh toggle. Defaults to true when absent. */
   autoRefreshEnabled?: boolean;
   /** Last auto-refresh error message, kept until the next successful auto-refresh. */
