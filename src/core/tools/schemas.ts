@@ -122,6 +122,27 @@ export const ALL_TOOLS: readonly ToolDefinition[] = [
       additionalProperties: false,
     },
   },
+  // --- PDF ---
+  {
+    name: 'export_to_pdf',
+    description:
+      'Render Markdown content to a PDF and prompt the user to save it. Returns a confirmation string with the saved file path (or a cancellation notice if the user dismissed the save dialog). Only call when the user explicitly asks for a PDF.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        markdown: {
+          type: 'string',
+          description: 'Full Markdown content to render into the PDF.',
+        },
+        title: {
+          type: 'string',
+          description: 'Document title shown in the PDF header and used as the default filename. If omitted, defaults to "Keel Export".',
+        },
+      },
+      required: ['markdown'],
+      additionalProperties: false,
+    },
+  },
   // --- Google ---
   {
     name: 'export_to_google_doc',
