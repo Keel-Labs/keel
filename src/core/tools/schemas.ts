@@ -132,7 +132,8 @@ export const ALL_TOOLS: readonly ToolDefinition[] = [
       properties: {
         markdown: {
           type: 'string',
-          description: 'Full Markdown content to render into the doc.',
+          description:
+            'Full Markdown content to render into the doc body. This MUST be the actual content the user is asking to export — typically the markdown from your prior assistant message that the user is referring to (e.g. a table, a draft, an outline), or content the user pasted. Do NOT pass a confirmation/summary message like "I\'ve created a Google Doc..." as the body. Do NOT include a docs.google.com URL — the tool returns that URL after creating the doc; only mention it in your reply AFTER the tool returns.',
         },
         title: {
           type: 'string',

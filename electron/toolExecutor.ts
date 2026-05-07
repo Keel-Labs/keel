@@ -23,6 +23,7 @@ import {
 import { isGoogleConnected } from '../src/core/connectors/googleAuth';
 import { exportToGoogleDoc } from '../src/core/connectors/googleDocs';
 import { exportToGoogleSheet } from '../src/core/connectors/googleSheets';
+import { checkExportMarkdown } from '../src/core/tools/exportGuard';
 import { createCalendarEvent } from '../src/core/connectors/googleCalendar';
 import { writeLocalSpreadsheet } from '../src/core/exporters/spreadsheet';
 import { X_CLIENT_ID } from '../src/core/connectors/xConfig';
@@ -144,6 +145,8 @@ export function makeToolExecutor(ctx: ToolExecutorContext) {
           const markdown = asString((input as any).markdown);
           const title = asString((input as any).title).trim() || undefined;
           if (!markdown.trim()) return fail(id, 'markdown content is required.');
+          const guard = checkExportMarkdown(markdown);
+          if (!guard.ok) return fail(id, guard.reason!);
           const config = googleConfigOrThrow();
           const url = title
             ? await exportToGoogleDoc(ctx.brainPath, config, markdown, title)

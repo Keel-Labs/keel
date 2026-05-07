@@ -29,3 +29,4 @@ keel.md
 
 # Local agent worktrees — created by Claude Code / similar tools. Never source.
 .claude/worktrees/
+.claude/scheduled_tasks.lock
