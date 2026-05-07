@@ -47,14 +47,26 @@ interface SourceMetadata {
   xText?: string;
 }
 
+export interface IngestWikiSourceOptions {
+  /**
+   * When set, reuse this slug instead of generating a new unique one. Used
+   * by project KB refresh so editing a tracked file overwrites its existing
+   * source page rather than producing `notes-2`, `notes-3`, etc.
+   */
+  replaceSlug?: string;
+}
+
 export async function ingestWikiSource(
   basePath: string,
   input: WikiSourceInput,
-  fileManager: FileManager
+  fileManager: FileManager,
+  options?: IngestWikiSourceOptions
 ): Promise<WikiIngestResult> {
   const capturedAt = new Date().toISOString();
   const resolved = await resolveSourceInput(input);
-  const sourceSlug = await resolveSourceSlug(basePath, resolved, fileManager);
+  const sourceSlug = options?.replaceSlug
+    ? options.replaceSlug
+    : await resolveSourceSlug(basePath, resolved, fileManager);
   const rawDir = `${basePath}/raw/${sourceSlug}`;
   const rawSourcePath = `${rawDir}/source.md`;
   const metadataPath = `${rawDir}/metadata.json`;

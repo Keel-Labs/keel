@@ -135,7 +135,7 @@ export interface WikiSourceInput {
 export interface ProjectKBManifest {
   wikiBaseSlug: string;
   lastRefreshed: number;
-  ingestedFiles: { path: string; mtime: number }[];
+  ingestedFiles: { path: string; mtime: number; sourceSlug?: string }[];
 }
 
 export interface ProjectKBStatus {

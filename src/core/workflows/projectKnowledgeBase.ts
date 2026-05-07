@@ -75,12 +75,12 @@ export async function refreshProjectKB(
   const wikiBaseRel = `knowledge-bases/${manifest.wikiBaseSlug}`;
 
   const files = await walkProjectFiles(projectAbs);
-  const indexed = new Map(manifest.ingestedFiles.map((f) => [f.path, f.mtime]));
+  const indexed = new Map(manifest.ingestedFiles.map((f) => [f.path, f]));
 
   let added = 0;
   let skipped = 0;
   const errors: string[] = [];
-  const updatedEntries: { path: string; mtime: number }[] = [...manifest.ingestedFiles];
+  const updatedEntries: ProjectKBManifest['ingestedFiles'] = [...manifest.ingestedFiles];
 
   for (const filePath of files) {
     const rel = path.relative(projectAbs, filePath);
@@ -90,23 +90,31 @@ export async function refreshProjectKB(
 
     const stat = await fs.stat(filePath);
     const previous = indexed.get(rel);
-    if (previous && previous >= stat.mtimeMs) {
+    if (previous && previous.mtime >= stat.mtimeMs) {
       skipped += 1;
       continue;
     }
 
+    const title = path.basename(filePath, ext);
     const input: WikiSourceInput = {
       sourceType: 'file',
       filePath,
       fileName: path.basename(filePath),
-      title: path.basename(filePath, ext),
+      title,
     };
 
+    const replaceSlug = await resolveExistingSlug(previous, title, wikiBaseRel, fileManager);
+
     try {
-      await ingestWikiSource(wikiBaseRel, input, fileManager);
+      const result = await ingestWikiSource(
+        wikiBaseRel,
+        input,
+        fileManager,
+        replaceSlug ? { replaceSlug } : undefined
+      );
       added += 1;
       const existingIdx = updatedEntries.findIndex((e) => e.path === rel);
-      const entry = { path: rel, mtime: stat.mtimeMs };
+      const entry = { path: rel, mtime: stat.mtimeMs, sourceSlug: result.sourceSlug };
       if (existingIdx >= 0) updatedEntries[existingIdx] = entry;
       else updatedEntries.push(entry);
     } catch (error) {
@@ -126,6 +134,33 @@ export async function refreshProjectKB(
 }
 
 // --- helpers ---
+
+// Determine the slug to overwrite when re-ingesting a known file. Prefers the
+// slug recorded in the manifest. For manifests written before slug tracking
+// existed, falls back to deriving the likely slug from the file's title and
+// reusing it only if a matching wiki source page already exists.
+async function resolveExistingSlug(
+  previous: ProjectKBManifest['ingestedFiles'][number] | undefined,
+  title: string,
+  wikiBaseRel: string,
+  fileManager: FileManager
+): Promise<string | undefined> {
+  if (!previous) return undefined;
+  if (previous.sourceSlug) return previous.sourceSlug;
+
+  const candidate = title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 48);
+  if (!candidate) return undefined;
+
+  const sourcePagePath = `${wikiBaseRel}/wiki/sources/${candidate}.md`;
+  if (await fileManager.fileExists(sourcePagePath)) {
+    return candidate;
+  }
+  return undefined;
+}
 
 async function readManifest(
   projectSlug: string,
