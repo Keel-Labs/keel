@@ -524,63 +524,12 @@ function looksLikeExportArtifact(content: string): boolean {
   return false;
 }
 
-function formatGoogleExportError(err: unknown): string {
-  const raw = err instanceof Error ? err.message : String(err ?? '');
-  // Electron wraps IPC errors as: Error invoking remote method 'keel:foo': Error: <real message>
-  const cleaned = raw
-    .replace(/^Error invoking remote method '[^']+':\s*/i, '')
-    .replace(/^Error:\s*/i, '')
-    .trim();
-  if (/not connected to google/i.test(cleaned)) {
-    return "You're not connected to Google yet. Open **Settings → Integrations → Google** to connect, then try again.";
-  }
-  return cleaned || "I couldn't export to Google Docs. Try again in a moment.";
-}
-
 function isPdfCommand(text: string): boolean {
   const t = text.trim().toLowerCase();
   if (/^(make|export|save|create|generate|give me|get me|download)\s.*(pdf)$/i.test(t)) return true;
   if (/^(pdf|save pdf|export pdf|make pdf|to pdf|as pdf)$/i.test(t)) return true;
   if (/^turn\s.*(pdf)$/i.test(t)) return true;
   if (/pdf/i.test(t) && /(make|create|save|export|want|need|give|get|generate|download)/i.test(t)) return true;
-  return false;
-}
-
-function isGoogleDocCommand(text: string): 'export-only' | 'write-and-export' | false {
-  const t = text.trim().toLowerCase();
-  if (!/google\s*doc/i.test(t)) return false;
-
-  // Strip common filler prefixes for easier matching
-  const stripped = t
-    .replace(/^(could you|can you|would you|will you|please|ok|okay|yes|yeah|sure)\s*,?\s*/i, '')
-    .trim();
-
-  // If the user names a specific prior turn by topic ("the blurb about
-  // California", "the recipe you wrote", "the table on revenue"), the
-  // renderer cannot pick the right prior message — that requires the
-  // LLM. Defer to the regular chat-with-tools path so the model invokes
-  // export_to_google_doc with the right content.
-  const specifiesTopic = /\b(about|regarding|covering|on)\s+\w/i.test(stripped) ||
-    /\byou\s+(wrote|made|created|drafted|generated|gave|composed)\b/i.test(stripped) ||
-    /\bthe\s+\w+\s+(blurb|response|reply|recipe|summary|table|list|outline|draft|note|paragraph|essay)\b/i.test(stripped);
-  if (specifiesTopic) return false;
-
-  // "export-only" — commands that reference existing content to export
-  // Direct export verbs at start: "put this in a google doc", "export to google doc"
-  if (/^(export|save|send|put|place|add)\s.*google\s*doc/i.test(stripped)) return 'export-only';
-  if (/^(create|make)\s+(a\s+)?google\s*doc/i.test(stripped)) return 'export-only';
-  // References to existing content (this/that/it) anywhere with google doc
-  if (/(put|save|send|export|place|add|move)\s+(this|that|it|the above)\s.*(google\s*doc)/i.test(stripped)) return 'export-only';
-  if (/google\s*docs?\s+(with|from|of|for)\s+(this|that|the above|this info)/i.test(stripped)) return 'export-only';
-  // "(put/save/turn) this (in/into) a google doc" — reference to existing content
-  if (/(this|that|it|the above).*(in|into|to|as)\s+(a\s+)?google\s*doc/i.test(stripped)) return 'export-only';
-  // Short commands (just the google doc request, not much else)
-  if (stripped.replace(/google\s*docs?/i, '').replace(/[^a-z]/g, '').length < 20) return 'export-only';
-
-  // "write-and-export" — user wants something NEW written AND exported
-  // e.g., "write a recommendation on X and put it in a google doc"
-  if (/(make|create|save|export|want|need|give|get|generate|send|turn|put|write|add|place)/i.test(t)) return 'write-and-export';
-
   return false;
 }
 
@@ -843,7 +792,6 @@ export default function Chat({
   const sessionStreamsRef = useRef(new Map<string, SessionStreamState>());
   const requestSessionMapRef = useRef(new Map<string, string>());
   const streamCleanupRef = useRef<Array<() => void>>([]);
-  const pendingGoogleExportRef = useRef(false);
   const actionButtonRef = useRef<HTMLButtonElement>(null);
   const [availableProviders, setAvailableProviders] = useState<Set<string>>(new Set());
   const [openrouterModelName, setOpenrouterModelName] = useState<string>('');
@@ -1168,67 +1116,6 @@ export default function Chat({
         sessionStreamsRef.current.delete(targetSessionId);
         requestSessionMapRef.current.delete(requestId);
         onSessionStreamStateChange?.(targetSessionId, false);
-
-        // Auto-export to Google Doc if flagged — skip showing full content
-        if (pendingGoogleExportRef.current && stream.accumulated) {
-          pendingGoogleExportRef.current = false;
-          const fullContent = stream.accumulated;
-
-          // Extract title: prefer markdown headings, then derive from user request
-          const headingMatch = fullContent.match(/^#+\s+(.{1,60})/m);
-          let title = headingMatch ? headingMatch[1].replace(/[*#]/g, '').trim() : '';
-          if (!title) {
-            // Derive from user's request
-            const userMsg = stream.baseMessages.filter((m) => m.role === 'user').pop();
-            if (userMsg) {
-              const req = userMsg.content
-                .replace(/\b(and\s+)?(put|place|save|export|send|add)\s+(it\s+)?(in|into|to|as)\s+(a\s+)?google\s*docs?\b/gi, '')
-                .replace(/\b(can you|could you|please|write|draft|create)\b/gi, '')
-                .replace(/\s{2,}/g, ' ').trim();
-              if (req.length > 5 && req.length <= 80) {
-                title = req.charAt(0).toUpperCase() + req.slice(1);
-              }
-            }
-          }
-          if (!title) title = 'Keel Export';
-
-          if (targetSessionId === currentSessionIdRef.current) {
-            justLoadedRef.current = true;
-            resetStreamingUi();
-            setMessages([
-              ...stream.baseMessages,
-              { role: 'assistant' as const, content: 'Exporting your document...', timestamp: Date.now(), kind: 'status' },
-            ]);
-          }
-
-          window.keel.googleExportDoc(fullContent, title).then((url: string) => {
-            const doneMessages = [
-              ...stream.baseMessages,
-              { role: 'assistant' as const, content: `Done — I wrote "${title}" for you.\n\n<!-- gdoc:${url} -->`, timestamp: Date.now(), kind: 'export-result' as const },
-            ];
-            sessionMessagesCacheRef.current.set(targetSessionId, doneMessages);
-            sessionMetadataCacheRef.current.set(targetSessionId, stream.sessionMetadata);
-            window.keel.saveChat(targetSessionId, buildStoredChatSession(doneMessages, stream.sessionMetadata)).catch(() => {});
-            if (targetSessionId === currentSessionIdRef.current) {
-              setMessages(doneMessages);
-              setSessionMetadata(stream.sessionMetadata);
-            }
-          }).catch((err: unknown) => {
-            const errMsg = formatGoogleExportError(err);
-            const errorMessages = [
-              ...stream.baseMessages,
-              { role: 'assistant' as const, content: errMsg, timestamp: Date.now(), kind: 'error' as const },
-            ];
-            sessionMessagesCacheRef.current.set(targetSessionId, errorMessages);
-            sessionMetadataCacheRef.current.set(targetSessionId, stream.sessionMetadata);
-            window.keel.saveChat(targetSessionId, buildStoredChatSession(errorMessages, stream.sessionMetadata)).catch(() => {});
-            if (targetSessionId === currentSessionIdRef.current) {
-              setMessages(errorMessages);
-              setSessionMetadata(stream.sessionMetadata);
-            }
-          });
-          return;
-        }
 
         const finalMessages = [
           ...stream.baseMessages,
@@ -1650,7 +1537,7 @@ export default function Chat({
       timestamp: Date.now(),
     };
 
-    let updatedMessages = [...messages, userMessage];
+    const updatedMessages = [...messages, userMessage];
     setMessages(updatedMessages);
     setInput('');
     setAttachedImages([]);
@@ -1658,53 +1545,6 @@ export default function Chat({
     closeActionMenu();
     setIsStreaming(true);
     setStreamingContent('');
-
-    // Google Doc export command
-    const googleDocMode = isGoogleDocCommand(trimmed);
-    if (googleDocMode === 'export-only') {
-      const lastContent = getLastAssistantMessage();
-      if (!lastContent) {
-        setMessages((prev) => [
-          ...prev,
-          { role: 'assistant', content: 'Nothing to export yet — ask me something first.', timestamp: Date.now(), kind: 'status' },
-        ]);
-      } else {
-        try {
-          // Derive title from markdown heading, fallback to first line
-          const headingMatch = lastContent.match(/^#+\s+(.{1,60})/m);
-          const title = headingMatch ? headingMatch[1].replace(/[*#]/g, '').trim() : 'Keel Export';
-          const url = await window.keel.googleExportDoc(lastContent, title);
-          setMessages((prev) => [
-            ...prev,
-            { role: 'assistant', content: `Done — exported your response.\n\n<!-- gdoc:${url} -->`, timestamp: Date.now(), kind: 'export-result' },
-          ]);
-        } catch (error) {
-          const msg = formatGoogleExportError(error);
-          setMessages((prev) => [
-            ...prev,
-            { role: 'assistant', content: msg, timestamp: Date.now(), kind: 'error' },
-          ]);
-        }
-      }
-      setIsStreaming(false);
-      return;
-    }
-    if (googleDocMode === 'write-and-export') {
-      // Flag for auto-export after the LLM responds
-      pendingGoogleExportRef.current = true;
-      // Strip the "google doc" request from the message so the LLM only writes the content
-      const lastMsg = updatedMessages[updatedMessages.length - 1];
-      if (lastMsg) {
-        const stripped = lastMsg.content
-          .replace(/\b(and\s+)?(put|place|save|export|send|add)\s+(it\s+)?(in|into|to|as)\s+(a\s+)?google\s*docs?\b/gi, '')
-          .replace(/\b(and\s+)?create\s+(a\s+)?google\s*docs?\s*(for|from|with)?\s*(it|this|that)?\b/gi, '')
-          .replace(/\s{2,}/g, ' ')
-          .trim();
-        updatedMessages = updatedMessages.map((m, i) =>
-          i === updatedMessages.length - 1 ? { ...m, content: stripped || m.content } : m
-        );
-      }
-    }
 
     // PDF export command
     if (isPdfCommand(trimmed)) {
@@ -2031,9 +1871,6 @@ export default function Chat({
         setMessages(finalMessages);
         setSessionMetadata(sessionMetadata);
         resetStreamingUi();
-
-        // Clear pending Google Doc export on error
-        pendingGoogleExportRef.current = false;
       }
     }
   };
@@ -2110,7 +1947,7 @@ export default function Chat({
 
           {isStreaming && !streamingContent && <ThinkingIndicator />}
 
-          {isStreaming && !!streamingContent && !pendingGoogleExportRef.current && (
+          {isStreaming && !!streamingContent && (
             <ActivityPanel
               steps={activitySteps}
               answerStarted={!!streamingContent}
@@ -2122,22 +1959,11 @@ export default function Chat({
             />
           )}
 
-          {isStreaming && streamingContent && !pendingGoogleExportRef.current && (
+          {isStreaming && streamingContent && (
             <Message
               message={{
                 role: 'assistant',
                 content: streamingContent,
-                timestamp: Date.now(),
-              }}
-              onOpenWikiPage={onOpenWikiPage}
-            />
-          )}
-
-          {isStreaming && streamingContent && pendingGoogleExportRef.current && (
-            <Message
-              message={{
-                role: 'assistant',
-                content: 'Writing your document...',
                 timestamp: Date.now(),
               }}
               onOpenWikiPage={onOpenWikiPage}
