@@ -13,12 +13,20 @@ interface BoldSpan {
   end: number;
 }
 
-interface DocSection {
+interface TextSection {
   type: 'heading' | 'paragraph' | 'list-item' | 'code';
   text: string;
   level?: number; // heading level 1-3
   boldSpans?: BoldSpan[];
 }
+
+interface TableSection {
+  type: 'table';
+  headers: string[];
+  rows: string[][];
+}
+
+type DocSection = TextSection | TableSection;
 
 /**
  * Strip inline markdown and extract bold span positions from text.
@@ -54,14 +62,86 @@ function extractFormattedText(raw: string): { text: string; boldSpans: BoldSpan[
 }
 
 /**
+ * Split a Markdown table row by `|`, dropping leading/trailing empty cells from
+ * the outer pipes. `\|` inside a cell is treated as a literal pipe.
+ */
+function splitTableRow(line: string): string[] {
+  const cells: string[] = [];
+  let current = '';
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '\\' && line[i + 1] === '|') {
+      current += '|';
+      i++;
+      continue;
+    }
+    if (ch === '|') {
+      cells.push(current);
+      current = '';
+      continue;
+    }
+    current += ch;
+  }
+  cells.push(current);
+  // Drop the empty first/last cells that come from the outer leading/trailing pipes.
+  if (cells.length > 0 && cells[0].trim() === '') cells.shift();
+  if (cells.length > 0 && cells[cells.length - 1].trim() === '') cells.pop();
+  return cells.map((c) => c.trim());
+}
+
+/**
+ * A GFM separator row looks like `| --- | :---: | ---: |` — every cell must be
+ * dashes with optional surrounding colons (for alignment) and optional whitespace.
+ */
+function isTableSeparator(line: string): boolean {
+  const trimmed = line.trim();
+  if (!trimmed.startsWith('|') && !trimmed.includes('|')) return false;
+  const cells = splitTableRow(trimmed);
+  if (cells.length === 0) return false;
+  return cells.every((c) => /^:?-{3,}:?$/.test(c));
+}
+
+/**
+ * Strip inline markdown from a cell (bold/italic/code/links) for plain-text rendering.
+ */
+function stripInlineMarkdown(s: string): string {
+  return s
+    .replace(/\*\*(.+?)\*\*/g, '$1')
+    .replace(/\*(.+?)\*/g, '$1')
+    .replace(/`(.+?)`/g, '$1')
+    .replace(/\[(.+?)\]\(.+?\)/g, '$1');
+}
+
+/**
  * Parse markdown into simple sections for Google Docs insertion.
  */
-function parseMarkdown(markdown: string): DocSection[] {
+export function parseMarkdown(markdown: string): DocSection[] {
   const sections: DocSection[] = [];
   const lines = markdown.split('\n');
 
   for (let idx = 0; idx < lines.length; idx++) {
     const line = lines[idx];
+
+    // GFM table: header row, separator row of dashes, then body rows.
+    if (line.includes('|') && idx + 1 < lines.length && isTableSeparator(lines[idx + 1])) {
+      const headerCells = splitTableRow(line).map(stripInlineMarkdown);
+      const separatorCells = splitTableRow(lines[idx + 1]);
+      // Header and separator must have matching column counts to count as a table.
+      if (headerCells.length > 0 && headerCells.length === separatorCells.length) {
+        const rows: string[][] = [];
+        let j = idx + 2;
+        while (j < lines.length && lines[j].includes('|') && lines[j].trim() !== '') {
+          const cells = splitTableRow(lines[j]).map(stripInlineMarkdown);
+          // Pad/truncate to header width so cells line up.
+          while (cells.length < headerCells.length) cells.push('');
+          rows.push(cells.slice(0, headerCells.length));
+          j++;
+        }
+        sections.push({ type: 'table', headers: headerCells, rows });
+        idx = j - 1;
+        continue;
+      }
+    }
 
     // Headings — demote H1 to H2 since we add our own H1 title
     const headingMatch = line.match(/^(#{1,3})\s+(.+)/);
@@ -148,20 +228,59 @@ async function createDoc(
   };
 }
 
-/**
- * Insert content into a Google Doc using batchUpdate.
- */
-async function insertContent(
+async function runBatchUpdate(
   accessToken: string,
   docId: string,
-  sections: DocSection[]
+  requests: any[]
 ): Promise<void> {
-  // Build requests in reverse order (insertText inserts at index, shifting everything)
-  // We insert from the end to the beginning to maintain correct ordering
-  const requests: any[] = [];
-  let insertIndex = 1; // Google Docs body starts at index 1
+  if (requests.length === 0) return;
+  const response = await fetch(
+    `https://docs.googleapis.com/v1/documents/${docId}:batchUpdate`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ requests }),
+    }
+  );
 
-  // Build the full text and formatting requests
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(`Docs batchUpdate error: ${response.status} ${err}`);
+  }
+}
+
+/**
+ * Return the index just before the document's trailing newline \u2014 the position
+ * where new content should be appended.
+ */
+async function getAppendIndex(accessToken: string, docId: string): Promise<number> {
+  const r = await fetch(
+    `https://docs.googleapis.com/v1/documents/${docId}?fields=body(content(endIndex))`,
+    { headers: { Authorization: `Bearer ${accessToken}` } }
+  );
+  if (!r.ok) {
+    const err = await r.text();
+    throw new Error(`Docs get error: ${r.status} ${err}`);
+  }
+  const data = (await r.json()) as any;
+  let lastEnd = 2;
+  for (const el of data.body?.content || []) {
+    if (typeof el.endIndex === 'number' && el.endIndex > lastEnd) lastEnd = el.endIndex;
+  }
+  // The last endIndex points just past the doc's trailing newline; insert before it.
+  return Math.max(1, lastEnd - 1);
+}
+
+/**
+ * Build a batchUpdate that inserts a contiguous run of text-like sections at
+ * `insertIndex`, returning the requests. Heading and bold formatting are
+ * applied via updateParagraphStyle / updateTextStyle requests.
+ */
+function buildTextRunRequests(sections: TextSection[], insertIndex: number): any[] {
+  const requests: any[] = [];
   const textParts: { text: string; style?: string; prefix?: string; boldSpans?: BoldSpan[] }[] = [];
 
   for (const section of sections) {
@@ -181,18 +300,11 @@ async function insertContent(
     }
   }
 
-  // First, insert all text at once
   const fullText = textParts.map((p) => (p.prefix || '') + p.text).join('');
-  if (!fullText.trim()) return;
+  if (!fullText) return requests;
 
-  requests.push({
-    insertText: {
-      location: { index: insertIndex },
-      text: fullText,
-    },
-  });
+  requests.push({ insertText: { location: { index: insertIndex }, text: fullText } });
 
-  // Then apply heading styles and bold formatting
   let currentIndex = insertIndex;
   for (const part of textParts) {
     const prefixLen = (part.prefix || '').length;
@@ -210,9 +322,8 @@ async function insertContent(
       });
     }
 
-    // Apply bold formatting
     if (part.boldSpans && part.boldSpans.length > 0) {
-      const textStart = currentIndex + prefixLen; // offset past the bullet prefix
+      const textStart = currentIndex + prefixLen;
       for (const span of part.boldSpans) {
         requests.push({
           updateTextStyle: {
@@ -227,21 +338,112 @@ async function insertContent(
     currentIndex = endIndex;
   }
 
-  const response = await fetch(
-    `https://docs.googleapis.com/v1/documents/${docId}:batchUpdate`,
-    {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ requests }),
-    }
-  );
+  return requests;
+}
 
-  if (!response.ok) {
-    const err = await response.text();
-    throw new Error(`Docs batchUpdate error: ${response.status} ${err}`);
+/**
+ * Insert a single Markdown table as a real Google Docs table at the document's
+ * append position. Done in two batchUpdates: one to insert an empty R\u00d7C table,
+ * a second to fill cells in reverse order so earlier-cell index calculations
+ * remain valid as later cells get text inserted into them.
+ */
+async function insertTableSection(
+  accessToken: string,
+  docId: string,
+  table: TableSection
+): Promise<void> {
+  const allRows: string[][] = [table.headers, ...table.rows];
+  const rowCount = allRows.length;
+  const colCount = Math.max(...allRows.map((r) => r.length));
+  if (rowCount === 0 || colCount === 0) return;
+
+  // Pad short rows so every cell exists.
+  const padded = allRows.map((r) => {
+    const out = r.slice();
+    while (out.length < colCount) out.push('');
+    return out;
+  });
+
+  const tableStart = await getAppendIndex(accessToken, docId);
+
+  await runBatchUpdate(accessToken, docId, [
+    {
+      insertTable: {
+        rows: rowCount,
+        columns: colCount,
+        location: { index: tableStart },
+      },
+    },
+  ]);
+
+  // Per the Google Docs API, after inserting an empty R\u00d7C table at index P, the
+  // first cell's first paragraph starts at P + 4, each subsequent cell in a row
+  // adds 2 indices, and each new row adds 1 extra index for the row boundary.
+  // Fill cells in reverse so insertions don't shift earlier cells' indices.
+  const cellRequests: any[] = [];
+  for (let i = rowCount - 1; i >= 0; i--) {
+    for (let j = colCount - 1; j >= 0; j--) {
+      const text = padded[i][j];
+      if (!text) continue;
+      const cellIndex = tableStart + 4 + i * (2 * colCount + 1) + j * 2;
+      cellRequests.push({
+        insertText: { location: { index: cellIndex }, text },
+      });
+    }
+  }
+
+  // Bold the header row.
+  if (cellRequests.length > 0) {
+    await runBatchUpdate(accessToken, docId, cellRequests);
+  }
+
+  const headerStyleRequests: any[] = [];
+  for (let j = 0; j < colCount; j++) {
+    const headerText = padded[0][j];
+    if (!headerText) continue;
+    const cellIndex = tableStart + 4 + 0 * (2 * colCount + 1) + j * 2;
+    headerStyleRequests.push({
+      updateTextStyle: {
+        range: { startIndex: cellIndex, endIndex: cellIndex + headerText.length },
+        textStyle: { bold: true },
+        fields: 'bold',
+      },
+    });
+  }
+  if (headerStyleRequests.length > 0) {
+    await runBatchUpdate(accessToken, docId, headerStyleRequests);
+  }
+}
+
+/**
+ * Insert content into a Google Doc. Text-like sections are inserted in batched
+ * runs; tables are inserted via dedicated insertTable + cell-fill batchUpdates
+ * because table cells live at indices we can only safely compute relative to
+ * the freshly-fetched document end.
+ */
+async function insertContent(
+  accessToken: string,
+  docId: string,
+  sections: DocSection[]
+): Promise<void> {
+  let i = 0;
+  while (i < sections.length) {
+    const textRun: TextSection[] = [];
+    while (i < sections.length && sections[i].type !== 'table') {
+      textRun.push(sections[i] as TextSection);
+      i++;
+    }
+
+    if (textRun.length > 0) {
+      const startIdx = await getAppendIndex(accessToken, docId);
+      const requests = buildTextRunRequests(textRun, startIdx);
+      await runBatchUpdate(accessToken, docId, requests);
+    }
+
+    if (i < sections.length && sections[i].type === 'table') {
+      await insertTableSection(accessToken, docId, sections[i] as TableSection);
+      i++;
+    }
   }
 }
 
