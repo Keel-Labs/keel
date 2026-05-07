@@ -555,6 +555,16 @@ function isGoogleDocCommand(text: string): 'export-only' | 'write-and-export' | 
     .replace(/^(could you|can you|would you|will you|please|ok|okay|yes|yeah|sure)\s*,?\s*/i, '')
     .trim();
 
+  // If the user names a specific prior turn by topic ("the blurb about
+  // California", "the recipe you wrote", "the table on revenue"), the
+  // renderer cannot pick the right prior message — that requires the
+  // LLM. Defer to the regular chat-with-tools path so the model invokes
+  // export_to_google_doc with the right content.
+  const specifiesTopic = /\b(about|regarding|covering|on)\s+\w/i.test(stripped) ||
+    /\byou\s+(wrote|made|created|drafted|generated|gave|composed)\b/i.test(stripped) ||
+    /\bthe\s+\w+\s+(blurb|response|reply|recipe|summary|table|list|outline|draft|note|paragraph|essay)\b/i.test(stripped);
+  if (specifiesTopic) return false;
+
   // "export-only" — commands that reference existing content to export
   // Direct export verbs at start: "put this in a google doc", "export to google doc"
   if (/^(export|save|send|put|place|add)\s.*google\s*doc/i.test(stripped)) return 'export-only';
