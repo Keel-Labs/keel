@@ -520,23 +520,70 @@ export async function readGoogleDoc(
 }
 
 /**
+ * Derive a Doc title from markdown content when the caller didn't supply one.
+ * Prefers the first H1, then the first H2/H3, then the first non-empty line
+ * (truncated). Falls back to "Keel Export" only when the content is empty.
+ */
+export function deriveTitleFromMarkdown(markdown: string): string {
+  const FALLBACK = 'Keel Export';
+  const MAX_LEN = 80;
+
+  const cleanInline = (s: string): string =>
+    s
+      .replace(/\*\*(.+?)\*\*/g, '$1')
+      .replace(/\*(.+?)\*/g, '$1')
+      .replace(/`(.+?)`/g, '$1')
+      .replace(/\[(.+?)\]\(.+?\)/g, '$1')
+      .trim();
+
+  const truncate = (s: string): string =>
+    s.length <= MAX_LEN ? s : s.slice(0, MAX_LEN).replace(/\s+\S*$/, '').trimEnd() + '…';
+
+  const lines = markdown.split('\n');
+
+  for (const heading of [/^#\s+(.+)/, /^##\s+(.+)/, /^###\s+(.+)/]) {
+    for (const line of lines) {
+      const m = line.match(heading);
+      if (m) {
+        const text = cleanInline(m[1]).replace(/[:\s]+$/, '');
+        if (text) return truncate(text);
+      }
+    }
+  }
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('```') || /^[-*]\s/.test(trimmed)) continue;
+    const text = cleanInline(trimmed);
+    if (text) return truncate(text);
+  }
+
+  return FALLBACK;
+}
+
+/**
  * Export markdown content to a new Google Doc.
  * Returns the URL of the created document.
+ *
+ * If `title` is omitted or blank, a title is derived from the markdown
+ * (first heading, falling back to the first non-empty line). The
+ * "Keel Export" fallback only kicks in when the content is empty.
  */
 export async function exportToGoogleDoc(
   brainPath: string,
   config: GoogleOAuthConfig,
   markdownContent: string,
-  title: string = 'Keel Export'
+  title?: string
 ): Promise<string> {
+  const resolvedTitle = (title && title.trim()) || deriveTitleFromMarkdown(markdownContent);
   const accessToken = await getValidAccessToken(brainPath, config);
 
   // Create the document
-  const { docId, url } = await createDoc(accessToken, title);
+  const { docId, url } = await createDoc(accessToken, resolvedTitle);
 
   // Parse and insert content — add title as H1 at top, skip duplicate first line
   const parsed = parseMarkdown(markdownContent);
-  const titleNorm = title.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const titleNorm = resolvedTitle.toLowerCase().replace(/[^a-z0-9]/g, '');
   // Skip first section if it matches the title (paragraph or heading)
   if (parsed.length > 0 && (parsed[0].type === 'paragraph' || parsed[0].type === 'heading')) {
     const firstNorm = parsed[0].text.toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -545,12 +592,12 @@ export async function exportToGoogleDoc(
     }
   }
   const sections: DocSection[] = [
-    { type: 'heading', text: title, level: 1 },
+    { type: 'heading', text: resolvedTitle, level: 1 },
     ...parsed,
   ];
   await insertContent(accessToken, docId, sections);
 
-  logActivity(brainPath, 'export-gdoc', `Exported to Google Doc: ${title}`);
+  logActivity(brainPath, 'export-gdoc', `Exported to Google Doc: ${resolvedTitle}`);
 
   return url;
 }

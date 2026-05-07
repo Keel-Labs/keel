@@ -158,7 +158,12 @@ export const ALL_TOOLS: readonly ToolDefinition[] = [
         },
         title: {
           type: 'string',
-          description: 'Document title. If omitted, the system derives one from the content.',
+          description:
+            'Optional short document title (3–8 words) that summarizes the content. ' +
+            'Use the topic of the content you are exporting — typically the first heading of the markdown. ' +
+            'Do NOT pass the user\'s message text or their request phrasing as the title (e.g. "Great. a Google document for me with this table?" is wrong). ' +
+            'Do NOT pass a question, instruction, or sentence ending in "?". ' +
+            'If you cannot summarize the content in a few words, omit this field — the system will derive a title from the markdown.',
         },
       },
       required: ['markdown'],

@@ -152,10 +152,16 @@ export function makeToolExecutor(ctx: ToolExecutorContext) {
             return fail(id, 'Google is not connected. Tell the user to connect Google in Settings.');
           }
           const markdown = asString((input as any).markdown);
-          const title = asString((input as any).title).trim() || undefined;
+          const rawTitle = asString((input as any).title).trim();
           if (!markdown.trim()) return fail(id, 'markdown content is required.');
           const guard = checkExportMarkdown(markdown);
           if (!guard.ok) return fail(id, guard.reason!);
+          // Defensive: if the model passed something that looks like the user's
+          // prompt (a question, or excessively long), drop it and let the
+          // connector derive a title from the markdown content instead.
+          const looksLikePrompt =
+            rawTitle.endsWith('?') || rawTitle.length > 120 || /\n/.test(rawTitle);
+          const title = rawTitle && !looksLikePrompt ? rawTitle : undefined;
           const config = googleConfigOrThrow();
           const url = title
             ? await exportToGoogleDoc(ctx.brainPath, config, markdown, title)
