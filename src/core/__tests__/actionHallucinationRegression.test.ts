@@ -56,14 +56,17 @@ function stubAnthropic(responses: any[]): {
 }
 
 describe('Issue #62 regression — fabricated action claims', () => {
-  describe('"Export this table to Google Sheets" — no spreadsheet tool exists', () => {
+  describe('"Email this to my team" — no email tool exists', () => {
+    // The original scenario used Google Sheets, but a spreadsheet tool was
+    // added to ALL_TOOLS in the meantime, invalidating the premise. Email
+    // is the closest still-genuinely-missing capability.
     it('does not invoke any tool and the model is forced to acknowledge it cannot', async () => {
       const tools = getToolsForContext({ googleConnected: true, xConnected: true });
 
-      // Sanity: there is genuinely no spreadsheet tool. If a future commit
-      // adds one, this assertion will fail and the test author will need to
+      // Sanity: there is genuinely no email tool. If a future commit adds
+      // one, this assertion will fail and the test author will need to
       // update the regression scenario.
-      expect(tools.some((t) => /sheet|spreadsheet/i.test(t.name))).toBe(false);
+      expect(tools.some((t) => /email|mail/i.test(t.name))).toBe(false);
 
       const { client, messagesCreate } = stubAnthropic([
         {
@@ -72,8 +75,8 @@ describe('Issue #62 regression — fabricated action claims', () => {
             {
               type: 'text',
               text:
-                "I can't create a Google Sheet — that tool isn't available. " +
-                'I can put the same data in a Google Doc as a Markdown table if that helps.',
+                "I can't send email — that tool isn't available. " +
+                'I can draft the message and you can send it yourself if that helps.',
             },
           ],
         },
@@ -84,7 +87,7 @@ describe('Issue #62 regression — fabricated action claims', () => {
       });
 
       const text = await client.chatWithTools(
-        [{ role: 'user', content: 'Export this table to Google Sheets', timestamp: 0 }],
+        [{ role: 'user', content: 'Email this to my team', timestamp: 0 }],
         'system prompt forbidding fabricated actions',
         { tools, executeTool },
       );
@@ -93,7 +96,7 @@ describe('Issue #62 regression — fabricated action claims', () => {
       expect(messagesCreate).toHaveBeenCalledTimes(1);
       // Must be an explicit refusal, not a claim of success.
       expect(text).toMatch(/can'?t|cannot|isn'?t available|not (yet )?supported/i);
-      expect(text).not.toMatch(/i'?ve (created|exported|made) (a )?(sheet|spreadsheet)/i);
+      expect(text).not.toMatch(/i'?ve (sent|emailed|delivered) (an? )?(email|message)/i);
     });
   });
 
@@ -296,9 +299,11 @@ describe('Issue #62 regression — fabricated action claims', () => {
         'capture_note',
         'create_calendar_event',
         'create_knowledge_base',
+        'create_local_spreadsheet',
         'create_reminder',
         'create_task',
         'export_to_google_doc',
+        'export_to_google_sheets',
         'publish_x_post',
         'refresh_knowledge_base',
       ]);
