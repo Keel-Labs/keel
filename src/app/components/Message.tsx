@@ -118,6 +118,17 @@ export default function Message({ message, onOpenWikiPage }: Props) {
     );
   }
 
+  if (message.kind === 'system-event') {
+    return (
+      <div className="chat-system-event">
+        <span
+          className="chat-system-event__text"
+          dangerouslySetInnerHTML={{ __html: renderedContent || '' }}
+        />
+      </div>
+    );
+  }
+
   return (
     <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 26, paddingRight: 88 }}>
       <div style={{ minWidth: 0, maxWidth: 'min(760px, 100%)' }}>

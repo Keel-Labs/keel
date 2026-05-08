@@ -327,17 +327,30 @@ export async function extractAndSaveMemory(
       }
     }
 
-    // Build summary of what was saved
+    // Build summary of what was saved. Group by verb so we don't repeat
+    // "Noted X, Noted Y" — instead: "Noted 2 projects, 1 contact".
+    const noted: string[] = [];
+    const saved: string[] = [];
+    const updated: string[] = [];
+    const completed: string[] = [];
+    const plural = (n: number, singular: string, pluralForm?: string) =>
+      `${n} ${n === 1 ? singular : (pluralForm ?? `${singular}s`)}`;
+
+    if (update.profile?.name || update.profile?.role) updated.push('profile');
+    if (update.priorities && update.priorities.length > 0) updated.push('priorities');
+    if (update.projects && update.projects.length > 0) noted.push(plural(update.projects.length, 'project'));
+    if (update.people && update.people.length > 0) noted.push(plural(update.people.length, 'contact'));
+    if (update.tasks && update.tasks.length > 0) saved.push(plural(update.tasks.length, 'task'));
+    if (update.completedTasks && update.completedTasks.length > 0) completed.push(plural(update.completedTasks.length, 'task'));
+
     const summaryParts: string[] = [];
-    if (update.profile?.name || update.profile?.role) summaryParts.push('Updated profile');
-    if (update.projects && update.projects.length > 0) summaryParts.push(`Noted ${update.projects.length} project(s)`);
-    if (update.priorities && update.priorities.length > 0) summaryParts.push('Updated priorities');
-    if (update.tasks && update.tasks.length > 0) summaryParts.push(`Saved ${update.tasks.length} task(s)`);
-    if (update.people && update.people.length > 0) summaryParts.push(`Noted ${update.people.length} contact(s)`);
-    if (update.completedTasks && update.completedTasks.length > 0) summaryParts.push(`Completed ${update.completedTasks.length} task(s)`);
+    if (updated.length > 0) summaryParts.push(`Updated ${updated.join(' and ')}`);
+    if (noted.length > 0) summaryParts.push(`Noted ${noted.join(', ')}`);
+    if (saved.length > 0) summaryParts.push(`Saved ${saved.join(', ')}`);
+    if (completed.length > 0) summaryParts.push(`Completed ${completed.join(', ')}`);
 
     if (summaryParts.length > 0) {
-      return { updated: true, summary: summaryParts.join(', ') };
+      return { updated: true, summary: summaryParts.join(' · ') };
     }
   } catch (err) {
     // Memory extraction is best-effort — never fail the chat

@@ -545,6 +545,12 @@ select {
   mask-repeat: no-repeat;
 }
 
+/* Override just for the chat scroll: the original 58px bottom fade was eating
+   the small system-event rows at the bottom of the conversation. */
+.chat-pane__scroll {
+  --scroll-fade-bottom: 16px;
+}
+
 .team-brain-surface,
 .wiki-surface {
   height: 100%;
@@ -881,6 +887,42 @@ select {
   color: var(--text-disabled);
   margin: 0 8px;
   user-select: none;
+}
+
+/* The preceding assistant message bubble has marginBottom: 26 (Message.tsx).
+   We use a negative top margin to pull the system-event up close to it (~4px
+   gap). Adjacent system-events stack tightly via the sibling selector below. */
+.chat-system-event {
+  display: flex;
+  justify-content: flex-start;
+  margin: -22px 0 16px;
+  padding-left: 2px;
+}
+
+.chat-system-event + .chat-system-event {
+  margin-top: -14px;
+}
+
+.chat-system-event__text {
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--text-disabled);
+  font-style: normal;
+}
+
+.chat-system-event__text strong {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.chat-system-event__text p {
+  margin: 0;
+  display: inline;
+}
+
+.chat-system-event__text a {
+  color: var(--accent);
+  text-decoration: none;
 }
 
 .wiki-shell__action-status {
