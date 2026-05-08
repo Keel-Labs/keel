@@ -965,26 +965,15 @@ export default function Chat({
     };
   }, [onBringToFront]);
 
-  // Listen for auto-capture confirmations
+  // Single combined system-event channel — main.ts merges memory-extract and
+  // auto-capture results into one event, so the renderer always shows one
+  // row. (Dashboard.tsx and Inbox.tsx still subscribe to onMemoryUpdated
+  // separately; main.ts continues to emit that channel for their refresh.)
   useEffect(() => {
     const cleanup = window.keel.onAutoCaptureDone((event) => {
       setMessages((prev) => [
         ...prev,
-        // kind: 'status' so getLastAssistantMessage skips this when picking
-        // content for a follow-up export. Without it, asking "export the
-        // blurb you wrote" picks up the auto-capture summary instead.
-        { role: 'assistant', content: `*${event.summary}*`, timestamp: Date.now(), kind: 'status' },
-      ]);
-    });
-    return cleanup;
-  }, []);
-
-  // Listen for memory extraction confirmations
-  useEffect(() => {
-    const cleanup = window.keel.onMemoryUpdated((event) => {
-      setMessages((prev) => [
-        ...prev,
-        { role: 'assistant', content: `*Noted: ${event.summary}*`, timestamp: Date.now(), kind: 'status' },
+        { role: 'assistant', content: event.summary, kind: 'system-event', timestamp: Date.now() },
       ]);
     });
     return cleanup;

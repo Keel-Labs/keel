@@ -22,7 +22,7 @@ export interface Message {
   timestamp: number;
   // Transient/system messages that should not be treated as substantive responses
   // (e.g., when looking up "the last thing you wrote" for a Google Doc export).
-  kind?: 'error' | 'status' | 'export-result';
+  kind?: 'error' | 'status' | 'export-result' | 'system-event';
 }
 
 export interface ChatSessionMetadata {

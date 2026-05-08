@@ -4,6 +4,7 @@ import * as vectorStore from './vectorStore';
 import { logActivity, searchChunksFts, type ChunkRow } from './db';
 import { rerank, type RankableChunk } from './reranker';
 import { getPersonality } from './personalities';
+import { buildProjectCatalog } from './projectCatalog';
 
 const MAX_CONTEXT_CHARS_V1 = 80_000;
 const MAX_CONTEXT_CHARS_V2 = 60_000;
@@ -12,7 +13,7 @@ const TOP_K = 8;
 const IDENTITY = `You are Keel, the user's personal AI chief of staff. You are not a generic assistant — you are a trusted colleague who has read every document, note, and project file the user has written.`;
 
 const BASE_RULES = `CRITICAL RULES — FOLLOW THESE STRICTLY:
-- When the user tells you about themselves, their projects, or priorities: acknowledge in 1-2 sentences. Confirm what you noted. STOP. Do NOT add action items, suggestions, resource links, or next steps unless explicitly asked.
+- When the user tells you about themselves, their projects, or priorities, or mentions a new topic, idea, or aspiration: engage with it like a helpful collaborator would. Acknowledge what they said and respond conversationally. If they shared facts (vendor, contact, dates), keep the acknowledgement short. If they raised a topic or idea, feel free to engage with it, ask a scoping question, or offer a thought — be useful, not just a stenographer.
 - When the user asks "what are my projects" or similar: list them concisely with only the details they gave you. No elaboration, no action items, no suggested resources.
 - NEVER generate URLs, links, or resource recommendations unless the user explicitly asks for them.
 - NEVER invent details, descriptions, or goals the user didn't state.
@@ -331,23 +332,28 @@ export class ContextAssembler {
       }
     }
 
-    // 2b. Always include ALL project context files (small, essential for identity)
+    // 2b. Project IDENTITY catalog (names + 1-line blurbs, ~few hundred chars).
+    // This replaces the previous unconditional inclusion of every project's
+    // full context.md, which caused the assistant to regurgitate project
+    // notes when the user mentioned an unrelated topic. Full context.md
+    // bodies now come in only via vector/FTS retrieval below when actually
+    // relevant. The catalog still lets the model answer "what are my
+    // projects?" and recognize project names.
     try {
-      const projectFiles = await this.fileManager.listFiles('projects/*/context.md');
-      if (projectFiles.length > 0) onStep?.(`Loading ${projectFiles.length} project(s)...`);
-      for (const file of projectFiles) {
-        try {
-          const content = await this.fileManager.readFile(file);
-          addSection(file, content);
-        } catch {
-          // skip unreadable files
-        }
+      const catalog = await buildProjectCatalog(this.fileManager);
+      if (catalog.length > 0) {
+        onStep?.(`Loading ${catalog.length} project(s)...`);
+        const lines = catalog.map((p) => {
+          return `- ${p.name} (slug: \`${p.slug}\`)${p.blurb ? `: ${p.blurb}` : ''}`;
+        });
+        addSection('projects (catalog)', lines.join('\n'));
       }
     } catch {
       // no project files
     }
 
-    // 2c. Project task files
+    // 2c. Project task files (kept unconditional so "what are my tasks?" works
+    // without a special-case detector — tasks are short and structured).
     try {
       const taskFiles = await this.fileManager.listFiles('projects/*/tasks.md');
       if (taskFiles.length > 0) onStep?.(`Loading ${taskFiles.length} project task file(s)...`);
@@ -371,24 +377,8 @@ export class ContextAssembler {
       // no general tasks
     }
 
-    // 2e. Recent captures
-    try {
-      const captureFiles = await this.fileManager.listFiles('projects/captures/*.md');
-      if (captureFiles.length > 0) {
-        onStep?.(`Loading ${captureFiles.length} capture(s)...`);
-        const recentCaptures = captureFiles.sort().reverse().slice(0, 20);
-        for (const file of recentCaptures) {
-          try {
-            const content = await this.fileManager.readFile(file);
-            addSection(file, content);
-          } catch {
-            // skip unreadable files
-          }
-        }
-      }
-    } catch {
-      // no captures
-    }
+    // (Captures dump removed — recent captures are already indexed and will
+    // be surfaced via vector + FTS retrieval below when relevant.)
 
     // 3. Retrieve: vector search (top-20) + FTS5 keyword search (top-10), then re-rank
     onStep?.('Searching for relevant context...');

@@ -1222,33 +1222,57 @@ function registerIpcHandlers() {
         sender.send('keel:chat-stream-done', { requestId: streamRequestId });
       }
 
-      // Extract and save memory in background (don't block the response)
+      // Run memory extraction and auto-capture in parallel, then emit ONE
+      // combined system-event so the renderer renders a single row instead of
+      // two racing events.
       const allMessages = [...normalizedRequest.messages, { role: 'assistant' as const, content: fullResponse, timestamp: Date.now() }];
-      extractAndSaveMemory(allMessages, fileManager, llmClient).then((result) => {
-        setSelfWriting();
-        if (result?.updated && !sender.isDestroyed()) {
-          sender.send('keel:memory-updated', {
-            requestId: streamRequestId,
-            summary: result.summary,
-          });
-        }
-      }).catch((err) => {
-        console.error('[main] Memory extraction failed:', err);
-      });
-
-      // Auto-capture substantial context from user messages
       const googleConfig = (GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET)
         ? { clientId: GOOGLE_CLIENT_ID, clientSecret: GOOGLE_CLIENT_SECRET, scopes: GOOGLE_SCOPES }
         : undefined;
-      autoCapture(allMessages, fileManager, llmClient, googleConfig).then((result) => {
-        if (result.captured && result.summary && !sender.isDestroyed()) {
+
+      Promise.allSettled([
+        extractAndSaveMemory(allMessages, fileManager, llmClient),
+        autoCapture(allMessages, fileManager, llmClient, googleConfig),
+      ]).then(([memoryOutcome, captureOutcome]) => {
+        setSelfWriting();
+        if (sender.isDestroyed()) return;
+
+        const parts: string[] = [];
+        let memorySummary: string | null = null;
+
+        if (captureOutcome.status === 'fulfilled') {
+          const r = captureOutcome.value;
+          if (r?.captured && r.summary) parts.push(r.summary);
+        } else {
+          console.error('[main] Auto-capture failed:', captureOutcome.reason);
+        }
+        if (memoryOutcome.status === 'fulfilled') {
+          const r = memoryOutcome.value;
+          if (r?.updated && r.summary) {
+            parts.push(r.summary);
+            memorySummary = r.summary;
+          }
+        } else {
+          console.error('[main] Memory extraction failed:', memoryOutcome.reason);
+        }
+
+        // Combined system-event row in chat (auto-capture + memory in one).
+        if (parts.length > 0) {
           sender.send('keel:auto-capture-done', {
             requestId: streamRequestId,
-            summary: result.summary,
+            summary: parts.join(' · '),
           });
         }
-      }).catch((err) => {
-        console.error('[main] Auto-capture failed:', err);
+
+        // Keep emitting keel:memory-updated separately — Dashboard.tsx and
+        // Inbox.tsx subscribe to it for view refresh, independent of the
+        // chat's combined row.
+        if (memorySummary) {
+          sender.send('keel:memory-updated', {
+            requestId: streamRequestId,
+            summary: memorySummary,
+          });
+        }
       });
     } catch (error) {
       activeStreamControllers.delete(streamRequestId);
