@@ -6,7 +6,7 @@ import * as path from 'path';
 import { loadSettings } from '../src/core/settings';
 
 // All diagnostics stay on disk. Nothing is ever sent off the user's machine.
-// Path is the OS default: ~/Library/Logs/Keel/main.log on macOS.
+// Path is the OS default for Electron logs on each platform.
 
 let initialized = false;
 

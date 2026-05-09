@@ -415,9 +415,17 @@ function createUtilityWindow(kind: UtilityWindowKind, query?: Record<string, str
 }
 
 function createTray() {
-  const icon = nativeImage.createEmpty();
+  const icon = process.platform === 'darwin'
+    ? nativeImage.createEmpty()
+    : nativeImage.createFromPath(
+      app.isPackaged
+        ? path.join(process.resourcesPath, 'build', 'icon.png')
+        : path.join(__dirname, '../../build/icon.png')
+    );
   tray = new Tray(icon);
-  tray.setTitle('⚓');
+  if (process.platform === 'darwin') {
+    tray.setTitle('⚓');
+  }
   tray.setToolTip('Keel');
 
   const contextMenu = Menu.buildFromTemplate([
@@ -2789,7 +2797,7 @@ app.whenReady().then(async () => {
   // Auto-update via electron-updater. Only when packaged — skip in dev.
   // Reads release metadata from GitHub (publish target in
   // electron-builder.config.mjs). On finding a newer release the updater
-  // downloads the DMG in the background and shows a native macOS
+  // downloads the platform artifact in the background and shows a native
   // notification when ready; install happens on next quit.
   if (app.isPackaged) {
     // Route updater logs through electron-log so failures land in

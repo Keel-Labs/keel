@@ -1,8 +1,12 @@
 const splitArtifacts = process.env.KEEL_MAC_SPLIT === '1';
 
-const artifactName = splitArtifacts
+const macArtifactName = splitArtifacts
   ? '${productName}-${version}-mac-${arch}.${ext}'
   : '${productName}-${version}-mac.${ext}';
+
+const winArtifactName = '${productName}-${version}-win-${arch}.${ext}';
+const isWindowsTarget = process.argv.includes('--win');
+const whisperResource = isWindowsTarget ? 'whisper.exe' : 'whisper';
 
 export default {
   appId: process.env.KEEL_APP_ID || 'com.keel.desktop',
@@ -12,8 +16,8 @@ export default {
     buildResources: 'build',
   },
   // Auto-update via electron-updater reads from GitHub releases. Setting this
-  // here also makes electron-builder generate latest-mac.yml in dist-packages
-  // during dist:mac, which we upload as a release asset alongside the DMG.
+  // here also makes electron-builder generate platform update manifests in
+  // dist-packages during release builds.
   publish: [
     {
       provider: 'github',
@@ -45,20 +49,25 @@ export default {
   asar: true,
   asarUnpack: [
     'node_modules/**/*.node',
+    'node_modules/ffmpeg-static/**',
   ],
   // Bundle pre-compiled whisper binary outside ASAR so it can be executed
   extraResources: [
     {
-      from: 'resources/whisper',
-      to: 'whisper',
-      filter: ['**/*'],
+      from: 'resources',
+      to: '.',
+      filter: [whisperResource],
+    },
+    {
+      from: 'build/icon.png',
+      to: 'build/icon.png',
     },
   ],
   mac: {
     category: 'public.app-category.productivity',
     icon: 'build/icon.icns',
     target: ['dmg'],
-    artifactName,
+    artifactName: macArtifactName,
     // App is English-only; drop the ~30–40 MB of other-language locale paks
     // that the Electron Framework ships by default.
     electronLanguages: ['en'],
@@ -91,8 +100,30 @@ export default {
       NSMicrophoneUsageDescription: 'Keel uses your microphone to transcribe meetings and voice notes locally on your device.',
     },
   },
+  win: {
+    icon: 'build/icon.ico',
+    target: [
+      {
+        target: 'nsis',
+        arch: ['x64'],
+      },
+      {
+        target: 'zip',
+        arch: ['x64'],
+      },
+    ],
+    artifactName: winArtifactName,
+    requestedExecutionLevel: 'asInvoker',
+  },
+  nsis: {
+    artifactName: winArtifactName,
+    oneClick: false,
+    perMachine: false,
+    allowToChangeInstallationDirectory: true,
+    deleteAppDataOnUninstall: false,
+  },
   dmg: {
-    artifactName,
+    artifactName: macArtifactName,
     // dmg-builder under-sizes the RW image (bytes / 1000 + "K" suffix gives
     // ~2.4% headroom) and HFS+ catalog overhead pushes us over for ~1.9GB+
     // payloads. ditto then exits with "no space" mid-copy and dmgbuild

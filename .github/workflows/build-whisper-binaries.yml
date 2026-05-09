@@ -1,6 +1,6 @@
 name: Build Whisper Binaries
 
-# Run manually, or automatically when this workflow file changes
+# Run manually, or automatically when this workflow file changes.
 on:
   workflow_dispatch:
   push:
@@ -8,11 +8,9 @@ on:
       - '.github/workflows/build-whisper-binaries.yml'
 
 jobs:
-  build-universal:
-    name: Build Universal Binary
-    runs-on: macos-latest   # Apple Silicon — can cross-compile for x86_64
-    permissions:
-      contents: write
+  build-macos:
+    name: Build macOS universal binary
+    runs-on: macos-latest
 
     steps:
       - uses: actions/checkout@v4
@@ -33,7 +31,7 @@ jobs:
             -DBUILD_SHARED_LIBS=OFF
           cmake --build build-arm64 --target whisper-cli -j$(sysctl -n hw.logicalcpu)
 
-      - name: Build x86_64 binary (cross-compile)
+      - name: Build x86_64 binary
         run: |
           cd /tmp/whisper
           cmake -B build-x64 \
@@ -54,23 +52,90 @@ jobs:
           chmod +x "$ARM64" "$X64"
           lipo -create -output /tmp/whisper-macos-universal "$ARM64" "$X64"
           chmod +x /tmp/whisper-macos-universal
-          echo "✅ Universal binary created"
           file /tmp/whisper-macos-universal
           ls -lh /tmp/whisper-macos-universal
 
-      - name: Delete existing whisper-binaries release (if any)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: whisper-macos-universal
+          path: /tmp/whisper-macos-universal
+          if-no-files-found: error
+
+  build-windows:
+    name: Build Windows x64 binary
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Clone whisper.cpp
+        shell: bash
+        run: git clone --depth 1 https://github.com/ggerganov/whisper.cpp /tmp/whisper
+
+      - name: Build x64 binary
+        shell: bash
+        run: |
+          cd /tmp/whisper
+          cmake -B build-win-x64 \
+            -A x64 \
+            -DGGML_NATIVE=OFF \
+            -DWHISPER_NO_AVX=ON \
+            -DWHISPER_NO_AVX2=ON \
+            -DWHISPER_NO_F16C=ON \
+            -DWHISPER_NO_FMA=ON \
+            -DBUILD_SHARED_LIBS=OFF
+          cmake --build build-win-x64 --config Release --target whisper-cli --parallel
+          WHISPER_EXE="$(find build-win-x64 -name whisper-cli.exe -print -quit)"
+          if [ -z "$WHISPER_EXE" ]; then
+            echo "whisper-cli.exe not found after build" >&2
+            exit 1
+          fi
+          cp "$WHISPER_EXE" "$GITHUB_WORKSPACE/whisper-windows-x64.exe"
+          ls -lh "$GITHUB_WORKSPACE/whisper-windows-x64.exe"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: whisper-windows-x64
+          path: whisper-windows-x64.exe
+          if-no-files-found: error
+
+  publish:
+    name: Publish whisper-binaries release
+    runs-on: ubuntu-latest
+    needs:
+      - build-macos
+      - build-windows
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: /tmp/whisper-assets
+
+      - name: Prepare release assets
+        run: |
+          cp /tmp/whisper-assets/whisper-macos-universal/whisper-macos-universal /tmp/whisper-macos-universal
+          cp /tmp/whisper-assets/whisper-windows-x64/whisper-windows-x64.exe /tmp/whisper-windows-x64.exe
+          chmod +x /tmp/whisper-macos-universal
+          ls -lh /tmp/whisper-macos-universal /tmp/whisper-windows-x64.exe
+
+      - name: Delete existing whisper-binaries release
         run: |
           gh release delete whisper-binaries --yes 2>/dev/null || true
           git push origin :refs/tags/whisper-binaries 2>/dev/null || true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Create release and upload binary
+      - name: Create release and upload binaries
         run: |
           gh release create whisper-binaries \
             --title "Whisper Binaries (auto-updated)" \
-            --notes "Pre-compiled whisper-cli universal binary for macOS (arm64 + x64). Auto-downloaded by Keel on first use. Do not edit manually." \
+            --notes "Pre-compiled whisper-cli binaries for Keel macOS and Windows builds. Auto-downloaded by Keel on first use. Do not edit manually." \
             --prerelease \
-            /tmp/whisper-macos-universal
+            /tmp/whisper-macos-universal \
+            /tmp/whisper-windows-x64.exe
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
