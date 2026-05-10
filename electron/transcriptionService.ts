@@ -10,11 +10,19 @@ const execFileAsync = promisify(execFile)
 
 const REPO = 'Keel-Labs/keel'
 const RELEASE_TAG = 'whisper-binaries'
-const ASSET_NAME = 'whisper-macos-universal'
+
+function getWhisperBinaryFileName(): string {
+  return process.platform === 'win32' ? 'whisper.exe' : 'whisper'
+}
+
+function getWhisperReleaseAssetName(): string {
+  if (process.platform === 'win32') return 'whisper-windows-x64.exe'
+  return 'whisper-macos-universal'
+}
 
 // Where the runtime-downloaded binary lives (writable, outside app bundle)
 function getUserDataBinaryPath(): string {
-  return path.join(app.getPath('userData'), 'bin', 'whisper')
+  return path.join(app.getPath('userData'), 'bin', getWhisperBinaryFileName())
 }
 
 // ---------------------------------------------------------------------------
@@ -24,15 +32,15 @@ function getUserDataBinaryPath(): string {
 /**
  * Returns the path to the whisper-cli binary.
  * Priority:
- *   1. Bundled binary in app extraResources (production .app)
+ *   1. Bundled binary in app extraResources (production app)
  *   2. Runtime-downloaded binary in userData/bin/ (auto-downloaded on first run)
  *   3. Homebrew / system binary (development convenience)
  */
 export function getWhisperBinary(): string | null {
-  // 1. Bundled inside .app (production)
+  // 1. Bundled inside the packaged app.
   const bundledPath = app.isPackaged
-    ? path.join(process.resourcesPath, 'whisper')
-    : path.join(__dirname, '../../../resources/whisper')
+    ? path.join(process.resourcesPath, getWhisperBinaryFileName())
+    : path.join(__dirname, '../../../resources', getWhisperBinaryFileName())
   if (fs.existsSync(bundledPath)) return bundledPath
 
   // 2. Runtime downloaded to userData
@@ -137,11 +145,11 @@ export async function downloadWhisperBinary(onProgress?: (pct: number) => void):
   const release = await fetchJson(
     `https://api.github.com/repos/${REPO}/releases/tags/${RELEASE_TAG}`
   )
-  const asset = release.assets?.find((a: any) => a.name === ASSET_NAME)
+  const asset = release.assets?.find((a: any) => a.name === getWhisperReleaseAssetName())
   if (!asset) throw new Error('Whisper binary not found in release. The build workflow may need to be run first.')
 
   await downloadFile(asset.browser_download_url, dest, onProgress)
-  fs.chmodSync(dest, 0o755)
+  if (process.platform !== 'win32') fs.chmodSync(dest, 0o755)
 }
 
 // ---------------------------------------------------------------------------

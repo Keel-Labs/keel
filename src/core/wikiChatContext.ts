@@ -35,15 +35,16 @@ export async function assembleWikiChatContext({
     const queryVector = await embedText(query);
     const vectorResults = await searchVectorStore(brainPath, queryVector, VECTOR_LIMIT);
     for (const result of vectorResults) {
-      if (!matchesPrefixes(result.chunk.filePath, prefixes)) continue;
+      const filePath = normalizeKeelPath(result.chunk.filePath);
+      if (!matchesPrefixes(filePath, prefixes)) continue;
       const similarity = Math.max(0, 1 - (result.score ?? 0));
       const text = result.chunk.text.trim();
       if (!text) continue;
       candidates.set(`vector:${result.chunk.id}`, {
         id: `vector:${result.chunk.id}`,
-        filePath: result.chunk.filePath,
+        filePath,
         text,
-        score: similarity * sourceWeight(result.chunk.filePath, digDeep),
+        score: similarity * sourceWeight(filePath, digDeep),
         updatedAt: Math.floor(result.chunk.createdAt / 1000),
       });
     }
@@ -54,12 +55,13 @@ export async function assembleWikiChatContext({
   const ftsResults = searchChunksFtsByPrefixes(brainPath, query, prefixes, FTS_LIMIT);
   for (let index = 0; index < ftsResults.length; index += 1) {
     const row = ftsResults[index];
+    const filePath = normalizeKeelPath(row.filePath);
     const score = Math.max(0.2, 1 - index / Math.max(ftsResults.length, 1));
     candidates.set(`fts:${row.id}`, {
       id: `fts:${row.id}`,
-      filePath: row.filePath,
+      filePath,
       text: row.content.trim(),
-      score: score * sourceWeight(row.filePath, digDeep),
+      score: score * sourceWeight(filePath, digDeep),
       updatedAt: row.updatedAt,
     });
   }
@@ -131,6 +133,7 @@ export async function assembleWikiChatContext({
 }
 
 function formatWikiReferenceLabel(filePath: string): string {
+  filePath = normalizeKeelPath(filePath);
   if (filePath.endsWith('/wiki/index.md')) return 'Wiki Index';
   if (filePath.endsWith('/wiki/log.md')) return 'Activity Log';
   if (filePath.endsWith('/overview.md')) return 'Overview';
@@ -151,6 +154,10 @@ function formatWikiReferenceLabel(filePath: string): string {
   if (filePath.includes('/health/')) return `Health: ${title}`;
 
   return title;
+}
+
+function normalizeKeelPath(filePath: string): string {
+  return filePath.replace(/\\/g, '/');
 }
 
 function buildPathPrefixes(basePath: string, digDeep: boolean): string[] {
