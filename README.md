@@ -261,3 +261,7 @@ Keel is a one-person project. Every coffee covers a little more time spent shipp
 ## License
 
 [MIT](./LICENSE).
+
+---
+
+If you found this helpful, please give it a ⭐ to show your support!
