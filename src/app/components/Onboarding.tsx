@@ -7,7 +7,7 @@ const PROVIDERS = [
   { value: 'claude' as const, label: 'Claude', description: 'Anthropic — best reasoning & writing', tag: 'API key', keyField: 'anthropicApiKey' as const, signupUrl: 'https://console.anthropic.com/' },
   { value: 'openai' as const, label: 'OpenAI', description: 'GPT models — strong all-rounder', tag: 'API key', keyField: 'openaiApiKey' as const, signupUrl: 'https://platform.openai.com/api-keys' },
   { value: 'openrouter' as const, label: 'OpenRouter', description: 'One key, hundreds of models', tag: 'API key', keyField: 'openrouterApiKey' as const, signupUrl: 'https://openrouter.ai/keys' },
-  { value: 'ollama' as const, label: 'Ollama', description: 'Local models — free, private, offline. Runs on your Mac.', tag: 'Free · No key', keyField: null, signupUrl: 'https://ollama.com/download' },
+  { value: 'ollama' as const, label: 'Ollama', description: 'Local models — free, private, offline. Runs on your machine.', tag: 'Free · No key', keyField: null, signupUrl: 'https://ollama.com/download' },
 ];
 
 interface Props {
@@ -622,7 +622,7 @@ export default function Onboarding({ initialSettings, onComplete }: Props) {
           <>
             <h2 style={headingStyle}>Choose your AI model</h2>
             <p style={subtextStyle}>
-              Keel needs an AI model to think with. Bring an API key from a provider below, or use Ollama to run models free on your Mac. You can switch anytime.
+              Keel needs an AI model to think with. Bring an API key from a provider below, or use Ollama to run models free on your machine. You can switch anytime.
             </p>
 
             {/* No-key helper callout */}
