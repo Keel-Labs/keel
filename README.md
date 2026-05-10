@@ -32,8 +32,6 @@ The model is the part that's interchangeable. Claude today, GPT tomorrow, a loca
 
 **[Download Keel for Windows](https://github.com/Keel-Labs/keel/releases/latest)** — Windows x64 installer.
 
-Linux builds are not yet shipped. See the [roadmap](#roadmap) below.
-
 ### Install
 
 **macOS**
@@ -125,7 +123,6 @@ Keel is a working beta and stable enough for daily use on macOS. Windows support
 - SQLite full-text search; optional LanceDB vector search
 
 **What doesn't work yet**
-- No Linux build
 - No mobile app
 - No cloud sync — your workspace lives on one machine at a time
 - No team or sharing features
@@ -168,7 +165,7 @@ If that tradeoff doesn't work, it's MIT licensed and can be forked.
 
 ## Install from source
 
-If you want to build Keel yourself instead of downloading the DMG:
+If you want to build Keel yourself instead of downloading a prebuilt installer:
 
 **Prerequisites**
 - Node.js 18+ and npm

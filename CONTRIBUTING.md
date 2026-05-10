@@ -9,7 +9,7 @@ Thanks for your interest in contributing to Keel! This guide covers both setup f
 - **Node.js 18+** (check with `node --version`)
 - **npm 9+** (check with `npm --version`)
 - **Git**
-- **macOS, Windows, or Linux** (development on any platform; packaging macOS DMG requires macOS, packaging Windows installer requires Windows)
+- **macOS or Windows** (packaging macOS DMG requires macOS, packaging Windows installer requires Windows)
 
 ### Clone & Install
 
