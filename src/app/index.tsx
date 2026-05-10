@@ -4,6 +4,10 @@ import App from './App';
 import { ErrorBoundary } from './ErrorBoundary';
 import './styles.css';
 
+if (navigator.userAgent.includes('Windows')) {
+  document.body.classList.add('is-windows');
+}
+
 window.addEventListener('error', (e) => {
   window.keel?.logRendererError?.({ message: e.message, stack: e.error?.stack });
 });

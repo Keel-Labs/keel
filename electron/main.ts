@@ -340,6 +340,14 @@ function createWindow() {
     windowOptions.titleBarStyle = 'hidden';
     windowOptions.titleBarOverlay = true;
     windowOptions.trafficLightPosition = { x: 14, y: 14 };
+  } else if (process.platform === 'win32') {
+    windowOptions.titleBarStyle = 'hidden';
+    windowOptions.titleBarOverlay = {
+      color: '#00000000',
+      symbolColor: '#8a8178',
+      height: 54,
+    };
+    windowOptions.autoHideMenuBar = true;
   } else {
     windowOptions.autoHideMenuBar = true;
   }
@@ -402,6 +410,14 @@ function createUtilityWindow(kind: UtilityWindowKind, query?: Record<string, str
     windowOptions.titleBarStyle = 'hidden';
     windowOptions.titleBarOverlay = true;
     windowOptions.trafficLightPosition = { x: 14, y: 14 };
+  } else if (process.platform === 'win32') {
+    windowOptions.titleBarStyle = 'hidden';
+    windowOptions.titleBarOverlay = {
+      color: '#00000000',
+      symbolColor: '#8a8178',
+      height: 54,
+    };
+    windowOptions.autoHideMenuBar = true;
   } else {
     windowOptions.autoHideMenuBar = true;
   }
