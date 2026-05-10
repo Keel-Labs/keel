@@ -1,5 +1,5 @@
 import path from 'path';
-import { FileManager } from '../fileManager';
+import { FileManager, toKeelRelativePath } from '../fileManager';
 import type { Message } from '../../shared/types';
 
 export interface WikiCompileLLM {
@@ -460,6 +460,7 @@ ${sources.map((source) => `- [${source.title}](../../${source.relativePath})`).j
 function buildSourceReferenceList(sourcePaths: string[], sources: SourceDigest[], currentDir: string): string {
   const pathMap = new Map(sources.map((source) => [source.relativePath, source.title]));
   return sourcePaths.map((sourcePath) => {
+    sourcePath = normalizeKeelPath(sourcePath);
     const title = pathMap.get(sourcePath) || formatTitle(path.basename(sourcePath, '.md'));
     const relativeHref = path.posix.relative(currentDir, sourcePath);
     return `- [${title}](${relativeHref})`;
@@ -735,5 +736,9 @@ function normalizeRelativePath(pathValue: string): string {
 }
 
 function relativeToBase(basePath: string, fullPath: string): string {
-  return fullPath.slice(`${basePath}/`.length);
+  return normalizeKeelPath(fullPath).slice(`${normalizeKeelPath(basePath)}/`.length);
+}
+
+function normalizeKeelPath(filePath: string): string {
+  return toKeelRelativePath(filePath).replace(/\\/g, '/');
 }

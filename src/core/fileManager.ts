@@ -3,6 +3,10 @@ import * as path from 'path';
 import { glob as globFn } from 'glob';
 import { getStarWarsWikiFiles } from './wikiSample';
 
+export function toKeelRelativePath(filePath: string): string {
+  return filePath.split(path.sep).join('/');
+}
+
 const BRAIN_DIRS = [
   'projects',
   'daily-log',
@@ -84,7 +88,7 @@ export class FileManager {
       cwd: this.brainPath,
       nodir: true,
     });
-    return matches.sort();
+    return matches.map(toKeelRelativePath).sort();
   }
 
   async ensureDirectoryStructure(): Promise<void> {
