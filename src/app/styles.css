@@ -211,7 +211,7 @@ select {
 }
 
 body.is-windows .desktop-topbar {
-  padding-right: calc(var(--windows-controls-width) + 18px);
+  padding: 0 calc(var(--windows-controls-width) + 18px) 0 18px;
 }
 
 .mode-switcher {
