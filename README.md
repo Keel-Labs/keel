@@ -2,7 +2,7 @@
 
 **An AI assistant whose memory belongs to you.**
 
-Keel is a local-first Mac app that captures what matters from your conversations into plain markdown files on your disk. Swap between Claude, GPT, OpenRouter, or a local model any time — your context stays with you, not the vendor.
+Keel is a local-first desktop app for macOS and Windows that captures what matters from your conversations into plain markdown files on your disk. Swap between Claude, GPT, OpenRouter, or a local model any time — your context stays with you, not the vendor.
 
 Open source (MIT). No telemetry. No account required. You can bring your own API key.
 
