@@ -83,6 +83,7 @@
   --sidebar-width: 260px;
   --sidebar-collapsed-width: 72px;
   --topbar-height: 54px;
+  --windows-controls-width: 138px;
 
   /* Semantic surfaces */
   --surface-panel: rgba(29, 29, 28, 0.92);
@@ -209,6 +210,10 @@ select {
   -webkit-app-region: drag;
 }
 
+body.is-windows .desktop-topbar {
+  padding: 0 calc(var(--windows-controls-width) + 18px) 0 18px;
+}
+
 .mode-switcher {
   position: absolute;
   left: 50%;
@@ -255,6 +260,10 @@ select {
 
 .desktop-topbar__trailing {
   justify-content: flex-end;
+}
+
+body.is-windows .desktop-topbar__trailing {
+  min-width: 0;
 }
 
 .desktop-topbar__control {

@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import type { MeetingEntry, MeetingTranscriptionResult, TaskGroup, WhisperStatus } from '../../shared/types';
 
 type RecorderState = 'idle' | 'recording' | 'processing' | 'done' | 'error';
-type SetupState = 'checking' | 'ready' | 'needs-model';
+type SetupState = 'checking' | 'ready' | 'needs-binary' | 'needs-model';
 
 interface Props {
   onOpenSettings?: (section?: string) => void;
@@ -77,6 +77,8 @@ export default function MeetingRecorder({ onOpenSettings }: Props) {
   const [transcriptionPercent, setTranscriptionPercent] = useState<number | null>(null);
   const [downloadPercent, setDownloadPercent] = useState<number | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [binaryDownloadPercent, setBinaryDownloadPercent] = useState<number | null>(null);
+  const [isDownloadingBinary, setIsDownloadingBinary] = useState(false);
   const [result, setResult] = useState<MeetingTranscriptionResult | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
   const [pastMeetings, setPastMeetings] = useState<MeetingEntry[]>([]);
@@ -119,12 +121,11 @@ export default function MeetingRecorder({ onOpenSettings }: Props) {
         whisperReadyRef.current = false;
         setSetupState('needs-model');
       } else {
-        // Binary always bundled; if missing fall back to OpenAI key or show needs-model
         whisperReadyRef.current = false;
-        setSetupState(hasKey ? 'ready' : 'needs-model');
+        setSetupState('needs-binary');
       }
     } catch {
-      setSetupState('needs-model');
+      setSetupState('needs-binary');
     }
   }, []);
 
@@ -142,7 +143,8 @@ export default function MeetingRecorder({ onOpenSettings }: Props) {
     const u1 = window.keel.onMeetingProgress((p) => setProgressStep(p.step));
     const u2 = window.keel.onTranscriptionProgress((p) => setTranscriptionPercent(p.percent));
     const u3 = window.keel.onModelDownloadProgress((p) => setDownloadPercent(p.percent));
-    return () => { u1(); u2(); u3(); };
+    const u4 = window.keel.onBinaryDownloadProgress((p) => setBinaryDownloadPercent(p.percent));
+    return () => { u1(); u2(); u3(); u4(); };
   }, []);
 
   // ── Timer ─────────────────────────────────────────────────────────────────
@@ -159,6 +161,26 @@ export default function MeetingRecorder({ onOpenSettings }: Props) {
   };
 
   // ── Model download ────────────────────────────────────────────────────────
+  const handleDownloadBinary = async () => {
+    setIsDownloadingBinary(true);
+    setBinaryDownloadPercent(0);
+    try {
+      const res = await window.keel.downloadWhisperBinary();
+      if (res.ok) {
+        await checkSetup();
+      } else {
+        setErrorMessage(res.error || 'Download failed');
+        setRecorderState('error');
+      }
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : 'Download failed');
+      setRecorderState('error');
+    } finally {
+      setIsDownloadingBinary(false);
+      setBinaryDownloadPercent(null);
+    }
+  };
+
   const handleDownloadModel = async () => {
     setIsDownloading(true);
     setDownloadPercent(0);
@@ -311,6 +333,38 @@ export default function MeetingRecorder({ onOpenSettings }: Props) {
           {/* ── CHECKING setup ── */}
           {setupState === 'checking' && recorderState === 'idle' && (
             <div style={{ color: 'var(--text-muted)', fontSize: 14 }}>Checking transcription setup…</div>
+          )}
+
+          {/* ── NEEDS BINARY DOWNLOAD ── */}
+          {setupState === 'needs-binary' && recorderState === 'idle' && (
+            <div style={{ width: '100%', textAlign: 'left' }}>
+              <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', marginBottom: 20 }}>
+                <div style={{ color: 'var(--text-muted)', opacity: 0.5, flexShrink: 0, marginTop: 4 }}><MicIcon size={32} /></div>
+                <div>
+                  <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4 }}>Install local transcription</div>
+                  <div style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.6 }}>
+                    Download the whisper.cpp engine once to enable local transcription. This avoids sending meeting audio to an external transcription API.
+                  </div>
+                </div>
+              </div>
+              {isDownloadingBinary ? (
+                <div style={{ width: '100%' }}>
+                  <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 8 }}>
+                    Downloading transcription engine… {binaryDownloadPercent !== null ? `${binaryDownloadPercent}%` : ''}
+                  </div>
+                  <div style={{ height: 6, background: 'var(--bg-surface)', borderRadius: 3, overflow: 'hidden' }}>
+                    <div style={{
+                      height: '100%', background: 'var(--accent)', borderRadius: 3,
+                      width: `${binaryDownloadPercent ?? 0}%`, transition: 'width 0.3s',
+                    }} />
+                  </div>
+                </div>
+              ) : (
+                <button onClick={handleDownloadBinary} style={btn('accent')}>
+                  <DownloadIcon /> Download Transcription Engine
+                </button>
+              )}
+            </div>
           )}
 
           {/* ── NEEDS MODEL DOWNLOAD ── */}

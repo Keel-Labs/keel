@@ -28,15 +28,23 @@ The model is the part that's interchangeable. Claude today, GPT tomorrow, a loca
 
 ## Download
 
-**[⬇ Download Keel for macOS](https://github.com/Keel-Labs/keel/releases/latest)** — universal DMG (Apple Silicon and Intel).
+**[Download Keel for macOS](https://github.com/Keel-Labs/keel/releases/latest)** — universal DMG (Apple Silicon and Intel).
 
-Windows and Linux builds are not yet shipped. See the [roadmap](#roadmap) below.
+**[Download Keel for Windows](https://github.com/Keel-Labs/keel/releases/latest)** — Windows x64 installer.
+
+Linux builds are not yet shipped. See the [roadmap](#roadmap) below.
 
 ### Install
 
+**macOS**
 1. Open the DMG and drag **Keel** to **Applications**.
 2. Double-click Keel to launch.
-3. On first launch, you'll need an API key from at least one provider (Anthropic, OpenAI, or OpenRouter), or [Ollama](https://ollama.com) installed locally. Keel walks you through this.
+
+**Windows**
+1. Run the `Keel-<version>-win-x64.exe` installer.
+2. Launch Keel from the Start menu.
+
+On first launch, you'll need an API key from at least one provider (Anthropic, OpenAI, or OpenRouter), or [Ollama](https://ollama.com) installed locally. Keel walks you through this.
 
 ---
 
@@ -99,7 +107,7 @@ A full feature list and configuration details live in the in-app help.
 
 ## Status: this is v1
 
-Keel is a working beta and stable enough for daily use on macOS, but it's early. Some things you should know before installing:
+Keel is a working beta and stable enough for daily use on macOS. Windows support is newer and should be treated as beta until it has more release mileage. Some things you should know before installing:
 
 **What works today**
 - Chat with Claude, OpenAI, OpenRouter, and Ollama
@@ -117,7 +125,7 @@ Keel is a working beta and stable enough for daily use on macOS, but it's early.
 - SQLite full-text search; optional LanceDB vector search
 
 **What doesn't work yet**
-- Mac only — no Windows or Linux builds
+- No Linux build
 - No mobile app
 - No cloud sync — your workspace lives on one machine at a time
 - No team or sharing features
@@ -164,7 +172,7 @@ If you want to build Keel yourself instead of downloading the DMG:
 
 **Prerequisites**
 - Node.js 18+ and npm
-- macOS (Windows and Linux builds may work but aren't tested)
+- macOS or Windows
 - ~500MB disk space
 - Optional: [Ollama](https://ollama.com) for local models
 
@@ -179,6 +187,7 @@ npm run dev:electron
 **Build a distributable**
 ```bash
 npm run dist:mac          # macOS DMG (requires macOS)
+npm run dist:win          # Windows x64 NSIS installer + ZIP (requires Windows)
 npm run build:desktop     # Generic desktop build
 ```
 
@@ -206,9 +215,9 @@ knowledge-bases/{slug}/    # Wiki bases
 
 **Indexes** — SQLite at `<workspace>/.config/keel.db`; optional LanceDB at `<workspace>/.config/lancedb`.
 
-**Logs** — `~/Library/Logs/Keel/main.log` on macOS. Rotated at 10 MB. Local-only — no telemetry. To attach context to a bug report, open Settings → Help & Feedback → **Copy diagnostic info**, then paste into your GitHub issue. The blob is app version, OS, configured providers (names only, no keys), and the last 100 log lines with your home path replaced by `~`.
+**Logs** — Electron's default log directory for your OS, rotated at 10 MB. Local-only — no telemetry. To attach context to a bug report, open Settings → Help & Feedback → **Copy diagnostic info**, then paste into your GitHub issue. The blob is app version, OS, configured providers (names only, no keys), and the last 100 log lines with your home path replaced by `~`.
 
-**Updates** — Keel checks GitHub for new releases on launch and downloads them in the background. You'll see a native macOS notification when an update is ready; the new version installs the next time you quit and reopen Keel. No telemetry — the only thing sent off your machine is a request for the latest release manifest from `github.com`.
+**Updates** — Keel checks GitHub for new releases on launch and downloads them in the background. You'll see a native notification when an update is ready; the new version installs the next time you quit and reopen Keel. No telemetry — the only thing sent off your machine is a request for the latest release manifest from `github.com`.
 
 You can move, back up, or version-control any of this yourself.
 

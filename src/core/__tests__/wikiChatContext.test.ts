@@ -3,6 +3,7 @@ import * as fs from 'fs/promises';
 import * as os from 'os';
 import * as path from 'path';
 import { FileManager } from '../fileManager';
+import { closeDb } from '../db';
 import { assembleWikiChatContext } from '../wikiChatContext';
 
 let tmpDir: string;
@@ -14,6 +15,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  closeDb();
   await fs.rm(tmpDir, { recursive: true, force: true });
 });
 

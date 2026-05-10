@@ -1,4 +1,4 @@
-import { app } from 'electron'
+import { app, net } from 'electron'
 import * as path from 'path'
 import * as fs from 'fs'
 import * as https from 'https'
@@ -46,6 +46,70 @@ export function getAvailableModels(): Array<{ id: string; downloaded: boolean; s
   }))
 }
 
+function describeNetError(err: Error): Error {
+  const msg = err.message || ''
+  if (/ERR_CERT|certificate|issuer/i.test(msg)) {
+    return new Error(
+      `Network certificate validation failed (${msg}). If you're on a corporate VPN or behind antivirus HTTPS inspection, install that root certificate in Windows Trusted Root Certification Authorities or use a different network.`
+    )
+  }
+  return err
+}
+
+function downloadWithElectronNet(
+  url: string,
+  tmpPath: string,
+  onProgress: (percent: number) => void,
+  signal?: AbortSignal,
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) { reject(new Error('Aborted')); return }
+
+    const req = net.request({ method: 'GET', url, redirect: 'follow' })
+    const abort = () => {
+      req.abort()
+      reject(new Error('Aborted'))
+    }
+    signal?.addEventListener('abort', abort, { once: true })
+
+    req.on('response', (res) => {
+      if (res.statusCode !== 200) {
+        signal?.removeEventListener('abort', abort)
+        reject(new Error(`HTTP ${res.statusCode} downloading model`))
+        return
+      }
+
+      const total = parseInt((res.headers['content-length'] as string) || '0', 10)
+      let received = 0
+      const file = fs.createWriteStream(tmpPath)
+      res.on('data', (chunk: Buffer) => {
+        received += chunk.length
+        if (total) onProgress(Math.round((received / total) * 100))
+        file.write(chunk)
+      })
+      res.on('end', () => {
+        file.end()
+        file.on('close', () => {
+          signal?.removeEventListener('abort', abort)
+          resolve()
+        })
+      })
+      res.on('error', (err: Error) => {
+        file.destroy()
+        fs.unlink(tmpPath, () => {})
+        signal?.removeEventListener('abort', abort)
+        reject(describeNetError(err))
+      })
+    })
+    req.on('error', (err: Error) => {
+      fs.unlink(tmpPath, () => {})
+      signal?.removeEventListener('abort', abort)
+      reject(describeNetError(err))
+    })
+    req.end()
+  })
+}
+
 /**
  * Download a GGML model to the user's Application Support folder.
  * Calls onProgress with 0–100 as download proceeds.
@@ -61,6 +125,12 @@ export async function downloadModel(
   const tmpPath = destPath + '.partial'
   const url = MODEL_URLS[model]
   if (!url) throw new Error(`Unknown model: ${model}`)
+
+  if (typeof net.request === 'function') {
+    await downloadWithElectronNet(url, tmpPath, onProgress, signal)
+    fs.renameSync(tmpPath, destPath)
+    return destPath
+  }
 
   return new Promise((resolve, reject) => {
     if (signal?.aborted) { reject(new Error('Aborted')); return }

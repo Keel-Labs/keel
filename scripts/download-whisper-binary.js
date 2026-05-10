@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 /**
- * Downloads the pre-compiled whisper-cli universal binary from the
- * whisper-binaries GitHub release into resources/whisper.
+ * Downloads the pre-compiled whisper-cli binary for the requested platform
+ * from the whisper-binaries GitHub release into resources/.
  *
- * Run manually:  node scripts/download-whisper-binary.js
- * Runs automatically before electron-builder via "predist:mac" npm script.
+ * Run manually:  node scripts/download-whisper-binary.js [darwin|win32]
+ * Runs automatically before electron-builder via the dist:* npm scripts.
  */
 
 import https from 'https';
@@ -16,8 +16,24 @@ import { fileURLToPath } from 'url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO = 'Keel-Labs/keel';
 const RELEASE_TAG = 'whisper-binaries';
-const ASSET_NAME = 'whisper-macos-universal';
-const DEST = path.join(__dirname, '..', 'resources', 'whisper');
+const TARGET_PLATFORM = process.argv[2] || process.env.KEEL_WHISPER_PLATFORM || process.platform;
+const ASSETS = {
+  darwin: {
+    assetName: 'whisper-macos-universal',
+    fileName: 'whisper',
+  },
+  win32: {
+    assetName: 'whisper-windows-x64.exe',
+    fileName: 'whisper.exe',
+  },
+};
+
+const target = ASSETS[TARGET_PLATFORM];
+if (!target) {
+  throw new Error(`Unsupported whisper binary platform: ${TARGET_PLATFORM}`);
+}
+
+const DEST = path.join(__dirname, '..', 'resources', target.fileName);
 
 function download(url, dest, redirectCount = 0) {
   return new Promise((resolve, reject) => {
@@ -61,7 +77,7 @@ async function main() {
     return;
   }
 
-  console.log(`📦 Downloading whisper binary from ${REPO} @ ${RELEASE_TAG}…`);
+  console.log(`📦 Downloading ${TARGET_PLATFORM} whisper binary from ${REPO} @ ${RELEASE_TAG}…`);
   fs.mkdirSync(path.dirname(DEST), { recursive: true });
 
   // Resolve the asset download URL via GitHub API
@@ -76,17 +92,17 @@ async function main() {
     }).on('error', reject);
   });
 
-  const asset = releaseJson.assets?.find((a) => a.name === ASSET_NAME);
+  const asset = releaseJson.assets?.find((a) => a.name === target.assetName);
   if (!asset) {
     throw new Error(
-      `Asset "${ASSET_NAME}" not found in release "${RELEASE_TAG}".\n` +
+      `Asset "${target.assetName}" not found in release "${RELEASE_TAG}".\n` +
       `Run the "Build Whisper Binaries" GitHub Actions workflow first.`
     );
   }
 
   await download(asset.browser_download_url, DEST);
-  fs.chmodSync(DEST, 0o755);
-  console.log(`✅ whisper binary saved to resources/whisper (${(fs.statSync(DEST).size / 1e6).toFixed(1)} MB)`);
+  if (TARGET_PLATFORM !== 'win32') fs.chmodSync(DEST, 0o755);
+  console.log(`✅ whisper binary saved to resources/${target.fileName} (${(fs.statSync(DEST).size / 1e6).toFixed(1)} MB)`);
 }
 
 main().catch((err) => {

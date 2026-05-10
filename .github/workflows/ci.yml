@@ -9,8 +9,14 @@ on:
 jobs:
   # Desktop app build
   desktop:
-    name: Desktop Build
-    runs-on: ubuntu-latest
+    name: Desktop Build (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - windows-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
