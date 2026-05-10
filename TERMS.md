@@ -8,7 +8,7 @@
 By downloading, installing, or using Keel ("**Software**"), you agree to be bound by these Terms of Service ("**Terms**"). If you do not agree to these Terms, do not use Keel.
 
 These Terms apply to:
-- The Keel desktop application (macOS, Windows, Linux)
+- The Keel desktop application (macOS, Windows)
 - Any associated services or documentation
 
 ---
