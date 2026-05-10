@@ -57,7 +57,7 @@ import {
 import { listAllTasks, toggleTask, moveTask, acceptIncomingTask, appendTask, createProject, renameProject, deleteProject } from '../src/core/tasks';
 import { capture } from '../src/core/workflows/capture';
 import { synthesizeMeeting, formatMeetingNote, formatDailyLogEntry } from '../src/core/workflows/meetingTranscription';
-import { isWhisperAvailable, getWhisperBinary, transcribeAudioBuffer } from './transcriptionService';
+import { isWhisperAvailable, getWhisperBinary, downloadWhisperBinary, transcribeAudioBuffer } from './transcriptionService';
 import { initLogger, logger, buildDiagnostics } from './logger';
 import { autoUpdater } from 'electron-updater';
 import { isModelDownloaded, getAvailableModels, downloadModel } from './modelManager';
@@ -340,9 +340,15 @@ function createWindow() {
     windowOptions.titleBarStyle = 'hidden';
     windowOptions.titleBarOverlay = true;
     windowOptions.trafficLightPosition = { x: 14, y: 14 };
+  } else {
+    windowOptions.autoHideMenuBar = true;
   }
 
   mainWindow = new BrowserWindow(windowOptions);
+  if (process.platform !== 'darwin') {
+    mainWindow.setMenu(null);
+    mainWindow.setMenuBarVisibility(false);
+  }
 
   loadRendererWindow(mainWindow);
 
@@ -396,9 +402,15 @@ function createUtilityWindow(kind: UtilityWindowKind, query?: Record<string, str
     windowOptions.titleBarStyle = 'hidden';
     windowOptions.titleBarOverlay = true;
     windowOptions.trafficLightPosition = { x: 14, y: 14 };
+  } else {
+    windowOptions.autoHideMenuBar = true;
   }
 
   const utilityWindow = new BrowserWindow(windowOptions);
+  if (process.platform !== 'darwin') {
+    utilityWindow.setMenu(null);
+    utilityWindow.setMenuBarVisibility(false);
+  }
   utilityWindows.set(kind, utilityWindow);
   loadRendererWindow(utilityWindow, { window: kind, ...(query || {}) });
 
@@ -526,6 +538,14 @@ function getElectronAwareFetch(): typeof fetch {
   }
 
   return fetch;
+}
+
+function describeTranscriptionError(error: unknown): string {
+  const message = error instanceof Error ? error.message : 'Transcription failed';
+  if (/unable to get local issuer certificate|ERR_CERT|certificate|issuer/i.test(message)) {
+    return 'Network certificate validation failed while contacting the transcription or AI provider. Download the local whisper model to transcribe offline, or install your organization root certificate in Windows Trusted Root Certification Authorities.';
+  }
+  return message;
 }
 
 // --- File Watcher & Indexing ---
@@ -1384,6 +1404,18 @@ function registerIpcHandlers() {
     };
   });
 
+  // Download whisper.cpp itself when a packaged build is missing the binary.
+  ipcMain.handle('keel:download-whisper-binary', async (event) => {
+    try {
+      await downloadWhisperBinary((percent) => {
+        event.sender.send('keel:binary-download-progress', { percent });
+      });
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : 'Download failed' };
+    }
+  });
+
   // Download a whisper model with progress events
   ipcMain.handle('keel:download-whisper-model', async (event, model = 'base.en') => {
     try {
@@ -1424,7 +1456,7 @@ function registerIpcHandlers() {
       }
       return { ok: false, error: 'no_transcription_available' };
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Transcription failed';
+      const message = describeTranscriptionError(error);
       // ffmpeg dumps its full stderr into the error message when it can't parse
       // the webm (e.g. empty/silent recording). Surface a clean error instead.
       if (/EBML header parsing failed|Invalid data found when processing input|matroska,webm/i.test(message)) {
@@ -1520,7 +1552,7 @@ function registerIpcHandlers() {
     } catch (err) {
       return {
         ok: false,
-        error: err instanceof Error ? err.message : 'Transcription failed',
+        error: describeTranscriptionError(err),
       };
     }
   });
