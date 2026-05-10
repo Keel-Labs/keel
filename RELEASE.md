@@ -54,6 +54,8 @@ The Windows build will:
 3. Rebuild/install native Electron dependencies.
 4. Produce an NSIS installer, ZIP, and `latest.yml` update manifest in `dist-packages/`.
 
+Do not commit `dist-packages/` output to git. It is intentionally gitignored. Release executables belong on GitHub Releases, not in repository history.
+
 ## Verify before publishing
 
 macOS:
@@ -82,14 +84,34 @@ On a clean Windows machine, install `dist-packages\Keel-<version>-win-x64.exe`, 
 
 ## Publish
 
+Upload the artifacts from the machines that built them. If macOS and Windows artifacts are produced on different machines, run `gh release upload` separately on each machine against the same tag.
+
+From macOS:
+
 ```sh
 gh release upload v<version> \
   dist-packages/Keel-<version>-mac.dmg \
   dist-packages/latest-mac.yml \
+  --clobber
+```
+
+From Windows PowerShell:
+
+```powershell
+gh release upload v<version> `
   dist-packages/Keel-<version>-win-x64.exe \
   dist-packages/Keel-<version>-win-x64.zip \
   dist-packages/latest.yml \
   --clobber
 ```
+
+If `gh` is not installed on the Windows build machine:
+
+```powershell
+winget install --id GitHub.cli -e
+gh auth login
+```
+
+Use `gh release view v<version> --web` after uploading to verify the release has both platform installers and both update manifests.
 
 Update the release notes to drop the Sequoia/Gatekeeper install instructions once the DMG is notarized — the dance no longer applies.
