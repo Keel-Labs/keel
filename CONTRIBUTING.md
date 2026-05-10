@@ -9,7 +9,7 @@ Thanks for your interest in contributing to Keel! This guide covers both setup f
 - **Node.js 18+** (check with `node --version`)
 - **npm 9+** (check with `npm --version`)
 - **Git**
-- **macOS, Windows, or Linux** (development on any platform; packaging macOS DMG requires macOS)
+- **macOS, Windows, or Linux** (development on any platform; packaging macOS DMG requires macOS, packaging Windows installer requires Windows)
 
 ### Clone & Install
 
@@ -70,6 +70,7 @@ The repo no longer includes the old server/mobile/cloud-auth runtime as active c
 | Wiki behavior | `src/core/workflows/wikiBase.ts` | `src/core/workflows/wikiIngest.ts`, `src/core/workflows/wikiMaintenance.ts`, `src/app/components/WikiWorkspace.tsx` |
 | Google integrations | `src/core/connectors/googleAuth.ts` | `src/core/connectors/googleCalendar.ts`, `src/core/connectors/googleDocs.ts`, `electron/main.ts` |
 | macOS packaging | `electron-builder.config.mjs` | `build/`, `scripts/build-mac-icon.sh`, `package.json` |
+| Windows packaging | `electron-builder.config.mjs` | `build/icon.ico`, `package.json` |
 
 ## Repo-Specific Gotchas
 
