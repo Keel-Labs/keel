@@ -447,6 +447,12 @@ function createTray() {
   });
 }
 
+function configureApplicationMenu() {
+  if (process.platform !== 'darwin') {
+    Menu.setApplicationMenu(null);
+  }
+}
+
 function registerShortcuts() {
   globalShortcut.register('CommandOrControl+Shift+K', () => {
     if (!mainWindow) {
@@ -2776,6 +2782,8 @@ app.setName('Keel');
 initLogger();
 
 app.whenReady().then(async () => {
+  configureApplicationMenu();
+
   // Set dock icon in dev mode
   if (process.platform === 'darwin' && !app.isPackaged) {
     const iconPath = path.join(__dirname, '..', 'build', 'icon.icns');
