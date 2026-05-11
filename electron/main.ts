@@ -1939,16 +1939,6 @@ function registerIpcHandlers() {
 
     const fullPath = path.join(settings.brainPath, filePath);
 
-    // Try Obsidian first for markdown files
-    if (fullPath.endsWith('.md')) {
-      try {
-        await shell.openExternal('obsidian://open?path=' + encodeURIComponent(fullPath));
-        return '';
-      } catch {
-        // Obsidian not installed — fall through to system default
-      }
-    }
-
     return shell.openPath(fullPath);
   });
 
