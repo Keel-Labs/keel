@@ -1,0 +1,73 @@
+name: Release Windows
+
+# Build Windows installers on tag push (e.g. v0.2.1) and upload them to the
+# GitHub Release for that tag. Also runnable on demand via workflow_dispatch
+# against any existing tag, which is what we need to back-fill v0.2.1 since
+# the workflow was added after the tag was created.
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to build (e.g. v0.2.1). Defaults to the workflow ref.'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    name: Build Windows installer
+    runs-on: windows-latest
+    steps:
+      - name: Resolve ref
+        id: ref
+        shell: bash
+        run: |
+          if [ -n "${{ github.event.inputs.tag }}" ]; then
+            echo "ref=${{ github.event.inputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "ref=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.ref.outputs.ref }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Windows installer
+        run: npm run dist:win
+        env:
+          # electron-builder needs a token to publish, but we upload via gh CLI
+          # separately. Setting this avoids a noisy "no token" warning.
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: List artifacts
+        shell: bash
+        run: ls -lh dist-packages/
+
+      - name: Upload to release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ steps.ref.outputs.ref }}"
+          # Strip the leading 'v' to derive the version used in artifact names.
+          VERSION="${TAG#v}"
+          gh release upload "$TAG" \
+            "dist-packages/Keel-${VERSION}-win-x64.exe" \
+            "dist-packages/Keel-${VERSION}-win-x64.zip" \
+            "dist-packages/latest.yml" \
+            --clobber
