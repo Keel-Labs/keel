@@ -26,7 +26,8 @@
  * If you would like to use your own OAuth client (for example, to keep your
  * Google API quota separate or to bypass the 100-user unverified-app cap):
  *   1. Create a Google Cloud project at console.cloud.google.com
- *   2. Enable Google Calendar API and Google Docs API
+ *   2. Enable Google Calendar API, Google Drive API, Google Docs API,
+ *      and Google Sheets API
  *   3. Create OAuth credentials of type "Desktop app"
  *   4. Replace the values below
  */
@@ -34,12 +35,16 @@
 export const GOOGLE_CLIENT_ID = '937899536084-5dl8cvucr9n5blaocbrdqhafktm702dc.apps.googleusercontent.com';
 export const GOOGLE_CLIENT_SECRET = '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';
 
+// Scope strategy: we deliberately avoid the `auth/documents` and
+// `auth/spreadsheets` scopes, which Google classifies as "restricted" and
+// gates behind a paid CASA security assessment. Instead we ask only for
+// `auth/drive.file`, which Google classifies as "sensitive" (free brand
+// verification only). `drive.file` grants access exclusively to files the
+// app itself creates, so the Docs/Sheets APIs can still create and edit
+// Keel-authored files — but Keel cannot read arbitrary pre-existing Docs
+// or Sheets in the user's Drive. That trade-off is intentional: the
+// primary use case is export from Keel, not import from Drive.
 export const GOOGLE_SCOPES = [
   'https://www.googleapis.com/auth/calendar',
-  'https://www.googleapis.com/auth/documents',
-  // Sheets export. Matches the broad-scope pattern used by `auth/documents`
-  // above. The migration plan in maintainer memory tracks moving both Docs
-  // and Sheets to `auth/drive.file` together to limit access to files Keel
-  // created — that's a coordinated change, not a piecemeal one.
-  'https://www.googleapis.com/auth/spreadsheets',
+  'https://www.googleapis.com/auth/drive.file',
 ];

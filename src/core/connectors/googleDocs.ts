@@ -1,12 +1,29 @@
 /**
  * Google Docs export connector.
  *
- * Converts markdown content to a Google Doc using the Google Docs API.
- * Uses simple text insertion with basic formatting.
+ * Converts markdown content to a Google Doc. The empty document is created
+ * via the Drive API (so we only need the `auth/drive.file` scope, which is
+ * non-restricted), then populated via the Docs API (which works on files
+ * the app created, even under `drive.file`).
+ *
+ * Reading pre-existing Google Docs is intentionally NOT supported here —
+ * `drive.file` only grants access to files Keel itself created. See
+ * googleConfig.ts for the scope-strategy rationale.
  */
 
 import { getValidAccessToken, type GoogleOAuthConfig } from './googleAuth';
 import { logActivity } from '../db';
+
+/**
+ * Thrown when a caller asks Keel to read a pre-existing Google Doc that
+ * Keel did not create. The current OAuth scope (`drive.file`) deliberately
+ * excludes that capability — see googleConfig.ts.
+ */
+export const READ_EXISTING_DOC_UNSUPPORTED =
+  'Reading existing Google Docs is not supported in this version of Keel. ' +
+  'Paste the content directly, attach it as a local file, or export the ' +
+  'doc as Markdown first. (Keel only requests access to Docs it creates ' +
+  'itself, which avoids requiring a paid Google security assessment.)';
 
 interface BoldSpan {
   start: number; // offset within the text
@@ -202,29 +219,37 @@ export function parseMarkdown(markdown: string): DocSection[] {
 
 /**
  * Create a new Google Doc with the given title and return its ID and URL.
+ *
+ * Uses the Drive API (not the Docs API) to create the empty document, so
+ * the OAuth grant only needs `auth/drive.file`. Drive returns a file ID;
+ * subsequent Docs API calls (batchUpdate, get) work on that file because
+ * `drive.file` grants per-file access to anything the app created.
  */
 async function createDoc(
   accessToken: string,
   title: string
 ): Promise<{ docId: string; url: string }> {
-  const response = await fetch('https://docs.googleapis.com/v1/documents', {
+  const response = await fetch('https://www.googleapis.com/drive/v3/files', {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${accessToken}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ title }),
+    body: JSON.stringify({
+      name: title,
+      mimeType: 'application/vnd.google-apps.document',
+    }),
   });
 
   if (!response.ok) {
     const err = await response.text();
-    throw new Error(`Docs API error: ${response.status} ${err}`);
+    throw new Error(`Drive API error (create doc): ${response.status} ${err}`);
   }
 
-  const data = await response.json() as any;
+  const data = (await response.json()) as { id: string };
   return {
-    docId: data.documentId,
-    url: `https://docs.google.com/document/d/${data.documentId}/edit`,
+    docId: data.id,
+    url: `https://docs.google.com/document/d/${data.id}/edit`,
   };
 }
 
@@ -448,75 +473,12 @@ async function insertContent(
 }
 
 /**
- * Extract a Google Doc ID from a URL.
- * Supports formats like:
- *   https://docs.google.com/document/d/DOC_ID/edit
- *   https://docs.google.com/document/d/DOC_ID/
- *   https://docs.google.com/document/d/DOC_ID
+ * Recognise a Google Docs URL. Used by callers to detect the unsupported
+ * "read this existing doc" case so they can show a helpful message instead
+ * of attempting an API call that would fail with a permissions error.
  */
-export function extractDocId(url: string): string | null {
-  const match = url.match(/docs\.google\.com\/document\/d\/([a-zA-Z0-9_-]+)/);
-  return match ? match[1] : null;
-}
-
-/**
- * Read the text content of a Google Doc by its ID.
- * Returns the document title and plain text body.
- */
-export async function readGoogleDoc(
-  brainPath: string,
-  config: GoogleOAuthConfig,
-  docId: string
-): Promise<{ title: string; content: string }> {
-  const accessToken = await getValidAccessToken(brainPath, config);
-
-  const response = await fetch(
-    `https://docs.googleapis.com/v1/documents/${docId}`,
-    { headers: { Authorization: `Bearer ${accessToken}` } }
-  );
-
-  if (!response.ok) {
-    const err = await response.text();
-    throw new Error(`Docs API error: ${response.status} ${err}`);
-  }
-
-  const doc = await response.json() as any;
-  const title = doc.title || 'Untitled';
-
-  // Extract plain text from the document body
-  let text = '';
-  if (doc.body?.content) {
-    for (const element of doc.body.content) {
-      if (element.paragraph?.elements) {
-        for (const el of element.paragraph.elements) {
-          if (el.textRun?.content) {
-            text += el.textRun.content;
-          }
-        }
-      }
-      if (element.table) {
-        for (const row of element.table.tableRows || []) {
-          const cells: string[] = [];
-          for (const cell of row.tableCells || []) {
-            let cellText = '';
-            for (const content of cell.content || []) {
-              if (content.paragraph?.elements) {
-                for (const el of content.paragraph.elements) {
-                  if (el.textRun?.content) cellText += el.textRun.content;
-                }
-              }
-            }
-            cells.push(cellText.trim());
-          }
-          text += cells.join(' | ') + '\n';
-        }
-      }
-    }
-  }
-
-  logActivity(brainPath, 'read-gdoc', `Read Google Doc: ${title}`);
-
-  return { title, content: text.trim() };
+export function isGoogleDocUrl(url: string): boolean {
+  return /docs\.google\.com\/document\/d\/[a-zA-Z0-9_-]+/.test(url);
 }
 
 /**

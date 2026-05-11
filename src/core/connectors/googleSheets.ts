@@ -1,14 +1,14 @@
 /**
  * Google Sheets export connector.
  *
- * Mirrors googleDocs.ts: creates a new Sheet via the Sheets API, populates
- * it via spreadsheets.values.update, optionally moves it into a Drive folder,
- * and returns the spreadsheetUrl.
+ * Mirrors googleDocs.ts: creates an empty Sheet via the Drive API (so we
+ * only need `auth/drive.file`, not the restricted `auth/spreadsheets`),
+ * then populates it via spreadsheets.values.update — which works on files
+ * the app created, even under `drive.file`. Optionally moves the file into
+ * a Drive folder and returns the spreadsheet URL.
  *
- * Scope: requires the `auth/spreadsheets` scope (added in googleConfig.ts).
- * The Drive-folder move is best-effort — if the user only granted Sheets
- * scope and not Drive, the file lands in My Drive root, which matches the
- * Docs export behavior today.
+ * Drive's default-created Sheet always has a single sheet titled "Sheet1"
+ * with sheetId 0, so we don't need to fetch metadata after creation.
  */
 
 import { getValidAccessToken, type GoogleOAuthConfig } from './googleAuth';
@@ -33,12 +33,12 @@ interface SheetsCreateResponse {
 }
 
 /**
- * Detect the "user connected Google before Sheets support was added" case and
- * throw a message the model can relay verbatim. This is a stopgap until we
- * store granted scopes alongside tokens and gate the tool on scope presence
- * (see follow-up issue) — the structural fix prevents the call from being
- * made at all. Until then, the API call goes through and Google rejects it
- * with 403 + "insufficient authentication scopes".
+ * Detect the "user's Google connection lacks the new drive.file scope" case
+ * and throw a message the model can relay verbatim. After the v0.2.x scope
+ * migration, every existing user's tokens lack `auth/drive.file` until they
+ * reconnect; the API call goes through and Google rejects it with 403 +
+ * "insufficient authentication scopes". This applies symmetrically to the
+ * Drive create call and the Sheets values.update call.
  *
  * Exported for unit testing only.
  */
@@ -51,38 +51,34 @@ export function explainSheetsApiError(status: number, body: string): string {
     /insufficient authentication scopes|ACCESS_TOKEN_SCOPE_INSUFFICIENT/i.test(body);
   if (insufficientScope) {
     return (
-      'Your Google connection was made before Sheets support was added, ' +
-      'so it does not include the Sheets scope. Open Settings, disconnect ' +
-      'Google, and reconnect to enable Sheets export. In the meantime, I ' +
-      'can save the data as a local .xlsx using create_local_spreadsheet.'
+      'Your Google connection needs to be refreshed for Sheets export. ' +
+      'Open Settings, disconnect Google, and reconnect to grant the ' +
+      'updated permissions. In the meantime, I can save the data as a ' +
+      'local .xlsx using create_local_spreadsheet.'
     );
   }
   return `Sheets API error: ${status} ${body}`;
 }
 
 /**
- * Create the spreadsheet shell with a single sheet. We pass the user-supplied
- * title both as the spreadsheet title and the first sheet's title (truncated
- * to Sheets' 100-char limit, sanitized).
+ * Create the spreadsheet shell via the Drive API. Drive returns the file ID;
+ * the spreadsheet URL is constructed deterministically. Drive-created Sheets
+ * always come with a single default sheet titled "Sheet1" with sheetId 0,
+ * so we synthesise the same response shape the Sheets API used to return.
  */
 async function createSheet(
   accessToken: string,
   title: string
 ): Promise<SheetsCreateResponse> {
-  const sheetTitle = (title || 'Sheet1')
-    .replace(/[\\/:*?\[\]]/g, ' ')
-    .trim()
-    .slice(0, 100) || 'Sheet1';
-
-  const response = await fetch('https://sheets.googleapis.com/v4/spreadsheets', {
+  const response = await fetch('https://www.googleapis.com/drive/v3/files', {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${accessToken}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      properties: { title },
-      sheets: [{ properties: { title: sheetTitle } }],
+      name: title,
+      mimeType: 'application/vnd.google-apps.spreadsheet',
     }),
   });
 
@@ -90,7 +86,12 @@ async function createSheet(
     const err = await response.text();
     throw new Error(explainSheetsApiError(response.status, err));
   }
-  return (await response.json()) as SheetsCreateResponse;
+  const data = (await response.json()) as { id: string };
+  return {
+    spreadsheetId: data.id,
+    spreadsheetUrl: `https://docs.google.com/spreadsheets/d/${data.id}/edit`,
+    sheets: [{ properties: { sheetId: 0, title: 'Sheet1' } }],
+  };
 }
 
 /**

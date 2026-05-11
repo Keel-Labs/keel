@@ -89,7 +89,7 @@ import {
 } from '../src/core/connectors/googleAuth';
 import { GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_SCOPES } from '../src/core/connectors/googleConfig';
 import { syncCalendar, getUpcomingEventsFormatted, createCalendarEvent } from '../src/core/connectors/googleCalendar';
-import { exportToGoogleDoc, readGoogleDoc, extractDocId } from '../src/core/connectors/googleDocs';
+import { exportToGoogleDoc, isGoogleDocUrl, READ_EXISTING_DOC_UNSUPPORTED } from '../src/core/connectors/googleDocs';
 import { checkExportMarkdown } from '../src/core/tools/exportGuard';
 import {
   startXOAuthFlow,
@@ -1080,23 +1080,14 @@ function registerIpcHandlers() {
     const config = { clientId: GOOGLE_CLIENT_ID, clientSecret: GOOGLE_CLIENT_SECRET, scopes: GOOGLE_SCOPES };
     const appendParts: string[] = [];
 
-    // 1. Auto-fetch Google Doc URLs
-    const docUrlPattern = /https?:\/\/docs\.google\.com\/document\/d\/[a-zA-Z0-9_-]+[^\s)"]*/g;
-    const urls = last.content.match(docUrlPattern);
-    if (urls) {
-      for (const url of urls) {
-        const docId = extractDocId(url);
-        if (!docId) continue;
-        emitThinking('Reading Google Doc');
-        try {
-          const { title, content } = await readGoogleDoc(settings.brainPath, config, docId);
-          emitThinking(`Read "${title}" (${content.length.toLocaleString()} chars)`);
-          appendParts.push(`\n\n--- Google Doc: "${title}" ---\n\n${content.slice(0, 50000)}`);
-        } catch (err) {
-          emitThinking(`Failed to read Google Doc: ${err instanceof Error ? err.message : 'unknown error'}`);
-          appendParts.push(`\n\n[Could not read Google Doc: ${err instanceof Error ? err.message : 'unknown error'}]`);
-        }
-      }
+    // 1. Detect Google Doc URLs in the user message and explain that reading
+    // existing docs isn't supported under our current OAuth scope. We surface
+    // one note per message regardless of how many doc URLs appear, so the
+    // model has the context to respond helpfully without flooding the prompt.
+    const docUrlPattern = /https?:\/\/docs\.google\.com\/document\/d\/[a-zA-Z0-9_-]+/;
+    if (docUrlPattern.test(last.content)) {
+      emitThinking('Skipping Google Doc fetch (unsupported scope)');
+      appendParts.push(`\n\n[${READ_EXISTING_DOC_UNSUPPORTED}]`);
     }
 
     // 2. Auto-fetch Calendar events when user asks about schedule/meetings
@@ -1836,17 +1827,12 @@ function registerIpcHandlers() {
           if (!ref) continue;
 
           try {
-            // Google Doc URL?
-            const docId = extractDocId(ref);
-            if (docId) {
-              if (!googleAvailable) {
-                result.docsFailed.push({ ref, error: 'Google not connected. Connect Google in Settings to import Docs.' });
-                continue;
-              }
-              const { title, content } = await readGoogleDoc(fileManager.getBrainPath(), googleConfig!, docId);
-              const truncated = content.slice(0, 50000);
-              sections.push(`\n## Source: ${title}\n\n_Imported from Google Doc: ${ref}_\n\n${truncated}\n`);
-              result.docsFetched++;
+            // Google Doc URL? Reading pre-existing Docs is no longer
+            // supported — Keel's OAuth scope (`drive.file`) only covers
+            // files Keel itself creates. Fail this ref with a helpful
+            // message and continue with the other refs.
+            if (isGoogleDocUrl(ref)) {
+              result.docsFailed.push({ ref, error: READ_EXISTING_DOC_UNSUPPORTED });
               continue;
             }
 

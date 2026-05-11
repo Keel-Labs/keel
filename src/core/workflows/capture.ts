@@ -3,15 +3,13 @@ import { Readability } from '@mozilla/readability';
 import { FileManager } from '../fileManager';
 import { LLMClient, ToolExecutor } from '../llmClient';
 import { logActivity } from '../db';
-import { readGoogleDoc, extractDocId } from '../connectors/googleDocs';
-import { isGoogleConnected } from '../connectors/googleAuth';
+import { isGoogleDocUrl, READ_EXISTING_DOC_UNSUPPORTED } from '../connectors/googleDocs';
 import { ingestWikiSource } from './wikiIngest';
 import { buildProjectCatalog } from '../projectCatalog';
 import type { GoogleOAuthConfig } from '../connectors/googleAuth';
 import type { ToolDefinition } from '../tools/schemas';
 
 const URL_PATTERN = /^https?:\/\//;
-const GDOC_PATTERN = /docs\.google\.com\/document\/d\//;
 
 function slugify(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
@@ -30,19 +28,12 @@ export async function capture(
   if (URL_PATTERN.test(input.trim())) {
     const url = input.trim();
 
-    if (GDOC_PATTERN.test(url) && googleConfig && isGoogleConnected(brainPath)) {
-      const docId = extractDocId(url);
-      if (docId) {
-        try {
-          const { title, content: docContent } = await readGoogleDoc(brainPath, googleConfig, docId);
-          content = docContent;
-          sourceLabel = title;
-        } catch (error) {
-          return `Failed to read Google Doc: ${error instanceof Error ? error.message : 'Unknown error'}`;
-        }
-      } else {
-        return 'Could not extract document ID from the Google Docs URL.';
-      }
+    if (isGoogleDocUrl(url)) {
+      // Reading pre-existing Google Docs requires a broader OAuth scope
+      // than Keel asks for. Surface the helpful message instead of falling
+      // through to the generic URL fetcher (which would download Google's
+      // sign-in HTML page).
+      return READ_EXISTING_DOC_UNSUPPORTED;
     } else {
       try {
         const response = await fetch(url);
