@@ -3953,7 +3953,7 @@ body.is-windows .desktop-topbar__trailing {
   border: 1px solid var(--border-primary);
   border-radius: var(--radius-lg);
   padding: 20px;
-  width: 320px;
+  width: 400px;
   max-width: 90vw;
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25);
 }
@@ -4003,6 +4003,7 @@ body.is-windows .desktop-topbar__trailing {
   font-size: 13px;
   cursor: pointer;
   transition: opacity 0.1s;
+  white-space: nowrap;
 }
 
 .inbox-dialog__btn:hover {

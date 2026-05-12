@@ -11,6 +11,8 @@ const BRAIN_DIRS = [
   'projects',
   'daily-log',
   'knowledge-bases',
+  'system',
+  'inbox',
 ];
 
 export const KEEL_MD_TEMPLATE = `# Profile
@@ -109,6 +111,14 @@ export class FileManager {
       await fs.mkdir(this.resolve(dir), { recursive: true });
     }
 
+    // One-time migration: calendar and captures used to live under projects/
+    // but are not user-authored projects (calendar is a sync mirror, captures
+    // is an unrouted inbox). Move them to their semantic homes so they stop
+    // polluting the project catalog. Idempotent: re-running is a no-op once
+    // the source paths no longer exist.
+    await this.migrateLegacyFolder('projects/calendar', 'system/calendar');
+    await this.migrateLegacyFolder('projects/captures', 'inbox');
+
     // Create keel.md if it doesn't exist
     if (brainIsNew) {
       await fs.writeFile(keelPath, KEEL_MD_TEMPLATE, 'utf-8');
@@ -132,6 +142,42 @@ export class FileManager {
     }
 
     await this.ensureSampleWikiBase(brainIsNew);
+  }
+
+  /**
+   * Move a legacy folder to a new path. No-op if the source doesn't exist.
+   * If the destination already exists (e.g. partial prior migration), merges
+   * the source's files into it rather than overwriting.
+   */
+  private async migrateLegacyFolder(oldRel: string, newRel: string): Promise<void> {
+    const oldFull = this.resolve(oldRel);
+    const newFull = this.resolve(newRel);
+    try {
+      await fs.access(oldFull);
+    } catch {
+      return; // nothing to migrate
+    }
+    try {
+      await fs.access(newFull);
+      // Destination exists — move children individually, skip name conflicts.
+      const entries = await fs.readdir(oldFull);
+      for (const name of entries) {
+        const srcChild = path.join(oldFull, name);
+        const destChild = path.join(newFull, name);
+        try {
+          await fs.access(destChild);
+          // Conflict — leave the new copy in place, drop the old one.
+          await fs.rm(srcChild, { recursive: true, force: true });
+        } catch {
+          await fs.rename(srcChild, destChild);
+        }
+      }
+      await fs.rm(oldFull, { recursive: true, force: true });
+    } catch {
+      // Destination missing — ensure parent exists, then move whole folder.
+      await fs.mkdir(path.dirname(newFull), { recursive: true });
+      await fs.rename(oldFull, newFull);
+    }
   }
 
   async resetProfile(): Promise<void> {

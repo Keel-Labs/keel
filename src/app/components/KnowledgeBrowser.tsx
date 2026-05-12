@@ -1,6 +1,46 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import type { FileEntry } from '../../shared/types';
 import { useIsMobile } from '../../lib/useIsMobile';
+import DeleteProjectDialog from './DeleteProjectDialog';
+
+// A top-level project folder lives at `projects/{slug}` (exactly one slash, dir).
+function isProjectFolder(entry: FileEntry): boolean {
+  if (!entry.isDirectory) return false;
+  const parts = entry.path.split('/');
+  return parts.length === 2 && parts[0] === 'projects';
+}
+
+function projectSlugFromPath(p: string): string {
+  return p.split('/')[1] ?? '';
+}
+
+// Root-level files/folders that the core references by literal name.
+// Renaming or deleting these silently breaks context assembly, the project
+// catalog, daily-log retrieval, and rerank weights — so they're locked.
+const PROTECTED_ROOT_PATHS = new Set([
+  'keel.md', 'tasks.md', 'projects', 'daily-log', 'inbox', 'system',
+]);
+
+// Files inside a project folder that the core treats as load-bearing:
+//  - context.md defines whether the project exists in the catalog at all
+//  - tasks.md is read by the task list and the project-delete migration
+// Deleting either silently breaks things. Lock them at the row level so the
+// user has to delete the whole project folder (which goes through the proper
+// dialog) instead of nuking the structural files.
+const PROJECT_STRUCTURAL_FILES = /^projects\/[^/]+\/(context|tasks)\.md$/;
+
+function isProtectedPath(entry: FileEntry): boolean {
+  if (PROTECTED_ROOT_PATHS.has(entry.path)) return true;
+  if (PROJECT_STRUCTURAL_FILES.test(entry.path)) return true;
+  return false;
+}
+
+// `system/` holds sync mirrors (calendar today, more later). Files inside it
+// are overwritten by their syncing connectors, so editing/deleting/renaming
+// them is silent data loss waiting to happen. Lock the whole subtree.
+function isSystemPath(p: string): boolean {
+  return p === 'system' || p.startsWith('system/');
+}
 
 interface Props {
   onBack?: () => void;
@@ -10,11 +50,52 @@ interface Props {
   focus?: 'all' | 'team';
 }
 
-function FolderItem({ entry, depth, onSelect, selectedPath, isTeam }: {
+function RowActions({ canDelete, canRename, onDelete, onRename }: {
+  canDelete: boolean; canRename: boolean;
+  onDelete: (e: React.MouseEvent) => void;
+  onRename: (e: React.MouseEvent) => void;
+}) {
+  if (!canDelete && !canRename) return null;
+  return (
+    <span className="kb-row-actions" style={{ marginLeft: 'auto', display: 'flex', gap: 2 }}>
+      {canRename && (
+        <span
+          role="button"
+          title="Rename"
+          onClick={onRename}
+          style={{ fontSize: 11, padding: '0 4px', opacity: 0.6, cursor: 'pointer' }}
+        >✎</span>
+      )}
+      {canDelete && (
+        <span
+          role="button"
+          title="Delete"
+          onClick={onDelete}
+          style={{ fontSize: 11, padding: '0 4px', opacity: 0.6, cursor: 'pointer' }}
+        >🗑</span>
+      )}
+    </span>
+  );
+}
+
+function FolderItem({ entry, depth, onSelect, selectedPath, isTeam, onDelete, onRename, refreshKey }: {
   entry: FileEntry; depth: number; onSelect: (path: string, team?: boolean) => void; selectedPath: string; isTeam?: boolean;
+  onDelete?: (entry: FileEntry) => void;
+  onRename?: (entry: FileEntry) => void;
+  refreshKey?: number;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [children, setChildren] = useState<FileEntry[]>([]);
+  const [hovered, setHovered] = useState(false);
+
+  // Re-fetch children when parent signals a refresh.
+  useEffect(() => {
+    if (expanded) {
+      const listFn = isTeam ? window.keel.listTeamFiles : window.keel.listFiles;
+      listFn(entry.path).then(setChildren).catch(() => {});
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refreshKey]);
 
   const toggle = () => {
     if (!expanded && children.length === 0) {
@@ -24,51 +105,69 @@ function FolderItem({ entry, depth, onSelect, selectedPath, isTeam }: {
     setExpanded(!expanded);
   };
 
+  // Team rows don't get destructive actions in phase 1.
+  // Protected root entries (projects/, daily-log/, keel.md, tasks.md) are
+  // referenced by literal name throughout the core — renaming/deleting them
+  // silently breaks context assembly. Lock them.
+  const canAct = !isTeam && !isProtectedPath(entry) && !isSystemPath(entry.path) && (onDelete != null || onRename != null);
+
   if (!entry.isDirectory) {
     const isActive = entry.path === selectedPath;
     return (
-      <button
-        onClick={() => onSelect(entry.path, isTeam)}
+      <div
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
         style={{
-          width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center',
+          width: '100%', display: 'flex', alignItems: 'center',
           gap: 6, padding: '5px 8px', paddingLeft: 8 + depth * 16,
-          borderRadius: 6, border: 'none',
-	          background: isActive ? 'var(--accent-bg)' : 'transparent',
-	          color: isActive ? 'var(--accent-link)' : 'var(--text-tertiary)',
+          borderRadius: 6,
+          background: isActive ? 'var(--accent-bg)' : hovered ? 'var(--surface-muted)' : 'transparent',
+          color: isActive ? 'var(--accent-link)' : 'var(--text-tertiary)',
           fontSize: 13, cursor: 'pointer', transition: 'all 0.12s',
-          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
         }}
-        onMouseEnter={(e) => {
-	          if (!isActive) e.currentTarget.style.background = 'var(--surface-muted)';
-        }}
-        onMouseLeave={(e) => {
-          if (!isActive) e.currentTarget.style.background = 'transparent';
-        }}
+        onClick={() => onSelect(entry.path, isTeam)}
       >
         <span style={{ fontSize: 11, opacity: 0.5 }}>📄</span>
-        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{entry.name}</span>
-      </button>
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: '0 1 auto' }}>{entry.name}</span>
+        {canAct && hovered && (
+          <RowActions
+            canDelete={onDelete != null}
+            canRename={onRename != null}
+            onDelete={(e) => { e.stopPropagation(); onDelete?.(entry); }}
+            onRename={(e) => { e.stopPropagation(); onRename?.(entry); }}
+          />
+        )}
+      </div>
     );
   }
 
   return (
     <div>
-      <button
-        onClick={toggle}
+      <div
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
         style={{
-          width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center',
+          width: '100%', display: 'flex', alignItems: 'center',
           gap: 6, padding: '5px 8px', paddingLeft: 8 + depth * 16,
-          borderRadius: 6, border: 'none', background: 'transparent',
-	          color: 'var(--text-secondary)', fontSize: 13, cursor: 'pointer',
+          borderRadius: 6,
+          background: hovered ? 'var(--surface-muted)' : 'transparent',
+          color: 'var(--text-secondary)', fontSize: 13, cursor: 'pointer',
           fontWeight: 500, transition: 'all 0.12s',
         }}
-	        onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--surface-muted)'; }}
-        onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+        onClick={toggle}
       >
         <span style={{ fontSize: 10, opacity: 0.4, transition: 'transform 0.15s', transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)' }}>▶</span>
         <span style={{ fontSize: 11 }}>📁</span>
-        <span>{entry.name}</span>
-      </button>
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{entry.name}</span>
+        {canAct && hovered && (
+          <RowActions
+            canDelete={onDelete != null}
+            canRename={onRename != null}
+            onDelete={(e) => { e.stopPropagation(); onDelete?.(entry); }}
+            onRename={(e) => { e.stopPropagation(); onRename?.(entry); }}
+          />
+        )}
+      </div>
       {expanded && children.map((child) => (
         <FolderItem
           key={child.path}
@@ -77,6 +176,9 @@ function FolderItem({ entry, depth, onSelect, selectedPath, isTeam }: {
           onSelect={onSelect}
           selectedPath={selectedPath}
           isTeam={isTeam}
+          onDelete={onDelete}
+          onRename={onRename}
+          refreshKey={refreshKey}
         />
       ))}
     </div>
@@ -85,7 +187,7 @@ function FolderItem({ entry, depth, onSelect, selectedPath, isTeam }: {
 
 // Only show these knowledge folders and files — not app source code
 const KNOWLEDGE_ITEMS = new Set([
-  'keel.md', 'tasks.md', 'projects', 'daily-log',
+  'keel.md', 'tasks.md', 'projects', 'daily-log', 'inbox', 'system',
 ]);
 
 const TEAM_KNOWLEDGE_ITEMS = new Set([
@@ -95,7 +197,7 @@ const TEAM_KNOWLEDGE_ITEMS = new Set([
 export default function KnowledgeBrowser({
   onBack,
   showBack = true,
-  title = 'Knowledge Browser',
+  title = 'My Brain',
   subtitle,
   focus = 'all',
 }: Props) {
@@ -109,16 +211,88 @@ export default function KnowledgeBrowser({
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // On mobile, show file tree or editor, not both
   const [mobileShowEditor, setMobileShowEditor] = useState(false);
+  const [projectDeleteTarget, setProjectDeleteTarget] = useState<{ slug: string; name: string } | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
 
-  useEffect(() => {
+  const reloadRoot = useCallback(() => {
     window.keel.listFiles('').then((entries) => {
       setRootEntries(entries.filter((e) => KNOWLEDGE_ITEMS.has(e.name)));
     }).catch(() => {});
+    setRefreshKey((k) => k + 1);
+  }, []);
+
+  useEffect(() => {
+    reloadRoot();
     // Load team files if team brain is configured
     window.keel.listTeamFiles('').then((entries) => {
       setTeamEntries(entries.filter((e) => TEAM_KNOWLEDGE_ITEMS.has(e.name)));
     }).catch(() => {});
-  }, []);
+  }, [reloadRoot]);
+
+  const handleDelete = useCallback(async (entry: FileEntry) => {
+    if (isProtectedPath(entry)) {
+      window.alert(`"${entry.name}" is part of Keel's core structure and can't be deleted.`);
+      return;
+    }
+    if (isProjectFolder(entry)) {
+      setProjectDeleteTarget({ slug: projectSlugFromPath(entry.path), name: entry.name });
+      return;
+    }
+    const label = entry.isDirectory ? `folder "${entry.name}" and everything inside it` : `"${entry.name}"`;
+    if (!window.confirm(`Delete ${label}? This cannot be undone.`)) return;
+    try {
+      await window.keel.deleteFile(entry.path);
+      if (selectedPath === entry.path || selectedPath.startsWith(entry.path + '/')) {
+        setSelectedPath('');
+        setContent('');
+      }
+      reloadRoot();
+    } catch (err: any) {
+      window.alert(`Delete failed: ${err?.message ?? err}`);
+    }
+  }, [selectedPath, reloadRoot]);
+
+  const handleRename = useCallback(async (entry: FileEntry) => {
+    if (isProtectedPath(entry)) {
+      window.alert(`"${entry.name}" is part of Keel's core structure and can't be renamed.`);
+      return;
+    }
+    const next = window.prompt(`Rename "${entry.name}" to:`, entry.name);
+    if (!next || next === entry.name) return;
+    const trimmed = next.trim();
+    if (!trimmed) return;
+    try {
+      // Use renameProject for top-level project folders so KB/wiki stay in sync.
+      if (isProjectFolder(entry)) {
+        await window.keel.renameProject(projectSlugFromPath(entry.path), trimmed);
+      } else {
+        await window.keel.renameFile(entry.path, trimmed);
+      }
+      if (selectedPath === entry.path) {
+        setSelectedPath('');
+        setContent('');
+      }
+      reloadRoot();
+    } catch (err: any) {
+      window.alert(`Rename failed: ${err?.message ?? err}`);
+    }
+  }, [selectedPath, reloadRoot]);
+
+  const confirmProjectDelete = useCallback(async (moveTasks: boolean) => {
+    const target = projectDeleteTarget;
+    if (!target) return;
+    try {
+      await window.keel.deleteProject(target.slug, moveTasks);
+      if (selectedPath.startsWith(`projects/${target.slug}`)) {
+        setSelectedPath('');
+        setContent('');
+      }
+    } catch (err: any) {
+      window.alert(`Delete failed: ${err?.message ?? err}`);
+    }
+    setProjectDeleteTarget(null);
+    reloadRoot();
+  }, [projectDeleteTarget, selectedPath, reloadRoot]);
 
   const loadFile = async (filePath: string, team = false) => {
     // Save current file before switching
@@ -156,13 +330,17 @@ export default function KnowledgeBrowser({
     }, 800);
   }, [selectedPath, isTeamFile]);
 
+  const isReadOnly = isSystemPath(selectedPath);
+
   const handleChange = (newContent: string) => {
+    if (isReadOnly) return;
     setContent(newContent);
     autoSave(newContent);
   };
 
   // Toggle a checkbox in the markdown content
   const toggleCheckbox = (lineIndex: number) => {
+    if (isReadOnly) return;
     const lines = content.split('\n');
     const line = lines[lineIndex];
     if (/- \[ \]/.test(line)) {
@@ -201,7 +379,7 @@ export default function KnowledgeBrowser({
         )}
         <div>
           <div style={{ fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-disabled)', marginBottom: 4 }}>
-            {focus === 'team' ? 'Shared Context' : 'Knowledge Workspace'}
+            {focus === 'team' ? 'Shared Context' : 'Personal Workspace'}
           </div>
           <div style={{ fontSize: 'var(--text-lg)', fontWeight: 600, color: 'var(--text-primary)' }}>{title}</div>
           {subtitle && (
@@ -230,6 +408,9 @@ export default function KnowledgeBrowser({
               depth={0}
               onSelect={loadFile}
               selectedPath={!isTeamFile ? selectedPath : ''}
+              onDelete={handleDelete}
+              onRename={handleRename}
+              refreshKey={refreshKey}
             />
           ))}
           {focus !== 'team' && rootEntries.length === 0 && (
@@ -297,13 +478,40 @@ export default function KnowledgeBrowser({
 	                  {isTeamFile && <span style={{ color: 'var(--accent-link)', marginRight: 6, fontSize: 10, fontWeight: 700, letterSpacing: '0.04em' }}>TEAM</span>}
                   {selectedPath}
                 </span>
-                <span style={{
-	                  fontSize: 11, color: saveStatus === 'saved' ? '#4ade80' : 'var(--text-disabled)',
-                  transition: 'color 0.3s',
-                }}>
-                  {saveStatus === 'saving' ? 'Saving...' : saveStatus === 'saved' ? 'Saved' : ''}
-                </span>
+                {saveStatus !== 'idle' && (
+                  <span style={{
+                    fontSize: 12,
+                    fontWeight: 600,
+                    letterSpacing: '0.02em',
+                    padding: '3px 10px',
+                    borderRadius: 999,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    background: saveStatus === 'saved' ? 'rgba(74, 222, 128, 0.18)' : 'var(--surface-muted)',
+                    color: saveStatus === 'saved' ? '#16a34a' : 'var(--text-secondary)',
+                    border: `1px solid ${saveStatus === 'saved' ? 'rgba(74, 222, 128, 0.45)' : 'var(--border-subtle)'}`,
+                    transition: 'all 0.2s',
+                  }}>
+                    <span style={{
+                      width: 6, height: 6, borderRadius: '50%',
+                      background: saveStatus === 'saved' ? '#16a34a' : 'var(--text-tertiary)',
+                    }} />
+                    {saveStatus === 'saving' ? 'Saving…' : 'Saved'}
+                  </span>
+                )}
               </div>
+
+              {isReadOnly && (
+                <div style={{
+                  padding: '8px 20px', fontSize: 12, color: 'var(--text-secondary)',
+                  background: 'var(--surface-muted)', borderBottom: '1px solid var(--border-subtle)',
+                  display: 'flex', alignItems: 'center', gap: 8,
+                }}>
+                  <span>🔒</span>
+                  <span>Read-only — this file is managed by a sync connector and will be overwritten on the next sync.</span>
+                </div>
+              )}
 
               {/* Checkbox view for task files */}
               {isTaskFile ? (
@@ -371,15 +579,32 @@ export default function KnowledgeBrowser({
                       );
                     })}
                   </div>
-                  {/* Raw editor below */}
-                  <div style={{ borderTop: '1px solid var(--border-subtle)', flexShrink: 0 }}>
+                  {/* Raw editor below — takes ~1/3 of the editor pane so it's
+                      obviously editable without scrolling. */}
+                  <div style={{
+                    borderTop: '1px solid var(--border-subtle)',
+                    flex: '0 0 33%',
+                    minHeight: 180,
+                    display: 'flex',
+                    flexDirection: 'column',
+                  }}>
+                    <div style={{
+                      padding: '6px 20px', fontSize: 10, fontWeight: 600,
+                      letterSpacing: '0.08em', textTransform: 'uppercase',
+                      color: 'var(--text-disabled)',
+                      borderBottom: '1px solid var(--border-subtle)',
+                      flexShrink: 0,
+                    }}>
+                      Raw markdown {isReadOnly ? '(read-only)' : '(editable)'}
+                    </div>
                     <textarea
                       value={content}
                       onChange={(e) => handleChange(e.target.value)}
+                      readOnly={isReadOnly}
                       style={{
-                        width: '100%', height: 150, padding: '12px 20px', background: 'var(--bg-raw-editor)',
+                        flex: 1, width: '100%', padding: '12px 20px', background: 'var(--bg-raw-editor)',
                         color: 'var(--text-secondary)', border: 'none', outline: 'none',
-                        fontSize: 12, lineHeight: 1.6, resize: 'vertical',
+                        fontSize: 12, lineHeight: 1.6, resize: 'none',
                         fontFamily: 'var(--font-mono)',
                         boxSizing: 'border-box',
                       }}
@@ -392,6 +617,7 @@ export default function KnowledgeBrowser({
                 <textarea
                   value={content}
                   onChange={(e) => handleChange(e.target.value)}
+                  readOnly={isReadOnly}
                   style={{
                     flex: 1, padding: '16px 20px', background: 'var(--bg-base)',
                     color: 'var(--text-primary)', border: 'none', outline: 'none',
@@ -405,6 +631,13 @@ export default function KnowledgeBrowser({
           )}
         </div>
       </div>
+      {projectDeleteTarget && (
+        <DeleteProjectDialog
+          projectName={projectDeleteTarget.name}
+          onCancel={() => setProjectDeleteTarget(null)}
+          onConfirm={confirmProjectDelete}
+        />
+      )}
     </div>
   );
 }

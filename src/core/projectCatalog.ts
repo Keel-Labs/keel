@@ -29,7 +29,9 @@ export async function buildProjectCatalog(fileManager: FileManager): Promise<Pro
   const out: ProjectCatalogEntry[] = [];
   for (const f of files) {
     const slug = f.split('/')[1];
-    if (!slug || slug === 'captures') continue;
+    // Skip the legacy `captures` slug in case migration hasn't run yet on
+     // this brain. After migration, captures live at top-level `inbox/`.
+    if (!slug || slug === 'captures' || slug === 'calendar') continue;
     let ctx = '';
     try { ctx = await fileManager.readFile(f); } catch { continue; }
     const titleMatch = ctx.match(/^#\s+(.+)/m);

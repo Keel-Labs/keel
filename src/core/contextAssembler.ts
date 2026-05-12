@@ -70,7 +70,7 @@ TASK RULES:
 - When the user asks "what are my tasks" (no project specified), show ALL tasks from every project and the general task list, grouped by project with flat checklists.
 - When the user asks about tasks for a specific project, only show tasks from that project.
 - Do not invent categories like "To Do", "In Progress", "Done" — just show the checkboxes.
-- Capture files (projects/captures/*.md) are reference material only. Their action items have already been extracted into the appropriate task files. Do NOT list captures as a separate task section — only show tasks from tasks.md and projects/*/tasks.md files.
+- Capture files (inbox/*.md) are reference material only. Their action items have already been extracted into the appropriate task files. Do NOT list captures as a separate task section — only show tasks from tasks.md and projects/*/tasks.md files.
 
 Here is everything you know about the user:`;
 
@@ -224,7 +224,7 @@ export class ContextAssembler {
 
     // 3d. Recent captures
     try {
-      const captureFiles = await this.fileManager.listFiles('projects/captures/*.md');
+      const captureFiles = await this.fileManager.listFiles('inbox/*.md');
       if (captureFiles.length > 0) {
         onStep?.(`Loading ${captureFiles.length} capture(s)...`);
         const recentCaptures = captureFiles.sort().reverse().slice(0, 20);

@@ -272,13 +272,13 @@ Reply with the tool call only. No prose.`;
       console.error('[capture] Wiki ingest failed (non-blocking):', err);
     }
   } else {
-    // Inbox path: standalone file under projects/captures/.
+    // Inbox path: standalone file under inbox/ (top-level, peer of projects/).
     const slug = sourceLabel
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-|-$/g, '')
       .slice(0, 40);
-    const fileName = `projects/captures/${date}-${slug || 'note'}.md`;
+    const fileName = `inbox/${date}-${slug || 'note'}.md`;
     const fileContent = `# ${sourceLabel}
 
 **Captured:** ${new Date().toISOString()}

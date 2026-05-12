@@ -2228,6 +2228,37 @@ function registerIpcHandlers() {
     fs.writeFileSync(fullPath, content, 'utf-8');
   });
 
+  ipcMain.handle('keel:delete-file', async (_event, filePath: string) => {
+    if (!filePath || filePath.includes('..') || filePath.startsWith('.config')) {
+      throw new Error('Access denied');
+    }
+    const fullPath = path.join(settings.brainPath, filePath);
+    const stat = fs.statSync(fullPath);
+    if (stat.isDirectory()) {
+      fs.rmSync(fullPath, { recursive: true, force: true });
+    } else {
+      fs.unlinkSync(fullPath);
+    }
+  });
+
+  ipcMain.handle('keel:rename-file', async (_event, oldPath: string, newName: string) => {
+    if (!oldPath || oldPath.includes('..') || oldPath.startsWith('.config')) {
+      throw new Error('Access denied');
+    }
+    if (!newName || newName.includes('/') || newName.includes('..') || newName.startsWith('.')) {
+      throw new Error('Invalid name');
+    }
+    const fullOld = path.join(settings.brainPath, oldPath);
+    const dir = path.dirname(oldPath);
+    const newRelPath = dir === '.' ? newName : `${dir}/${newName}`;
+    const fullNew = path.join(settings.brainPath, newRelPath);
+    if (fs.existsSync(fullNew)) {
+      throw new Error('A file with that name already exists');
+    }
+    fs.renameSync(fullOld, fullNew);
+    return newRelPath;
+  });
+
   // --- Team Brain file operations ---
 
   ipcMain.handle('keel:list-team-files', async (_event, dirPath: string) => {

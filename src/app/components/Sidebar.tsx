@@ -7,7 +7,7 @@ interface Session {
   updatedAt: number;
 }
 
-export type DesktopView = 'dashboard' | 'chat' | 'search' | 'chats' | 'wiki' | 'inbox' | 'meetings' | 'settings';
+export type DesktopView = 'dashboard' | 'chat' | 'search' | 'chats' | 'wiki' | 'inbox' | 'knowledge' | 'meetings' | 'settings';
 // Note: 'dashboard' is routed via the top mode-switcher, not the sidebar nav
 export type WikiNavId = 'home' | 'synthesis';
 
@@ -129,6 +129,14 @@ function SparkleIcon() {
   );
 }
 
+function FolderIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+    </svg>
+  );
+}
+
 function MicIcon() {
   return (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -148,6 +156,7 @@ const PRIMARY_ITEMS: Array<{
   { id: 'search', label: 'Search', icon: <SearchIcon /> },
   { id: 'inbox', label: 'Tasks', icon: <InboxIcon /> },
   { id: 'meetings', label: 'Meetings', icon: <MicIcon /> },
+  { id: 'knowledge', label: 'My Brain', icon: <FolderIcon /> },
 ];
 
 const WIKI_ITEMS: Array<{ id: WikiNavId; label: string; icon: React.ReactNode }> = [
