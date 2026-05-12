@@ -205,9 +205,25 @@ const api: KeelAPI = {
     return () => ipcRenderer.off('keel:binary-download-progress', handler);
   },
   downloadWhisperModel: (model?: string) => ipcRenderer.invoke('keel:download-whisper-model', model),
+
+  getUpdateState: () => ipcRenderer.invoke('keel:update-get-state'),
+  checkForUpdates: () => ipcRenderer.invoke('keel:update-check'),
+  restartForUpdate: () => ipcRenderer.invoke('keel:update-restart'),
+  onUpdateState: (callback) => {
+    const handler = (_event: Electron.IpcRendererEvent, state: import('../src/shared/types').UpdateState) => callback(state);
+    ipcRenderer.on('keel:update-state', handler);
+    return () => ipcRenderer.off('keel:update-state', handler);
+  },
 };
 
 contextBridge.exposeInMainWorld('keel', api);
+
+// Dev-only hatch for faking update states from DevTools. The main-process
+// handler is also gated on !app.isPackaged, so this is a no-op in production.
+contextBridge.exposeInMainWorld('keelDev', {
+  setUpdateState: (patch: Partial<import('../src/shared/types').UpdateState>) =>
+    ipcRenderer.invoke('keel:update-debug-set-state', patch),
+});
 
 // Desktop-only migration API
 contextBridge.exposeInMainWorld('keelMigrate', {

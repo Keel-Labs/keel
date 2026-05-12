@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Chat from './components/Chat';
 import Sidebar, { type DesktopView, type WikiNavId, type WikiSidebarState } from './components/Sidebar';
+import WhatsNewModal from './components/WhatsNewModal';
 import Settings, { type SettingsNavigationState } from './components/Settings';
 import WikiWorkspace, { type WikiCommand } from './components/WikiWorkspace';
 import Onboarding from './components/Onboarding';
@@ -566,6 +567,7 @@ export default function App() {
           {desktopView !== 'chat' && renderDesktopView()}
         </div>
       </div>
+      <WhatsNewModal />
     </div>
   );
 }

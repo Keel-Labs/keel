@@ -434,7 +434,29 @@ export type IpcChannels =
   | 'keel:check-whisper'
   | 'keel:download-whisper-binary'
   | 'keel:binary-download-progress'
-  | 'keel:download-whisper-model';
+  | 'keel:download-whisper-model'
+  | 'keel:update-state'
+  | 'keel:update-get-state'
+  | 'keel:update-check'
+  | 'keel:update-restart';
+
+export type UpdateStatus =
+  | 'idle'
+  | 'checking'
+  | 'available'
+  | 'downloading'
+  | 'downloaded'
+  | 'not-available'
+  | 'error'
+  | 'disabled';
+
+export interface UpdateState {
+  status: UpdateStatus;
+  version: string | null;
+  downloadPercent: number | null;
+  lastCheckedAt: number | null;
+  error: string | null;
+}
 
 export interface MeetingTranscriptionResult {
   ok: boolean;
@@ -608,6 +630,11 @@ export interface KeelAPI {
   // Diagnostics
   getDiagnostics: () => Promise<string>;
   logRendererError: (payload: { message?: string; stack?: string; componentStack?: string }) => Promise<void>;
+  // Auto-update
+  getUpdateState: () => Promise<UpdateState>;
+  checkForUpdates: () => Promise<void>;
+  restartForUpdate: () => Promise<void>;
+  onUpdateState: (callback: (state: UpdateState) => void) => () => void;
 }
 
 declare global {

@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import type { SessionIndicatorState } from '../sessionState';
 import SessionStatusIndicator from './SessionStatusIndicator';
+import UpdatePill from './UpdatePill';
 interface Session {
   id: string;
   title: string;
@@ -356,6 +357,7 @@ export default function Sidebar({
       )}
 
       <div className="desktop-sidebar__footer">
+        <UpdatePill collapsed={collapsed} />
         <NavRow
           active={activeView === 'settings'}
           collapsed={collapsed}
