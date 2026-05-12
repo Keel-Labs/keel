@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import type {
   Settings as SettingsType,
   OllamaModelInfo,
+  OpenRouterModelInfo,
   WikiFileImport,
   WikiSourceInput,
   WikiSourceType,
@@ -188,11 +189,12 @@ function statusTone(
 }
 
 interface Props {
-  onBack: () => void;
+  onBack: (settings?: SettingsType) => void;
   navigation?: SettingsNavigationState;
+  onSettingsChange?: (settings: SettingsType) => void;
 }
 
-export default function Settings({ onBack, navigation }: Props) {
+export default function Settings({ onBack, navigation, onSettingsChange }: Props) {
   const [settings, setSettings] = useState<SettingsType | null>(null);
   const [selectedSection, setSelectedSection] = useState<SettingsSectionId>(() => resolveSettingsSection(navigation?.section));
   const [saving, setSaving] = useState(false);
@@ -212,6 +214,9 @@ export default function Settings({ onBack, navigation }: Props) {
   const [openaiModels, setOpenaiModels] = useState<string[]>([]);
   const [openaiModelsLoading, setOpenaiModelsLoading] = useState(false);
   const [openaiModelError, setOpenaiModelError] = useState<string | null>(null);
+  const [openrouterModels, setOpenrouterModels] = useState<OpenRouterModelInfo[]>([]);
+  const [openrouterModelsLoading, setOpenrouterModelsLoading] = useState(false);
+  const [openrouterModelError, setOpenrouterModelError] = useState<string | null>(null);
   const [ollamaError, setOllamaError] = useState<string | null>(null);
   const [ollamaLoading, setOllamaLoading] = useState(false);
   const [ollamaManualEntry, setOllamaManualEntry] = useState(false);
@@ -234,6 +239,21 @@ export default function Settings({ onBack, navigation }: Props) {
       setOpenaiModelError('Failed to fetch OpenAI models');
     } finally {
       setOpenaiModelsLoading(false);
+    }
+  }, []);
+
+  const fetchOpenRouterModels = useCallback(async () => {
+    setOpenrouterModelsLoading(true);
+    setOpenrouterModelError(null);
+    try {
+      const result = await window.keel.openrouterListModels();
+      setOpenrouterModels(result.models);
+      setOpenrouterModelError(result.error);
+    } catch {
+      setOpenrouterModels([]);
+      setOpenrouterModelError('Failed to fetch OpenRouter models');
+    } finally {
+      setOpenrouterModelsLoading(false);
     }
   }, []);
 
@@ -270,6 +290,7 @@ export default function Settings({ onBack, navigation }: Props) {
       latestSettingsRef.current = s;
       if (s.provider === 'ollama') fetchOllamaModels();
       if (s.openaiApiKey) fetchOpenAIModels();
+      if (s.openrouterApiKey || s.provider === 'openrouter') fetchOpenRouterModels();
     }).catch(() => {});
     window.keel.googleStatus().then((s) => {
       setGoogleConnected(s.connected);
@@ -280,7 +301,7 @@ export default function Settings({ onBack, navigation }: Props) {
     window.keel.getUpdateState?.().then(setUpdateState).catch(() => {});
     const unsub = window.keel.onUpdateState?.(setUpdateState);
     return () => { unsub?.(); };
-  }, [fetchOllamaModels, fetchOpenAIModels, refreshXStatus]);
+  }, [fetchOllamaModels, fetchOpenAIModels, fetchOpenRouterModels, refreshXStatus]);
 
   useEffect(() => {
     if (!settings?.openaiApiKey) {
@@ -296,6 +317,16 @@ export default function Settings({ onBack, navigation }: Props) {
 
     return () => clearTimeout(timer);
   }, [fetchOpenAIModels, settings?.openaiApiKey]);
+
+  useEffect(() => {
+    if (settings?.provider !== 'openrouter' && !settings?.openrouterApiKey) {
+      return;
+    }
+    const timer = setTimeout(() => {
+      fetchOpenRouterModels();
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [fetchOpenRouterModels, settings?.openrouterApiKey, settings?.openrouterBaseUrl, settings?.provider]);
 
   useEffect(() => {
     const onResize = () => setIsCompactLayout(window.innerWidth < 980);
@@ -333,6 +364,7 @@ export default function Settings({ onBack, navigation }: Props) {
     const newSettings = { ...settings, ...partial };
     setSettings(newSettings);
     latestSettingsRef.current = newSettings;
+    onSettingsChange?.(newSettings);
     if ('theme' in partial) applyTheme(newSettings.theme);
     setSaved(false);
     hasPendingSaveRef.current = true;
@@ -353,7 +385,7 @@ export default function Settings({ onBack, navigation }: Props) {
     if (hasPendingSaveRef.current) {
       await save();
     }
-    onBack();
+    onBack(latestSettingsRef.current ?? settings ?? undefined);
   };
 
   const toggleKeyVisibility = (key: string) => {
@@ -568,19 +600,55 @@ export default function Settings({ onBack, navigation }: Props) {
     }
 
     if (settings.provider === 'openrouter') {
+      const hasLiveList = openrouterModels.length > 0;
+      const selectOptionIds = Array.from(new Set([
+        ...openrouterModels.map((m) => m.id),
+        settings.openrouterModel,
+      ].filter(Boolean)));
       return (
         <SectionCard
           title="Runtime Settings"
           description="Set the default model and endpoint for your OpenRouter-compatible provider."
         >
           <FieldRow label="Model">
-            <input
-              type="text"
-              value={settings.openrouterModel}
-              onChange={(e) => update({ openrouterModel: e.target.value })}
-              placeholder="e.g. anthropic/claude-3.5-sonnet"
-              style={inputStyle}
-            />
+            {hasLiveList ? (
+              <select
+                value={settings.openrouterModel}
+                onChange={(e) => update({ openrouterModel: e.target.value })}
+                style={selectStyle}
+              >
+                {!settings.openrouterModel && <option value="">Select a model…</option>}
+                {selectOptionIds.map((id) => {
+                  const found = openrouterModels.find((m) => m.id === id);
+                  const label = found && found.name && found.name !== found.id ? `${found.name} (${id})` : id;
+                  return <option key={id} value={id}>{label}</option>;
+                })}
+              </select>
+            ) : (
+              <input
+                type="text"
+                value={settings.openrouterModel}
+                onChange={(e) => update({ openrouterModel: e.target.value })}
+                placeholder="e.g. anthropic/claude-3.5-sonnet"
+                style={inputStyle}
+              />
+            )}
+            {openrouterModelsLoading && (
+              <InlineNote>Loading the live OpenRouter model list…</InlineNote>
+            )}
+            {openrouterModelError && (
+              <InlineNote>
+                Could not load the live OpenRouter model list: {openrouterModelError}. Enter the full model ID, e.g. <code>anthropic/claude-3.5-sonnet</code>.
+              </InlineNote>
+            )}
+            {hasLiveList && !openrouterModelsLoading && !openrouterModelError && (
+              <InlineNote>Loaded {openrouterModels.length} OpenRouter models.</InlineNote>
+            )}
+            {!hasLiveList && !openrouterModelsLoading && settings.openrouterModel && !settings.openrouterModel.includes('/') && (
+              <InlineNote>
+                OpenRouter model IDs usually look like <code>provider/model</code> (e.g. <code>anthropic/claude-3.5-haiku</code>).
+              </InlineNote>
+            )}
           </FieldRow>
           <FieldRow
             label="Base URL"
@@ -1110,28 +1178,66 @@ export default function Settings({ onBack, navigation }: Props) {
               </FieldRow>
             )}
 
-            {settings.provider === 'openrouter' && (
-              <>
-                <FieldRow label="Model">
-                  <input
-                    type="text"
-                    value={settings.openrouterModel}
-                    onChange={(e) => update({ openrouterModel: e.target.value })}
-                    placeholder="e.g. anthropic/claude-3.5-sonnet"
-                    style={inputStyle}
-                  />
-                </FieldRow>
-                <FieldRow label="Base URL">
-                  <input
-                    type="text"
-                    value={settings.openrouterBaseUrl}
-                    onChange={(e) => update({ openrouterBaseUrl: e.target.value })}
-                    placeholder="https://openrouter.ai/api/v1"
-                    style={inputStyle}
-                  />
-                </FieldRow>
-              </>
-            )}
+            {settings.provider === 'openrouter' && (() => {
+              const hasLiveList = openrouterModels.length > 0;
+              const selectOptionIds = Array.from(new Set([
+                ...openrouterModels.map((m) => m.id),
+                settings.openrouterModel,
+              ].filter(Boolean)));
+              return (
+                <>
+                  <FieldRow label="Model">
+                    {hasLiveList ? (
+                      <select
+                        value={settings.openrouterModel}
+                        onChange={(e) => update({ openrouterModel: e.target.value })}
+                        style={selectStyle}
+                      >
+                        {!settings.openrouterModel && <option value="">Select a model…</option>}
+                        {selectOptionIds.map((id) => {
+                          const found = openrouterModels.find((m) => m.id === id);
+                          const label = found && found.name && found.name !== found.id ? `${found.name} (${id})` : id;
+                          return <option key={id} value={id}>{label}</option>;
+                        })}
+                      </select>
+                    ) : (
+                      <input
+                        type="text"
+                        value={settings.openrouterModel}
+                        onChange={(e) => update({ openrouterModel: e.target.value })}
+                        placeholder="e.g. anthropic/claude-3.5-sonnet"
+                        style={inputStyle}
+                      />
+                    )}
+                    {openrouterModelsLoading && (
+                      <InlineNote>Loading the live OpenRouter model list…</InlineNote>
+                    )}
+                    {openrouterModelError && (
+                      <InlineNote>
+                        Could not load the live OpenRouter model list: {openrouterModelError}. Enter the full model ID, e.g. <code>anthropic/claude-3.5-sonnet</code>.
+                      </InlineNote>
+                    )}
+                    {hasLiveList && !openrouterModelsLoading && !openrouterModelError && (
+                      <InlineNote>Loaded {openrouterModels.length} OpenRouter models.</InlineNote>
+                    )}
+                    {!hasLiveList && !openrouterModelsLoading && settings.openrouterModel && !settings.openrouterModel.includes('/') && (
+                      <InlineNote>
+                        OpenRouter model IDs usually look like <code>provider/model</code> (e.g. <code>anthropic/claude-3.5-haiku</code>).
+                      </InlineNote>
+                    )}
+                  </FieldRow>
+                  <FieldRow label="Base URL">
+                    <input
+                      type="text"
+                      value={settings.openrouterBaseUrl}
+                      onChange={(e) => update({ openrouterBaseUrl: e.target.value })}
+                      placeholder="https://openrouter.ai/api/v1"
+                      style={inputStyle}
+                    />
+                  </FieldRow>
+                </>
+              );
+            })()}
 
             {settings.provider === 'ollama' && (
               <>

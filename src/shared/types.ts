@@ -301,6 +301,16 @@ export interface OpenAIListResult {
   error: string | null;
 }
 
+export interface OpenRouterModelInfo {
+  id: string;
+  name: string;
+}
+
+export interface OpenRouterListResult {
+  models: OpenRouterModelInfo[];
+  error: string | null;
+}
+
 // IPC channel types
 export interface ScheduledNotification {
   type: 'daily-brief' | 'eod' | 'reminder' | 'scheduled-job';
@@ -402,6 +412,7 @@ export type IpcChannels =
   | 'keel:x-sync-bookmarks'
   | 'keel:x-publish-post'
   | 'keel:openai-list-models'
+  | 'keel:openrouter-list-models'
   | 'keel:ollama-list-models'
   | 'keel:list-tasks'
   | 'keel:toggle-task'
@@ -599,6 +610,7 @@ export interface KeelAPI {
   xSyncBookmarks: () => Promise<XSyncResult>;
   xPublishPost: (request: XPublishRequest) => Promise<XPublishResult>;
   openaiListModels: () => Promise<OpenAIListResult>;
+  openrouterListModels: () => Promise<OpenRouterListResult>;
   // Ollama
   ollamaListModels: () => Promise<OllamaListResult>;
   // Activity
