@@ -1142,6 +1142,15 @@ function registerIpcHandlers() {
     }
   });
 
+  // Dev-only: let the renderer push fake update states for UI testing.
+  // Gated so this never ships in packaged builds.
+  if (!app.isPackaged) {
+    ipcMain.handle('keel:update-debug-set-state', (_event, patch: Partial<UpdateState>) => {
+      setUpdateState(patch);
+      return updateState;
+    });
+  }
+
   ipcMain.handle('keel:get-diagnostics', () => {
     return buildDiagnostics();
   });

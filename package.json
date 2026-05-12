@@ -15,9 +15,9 @@
     "package:mac:dir": "npm run build:desktop && npm run electron:install-app-deps && electron-builder --config electron-builder.config.mjs --mac --dir",
     "package:win:dir": "node scripts/download-whisper-binary.js win32 && npm run build:desktop && npm run electron:install-app-deps && electron-builder --config electron-builder.config.mjs --win --dir",
     "download-whisper": "node scripts/download-whisper-binary.js",
-    "dist:mac": "node scripts/download-whisper-binary.js && npm run build:desktop && npm run electron:install-app-deps && node scripts/install-universal-mac-deps.mjs && electron-builder --config electron-builder.config.mjs --mac dmg --universal && ./scripts/verify-dmg.sh",
-    "dist:mac:arm64": "node scripts/download-whisper-binary.js && npm run build:desktop && npm run electron:install-app-deps && KEEL_MAC_SPLIT=1 electron-builder --config electron-builder.config.mjs --mac dmg --arm64 && ./scripts/verify-dmg.sh",
-    "dist:mac:x64": "node scripts/download-whisper-binary.js && npm run build:desktop && npm run electron:install-app-deps && KEEL_MAC_SPLIT=1 electron-builder --config electron-builder.config.mjs --mac dmg --x64 && ./scripts/verify-dmg.sh",
+    "dist:mac": "node scripts/download-whisper-binary.js && npm run build:desktop && npm run electron:install-app-deps && node scripts/install-universal-mac-deps.mjs && electron-builder --config electron-builder.config.mjs --mac dmg zip --universal && ./scripts/verify-dmg.sh",
+    "dist:mac:arm64": "node scripts/download-whisper-binary.js && npm run build:desktop && npm run electron:install-app-deps && KEEL_MAC_SPLIT=1 electron-builder --config electron-builder.config.mjs --mac dmg zip --arm64 && ./scripts/verify-dmg.sh",
+    "dist:mac:x64": "node scripts/download-whisper-binary.js && npm run build:desktop && npm run electron:install-app-deps && KEEL_MAC_SPLIT=1 electron-builder --config electron-builder.config.mjs --mac dmg zip --x64 && ./scripts/verify-dmg.sh",
     "dist:win": "node scripts/download-whisper-binary.js win32 && npm run build:desktop && npm run electron:install-app-deps && electron-builder --config electron-builder.config.mjs --win nsis zip --x64",
     "test": "vitest run",
     "test:watch": "vitest"

@@ -218,6 +218,13 @@ const api: KeelAPI = {
 
 contextBridge.exposeInMainWorld('keel', api);
 
+// Dev-only hatch for faking update states from DevTools. The main-process
+// handler is also gated on !app.isPackaged, so this is a no-op in production.
+contextBridge.exposeInMainWorld('keelDev', {
+  setUpdateState: (patch: Partial<import('../src/shared/types').UpdateState>) =>
+    ipcRenderer.invoke('keel:update-debug-set-state', patch),
+});
+
 // Desktop-only migration API
 contextBridge.exposeInMainWorld('keelMigrate', {
   migrateToCloud: (serverUrl: string, accessToken: string) =>

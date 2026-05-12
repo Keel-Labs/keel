@@ -66,7 +66,11 @@ export default {
   mac: {
     category: 'public.app-category.productivity',
     icon: 'build/icon.icns',
-    target: ['dmg'],
+    // electron-updater requires the .zip target for in-place macOS updates;
+    // the .dmg is only used for first-time installs from the website. Without
+    // the zip, autoUpdater downloads will fail with "ZIP file not provided",
+    // which was silently broken for all macOS releases before v0.3.0.
+    target: ['dmg', 'zip'],
     artifactName: macArtifactName,
     // App is English-only; drop the ~30–40 MB of other-language locale paks
     // that the Electron Framework ships by default.
