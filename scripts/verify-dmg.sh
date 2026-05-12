@@ -124,7 +124,17 @@ for dmg in "${dmgs[@]}"; do
   hdiutil detach "$mount_point" -quiet >/dev/null 2>&1 || true
   rm -rf "$mount_point"
   trap - EXIT
-  echo "verify-dmg: OK — $(basename "$dmg") (framework binary $dmg_bytes bytes)"
+
+  # Notarization safety net: even if the afterSign hook was misconfigured or
+  # skipped, refuse to ship a DMG that Apple hasn't stapled a ticket onto.
+  if ! xcrun stapler validate "$dmg" >/dev/null 2>&1; then
+    echo "verify-dmg: FAIL — $(basename "$dmg") was not notarized + stapled — refusing to ship." >&2
+    echo "verify-dmg: Set up the 'keel-notarytool' keychain profile (xcrun notarytool store-credentials)," >&2
+    echo "verify-dmg: or set SKIP_NOTARIZATION=1 if you really mean to skip." >&2
+    exit 8
+  fi
+
+  echo "verify-dmg: OK — $(basename "$dmg") (framework binary $dmg_bytes bytes, stapled)"
 done
 
 echo "verify-dmg: all DMGs passed"
