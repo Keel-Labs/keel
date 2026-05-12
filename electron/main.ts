@@ -120,7 +120,7 @@ import type {
   XPublishRequest,
   XPublishResult,
 } from '../src/shared/types';
-import type { NewsItem, WeatherInfo } from '../src/shared/types';
+import type { NewsItem, WeatherInfo, UpdateState } from '../src/shared/types';
 
 const AI_NEWS_FEEDS = [
   { url: 'https://techcrunch.com/category/artificial-intelligence/feed/', source: 'TechCrunch' },
@@ -237,6 +237,85 @@ async function fetchAiNewsRss(): Promise<NewsItem[]> {
 
 let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
+
+let updateState: UpdateState = {
+  status: 'idle',
+  version: null,
+  downloadPercent: null,
+  lastCheckedAt: null,
+  error: null,
+};
+let updateCheckTimer: NodeJS.Timeout | null = null;
+const UPDATE_RECHECK_MS = 4 * 60 * 60 * 1000;
+
+function broadcastUpdateState() {
+  mainWindow?.webContents.send('keel:update-state', updateState);
+}
+
+function setUpdateState(patch: Partial<UpdateState>) {
+  updateState = { ...updateState, ...patch };
+  broadcastUpdateState();
+}
+
+function setupAutoUpdater() {
+  (autoUpdater as unknown as { logger: typeof logger }).logger = logger;
+  // We manage notification + restart UI ourselves; don't auto-download
+  // until we know the user wants it (keep default behavior: download
+  // automatically, install on quit). Just disable the OS-level notification.
+  autoUpdater.autoDownload = true;
+  autoUpdater.autoInstallOnAppQuit = true;
+
+  autoUpdater.on('checking-for-update', () => {
+    setUpdateState({ status: 'checking', error: null });
+  });
+  autoUpdater.on('update-available', (info) => {
+    setUpdateState({
+      status: 'downloading',
+      version: info?.version ?? null,
+      downloadPercent: 0,
+      lastCheckedAt: Date.now(),
+    });
+  });
+  autoUpdater.on('update-not-available', () => {
+    setUpdateState({
+      status: 'not-available',
+      lastCheckedAt: Date.now(),
+      downloadPercent: null,
+    });
+  });
+  autoUpdater.on('download-progress', (progress) => {
+    setUpdateState({
+      status: 'downloading',
+      downloadPercent: typeof progress?.percent === 'number' ? Math.round(progress.percent) : null,
+    });
+  });
+  autoUpdater.on('update-downloaded', (info) => {
+    setUpdateState({
+      status: 'downloaded',
+      version: info?.version ?? updateState.version,
+      downloadPercent: 100,
+      lastCheckedAt: Date.now(),
+    });
+  });
+  autoUpdater.on('error', (err) => {
+    logger.error('autoUpdater error:', err);
+    setUpdateState({
+      status: 'error',
+      error: err?.message || String(err),
+      lastCheckedAt: Date.now(),
+    });
+  });
+
+  const runCheck = () => {
+    autoUpdater.checkForUpdates().catch((err) => {
+      logger.error('autoUpdater check failed:', err);
+      setUpdateState({ status: 'error', error: err?.message || String(err), lastCheckedAt: Date.now() });
+    });
+  };
+
+  runCheck();
+  updateCheckTimer = setInterval(runCheck, UPDATE_RECHECK_MS);
+}
 const utilityWindows = new Map<UtilityWindowKind, BrowserWindow>();
 const wikiJobs = new Map<string, WikiJob>();
 
@@ -1041,6 +1120,26 @@ function registerIpcHandlers() {
 
   ipcMain.handle('keel:get-app-version', () => {
     return app.getVersion();
+  });
+
+  ipcMain.handle('keel:update-get-state', () => updateState);
+
+  ipcMain.handle('keel:update-check', () => {
+    if (!app.isPackaged) {
+      setUpdateState({ status: 'disabled' });
+      return;
+    }
+    setUpdateState({ status: 'checking', error: null });
+    autoUpdater.checkForUpdates().catch((err) => {
+      logger.error('manual update check failed:', err);
+      setUpdateState({ status: 'error', error: err?.message || String(err), lastCheckedAt: Date.now() });
+    });
+  });
+
+  ipcMain.handle('keel:update-restart', () => {
+    if (updateState.status === 'downloaded') {
+      autoUpdater.quitAndInstall();
+    }
   });
 
   ipcMain.handle('keel:get-diagnostics', () => {
@@ -2857,19 +2956,10 @@ app.whenReady().then(async () => {
   registerShortcuts();
   registerIpcHandlers();
 
-  // Auto-update via electron-updater. Only when packaged — skip in dev.
-  // Reads release metadata from GitHub (publish target in
-  // electron-builder.config.mjs). On finding a newer release the updater
-  // downloads the platform artifact in the background and shows a native
-  // notification when ready; install happens on next quit.
   if (app.isPackaged) {
-    // Route updater logs through electron-log so failures land in
-    // ~/Library/Logs/Keel/main.log and show up in Copy diagnostic info.
-    // electron-updater accepts any object with the standard log methods.
-    (autoUpdater as unknown as { logger: typeof logger }).logger = logger;
-    autoUpdater.checkForUpdatesAndNotify().catch((err) => {
-      logger.error('autoUpdater check failed:', err);
-    });
+    setupAutoUpdater();
+  } else {
+    updateState = { ...updateState, status: 'disabled' };
   }
 
   // Start file watcher

@@ -205,6 +205,15 @@ const api: KeelAPI = {
     return () => ipcRenderer.off('keel:binary-download-progress', handler);
   },
   downloadWhisperModel: (model?: string) => ipcRenderer.invoke('keel:download-whisper-model', model),
+
+  getUpdateState: () => ipcRenderer.invoke('keel:update-get-state'),
+  checkForUpdates: () => ipcRenderer.invoke('keel:update-check'),
+  restartForUpdate: () => ipcRenderer.invoke('keel:update-restart'),
+  onUpdateState: (callback) => {
+    const handler = (_event: Electron.IpcRendererEvent, state: import('../src/shared/types').UpdateState) => callback(state);
+    ipcRenderer.on('keel:update-state', handler);
+    return () => ipcRenderer.off('keel:update-state', handler);
+  },
 };
 
 contextBridge.exposeInMainWorld('keel', api);

@@ -14,6 +14,23 @@ import { BetaBadge } from './BetaBadge';
 
 const isElectron = typeof window !== 'undefined' && !!(window as any).keelMigrate;
 
+function describeUpdateState(state: import('../../shared/types').UpdateState | null): string {
+  if (!state) return '';
+  const stamp = state.lastCheckedAt ? new Date(state.lastCheckedAt).toLocaleString() : null;
+  switch (state.status) {
+    case 'disabled': return 'Auto-update is only active in packaged builds.';
+    case 'checking': return 'Checking for updates…';
+    case 'available': return `Update v${state.version} available.`;
+    case 'downloading': return `Downloading v${state.version ?? ''}${state.downloadPercent != null ? ` (${state.downloadPercent}%)` : ''}…`;
+    case 'downloaded': return `v${state.version} downloaded — restart to install.`;
+    case 'not-available': return stamp ? `Up to date · last checked ${stamp}` : 'Up to date.';
+    case 'error': return `Update check failed${state.error ? `: ${state.error}` : ''}.`;
+    case 'idle':
+    default:
+      return stamp ? `Last checked ${stamp}` : 'Not checked yet.';
+  }
+}
+
 const CLAUDE_MODELS = [
   { value: 'claude-sonnet-4-20250514', label: 'Claude Sonnet 4' },
   { value: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5' },
@@ -183,6 +200,7 @@ export default function Settings({ onBack, navigation }: Props) {
   const [showApiKey, setShowApiKey] = useState<Record<string, boolean>>({});
   const [appVersion, setAppVersion] = useState<string>('');
   const [copyDiagnosticStatus, setCopyDiagnosticStatus] = useState<'idle' | 'copied' | 'error'>('idle');
+  const [updateState, setUpdateState] = useState<import('../../shared/types').UpdateState | null>(null);
   const [googleConnected, setGoogleConnected] = useState(false);
   const [googleConfigured, setGoogleConfigured] = useState(false);
   const [googleSyncing, setGoogleSyncing] = useState(false);
@@ -259,6 +277,9 @@ export default function Settings({ onBack, navigation }: Props) {
     }).catch(() => {});
     refreshXStatus().catch(() => {});
     window.keel.getAppVersion?.().then(setAppVersion).catch(() => {});
+    window.keel.getUpdateState?.().then(setUpdateState).catch(() => {});
+    const unsub = window.keel.onUpdateState?.(setUpdateState);
+    return () => { unsub?.(); };
   }, [fetchOllamaModels, fetchOpenAIModels, refreshXStatus]);
 
   useEffect(() => {
@@ -779,8 +800,43 @@ export default function Settings({ onBack, navigation }: Props) {
               <span style={{ color: 'var(--text-tertiary)' }}>→</span>
             </button>
           </div>
-          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 10 }}>
-            Version {versionLabel}
+          <div style={{
+            marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--panel-border)',
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
+          }}>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+              <div>Version {versionLabel}</div>
+              <div style={{ marginTop: 2 }}>{describeUpdateState(updateState)}</div>
+            </div>
+            {updateState?.status === 'downloaded' ? (
+              <button
+                type="button"
+                onClick={() => window.keel.restartForUpdate?.()}
+                style={{
+                  padding: '6px 12px', borderRadius: 8, fontSize: 12, cursor: 'pointer',
+                  background: 'var(--accent, #1f6feb)', color: '#fff',
+                  border: '1px solid var(--accent, #1f6feb)', fontFamily: 'inherit',
+                }}
+              >
+                Restart to update
+              </button>
+            ) : (
+              <button
+                type="button"
+                disabled={updateState?.status === 'checking' || updateState?.status === 'downloading' || updateState?.status === 'disabled'}
+                onClick={() => window.keel.checkForUpdates?.()}
+                style={{
+                  padding: '6px 12px', borderRadius: 8, fontSize: 12, cursor: 'pointer',
+                  background: 'var(--surface-muted)', color: 'var(--text-primary)',
+                  border: '1px solid var(--panel-border)', fontFamily: 'inherit',
+                  opacity: (updateState?.status === 'checking' || updateState?.status === 'downloading' || updateState?.status === 'disabled') ? 0.5 : 1,
+                }}
+              >
+                {updateState?.status === 'checking' ? 'Checking…'
+                  : updateState?.status === 'downloading' ? `Downloading${updateState.downloadPercent != null ? ` ${updateState.downloadPercent}%` : '…'}`
+                  : 'Check for updates'}
+              </button>
+            )}
           </div>
         </SectionCard>
 
