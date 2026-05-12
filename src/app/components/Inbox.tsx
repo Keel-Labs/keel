@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import type { TaskGroup, IncomingTask } from '../../shared/types';
+import DeleteProjectDialog from './DeleteProjectDialog';
 
 // Drag data types
 type DragPayload =
@@ -345,36 +346,6 @@ function ProjectGroup({
 }
 
 // ── Dialogs ──
-
-function DeleteProjectDialog({
-  projectName,
-  onConfirm,
-  onCancel,
-}: {
-  projectName: string;
-  onConfirm: (moveTasks: boolean) => void;
-  onCancel: () => void;
-}) {
-  return (
-    <div className="inbox-dialog-backdrop" onClick={onCancel}>
-      <div className="inbox-dialog" onClick={(e) => e.stopPropagation()}>
-        <h3 className="inbox-dialog__title">Delete "{projectName}"?</h3>
-        <p className="inbox-dialog__text">What should happen to open tasks in this project?</p>
-        <div className="inbox-dialog__actions">
-          <button className="inbox-dialog__btn" onClick={() => onConfirm(true)}>
-            Move to General
-          </button>
-          <button className="inbox-dialog__btn inbox-dialog__btn--danger" onClick={() => onConfirm(false)}>
-            Delete all
-          </button>
-          <button className="inbox-dialog__btn inbox-dialog__btn--cancel" onClick={onCancel}>
-            Cancel
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 function AddProjectDialog({
   onConfirm,

@@ -84,6 +84,8 @@ const api: KeelAPI = {
   readFile: (filePath: string) => ipcRenderer.invoke('keel:read-file', filePath),
 
   writeFile: (filePath: string, content: string) => ipcRenderer.invoke('keel:write-file', filePath, content),
+  deleteFile: (filePath: string) => ipcRenderer.invoke('keel:delete-file', filePath),
+  renameFile: (oldPath: string, newName: string) => ipcRenderer.invoke('keel:rename-file', oldPath, newName),
   ingestWikiSource: (basePath, input) => ipcRenderer.invoke('keel:wiki-ingest-source', basePath, input),
   deleteWikiSource: (basePath: string, sourceSlug: string) => ipcRenderer.invoke('keel:delete-wiki-source', basePath, sourceSlug),
   deleteWikiBase: (basePath: string) => ipcRenderer.invoke('keel:delete-wiki-base', basePath),

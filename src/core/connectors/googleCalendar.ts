@@ -2,7 +2,7 @@
  * Google Calendar connector.
  *
  * Syncs upcoming events and writes them as structured markdown files
- * in the brain's `projects/calendar/` directory.
+ * in the brain's `system/calendar/` directory.
  */
 
 import { FileManager } from '../fileManager';
@@ -10,7 +10,7 @@ import { getValidAccessToken, type GoogleOAuthConfig } from './googleAuth';
 import { getSyncState, upsertSyncState, logActivity } from '../db';
 
 const CONNECTOR_KEY = 'google-calendar';
-const CALENDAR_DIR = 'projects/calendar';
+const CALENDAR_DIR = 'system/calendar';
 
 interface CalendarEvent {
   id: string;

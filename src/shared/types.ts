@@ -413,6 +413,8 @@ export type IpcChannels =
   | 'keel:create-project'
   | 'keel:rename-project'
   | 'keel:delete-project'
+  | 'keel:delete-file'
+  | 'keel:rename-file'
   | 'keel:get-recent-activity'
   | 'keel:fetch-weather'
   | 'keel:fetch-ai-news'
@@ -527,6 +529,8 @@ export interface KeelAPI {
   listFiles: (dirPath: string) => Promise<FileEntry[]>;
   readFile: (filePath: string) => Promise<string>;
   writeFile: (filePath: string, content: string) => Promise<void>;
+  deleteFile: (filePath: string) => Promise<void>;
+  renameFile: (oldPath: string, newName: string) => Promise<string>;
   ingestWikiSource: (basePath: string, input: WikiSourceInput) => Promise<WikiIngestResult>;
   deleteWikiSource: (basePath: string, sourceSlug: string) => Promise<{ deleted: string }>;
   deleteWikiBase: (basePath: string) => Promise<{ deleted: string }>;

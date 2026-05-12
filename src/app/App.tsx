@@ -7,6 +7,7 @@ import Onboarding from './components/Onboarding';
 import DesktopTopBar from './components/DesktopTopBar';
 import PlaceholderPane from './components/PlaceholderPane';
 import Inbox from './components/Inbox';
+import KnowledgeBrowser from './components/KnowledgeBrowser';
 import Dashboard from './components/Dashboard';
 import ChatsIndex from './components/ChatsIndex';
 import MeetingRecorder from './components/MeetingRecorder';
@@ -485,6 +486,8 @@ export default function App() {
         );
       case 'inbox':
         return <Inbox />;
+      case 'knowledge':
+        return <KnowledgeBrowser showBack={false} />;
       case 'meetings':
         return <MeetingRecorder onOpenSettings={(section) => openSettings(section ? { section: section as any } : {})} />;
       case 'settings':
