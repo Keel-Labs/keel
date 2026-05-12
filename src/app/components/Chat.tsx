@@ -6,6 +6,7 @@ import type {
   Message as MessageType,
   MessageImage,
   OllamaModelInfo,
+  OpenRouterModelInfo,
   Settings as SettingsType,
   StoredChatSession,
   WikiBaseSummary,
@@ -701,6 +702,8 @@ type SessionStreamState = {
 
 interface ChatProps {
   newChatSignal: number;
+  settingsSyncSignal?: number;
+  latestSettings?: SettingsType | null;
   loadSessionId: string | null;
   initialDraft?: string;
   autoSendDraft?: boolean;
@@ -712,6 +715,8 @@ interface ChatProps {
 
 export default function Chat({
   newChatSignal,
+  settingsSyncSignal,
+  latestSettings,
   loadSessionId,
   initialDraft,
   autoSendDraft,
@@ -764,6 +769,7 @@ export default function Chat({
   const actionButtonRef = useRef<HTMLButtonElement>(null);
   const [availableProviders, setAvailableProviders] = useState<Set<string>>(new Set());
   const [openrouterModelName, setOpenrouterModelName] = useState<string>('');
+  const [openrouterModels, setOpenrouterModels] = useState<OpenRouterModelInfo[]>([]);
   const openaiModelOptionIds = Array.from(new Set([
     ...openaiModels,
     currentProvider === 'openai' ? currentModel : '',
@@ -802,8 +808,14 @@ export default function Chat({
       if (s.openrouterApiKey) {
         available.add('openrouter');
         setOpenrouterModelName(s.openrouterModel || '');
+        window.keel.openrouterListModels().then((result) => {
+          setOpenrouterModels(result.error ? [] : result.models);
+        }).catch(() => {
+          setOpenrouterModels([]);
+        });
       } else {
         setOpenrouterModelName('');
+        setOpenrouterModels([]);
       }
       // Always try Ollama
       window.keel.ollamaListModels().then((r) => {
@@ -834,6 +846,20 @@ export default function Chat({
     window.addEventListener('focus', handleFocus);
     return () => window.removeEventListener('focus', handleFocus);
   }, [syncProviderSettings]);
+
+  useEffect(() => {
+    if (settingsSyncSignal === undefined) return;
+    if (latestSettings) {
+      setCurrentProvider(latestSettings.provider);
+      switch (latestSettings.provider) {
+        case 'claude': setCurrentModel(latestSettings.claudeModel || 'claude-sonnet-4-20250514'); break;
+        case 'openai': setCurrentModel(latestSettings.openaiModel || 'gpt-4o'); break;
+        case 'openrouter': setCurrentModel(latestSettings.openrouterModel || ''); break;
+        case 'ollama': setCurrentModel(latestSettings.ollamaModel || 'llama3.2'); break;
+      }
+    }
+    syncProviderSettings();
+  }, [settingsSyncSignal, latestSettings, syncProviderSettings]);
 
   const loadWikiBases = useCallback(async () => {
     setWikiBasesLoading(true);
@@ -2257,10 +2283,22 @@ export default function Chat({
                   <>
 	                    {(availableProviders.has('claude') || availableProviders.has('openai') || availableProviders.has('ollama')) && <div style={{ height: 1, background: 'var(--panel-border)', margin: '4px 0' }} />}
 	                    <div style={{ fontSize: 10, color: 'var(--text-disabled)', padding: '6px 14px 2px', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600 }}>OpenRouter</div>
-	                    <button onClick={() => handleModelChange('openrouter', openrouterModelName)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '7px 14px', border: 'none', cursor: 'pointer', background: currentProvider === 'openrouter' ? 'var(--accent-bg)' : 'transparent', color: currentProvider === 'openrouter' ? 'var(--accent-link)' : 'var(--text-secondary)', fontSize: 12, transition: 'background 0.1s' }}
-	                      onMouseEnter={(e) => { if (currentProvider !== 'openrouter') e.currentTarget.style.background = 'var(--surface-muted)'; }}
-	                      onMouseLeave={(e) => { if (currentProvider !== 'openrouter') e.currentTarget.style.background = 'transparent'; }}
-	                    >{openrouterModelName || 'Configure in Settings'}</button>
+	                    {openrouterModels.length > 0 ? (
+	                      openrouterModels.map((m) => {
+	                        const active = currentProvider === 'openrouter' && currentModel === m.id;
+	                        return (
+	                          <button key={`openrouter-${m.id}`} onClick={() => handleModelChange('openrouter', m.id)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '7px 14px', border: 'none', cursor: 'pointer', background: active ? 'var(--accent-bg)' : 'transparent', color: active ? 'var(--accent-link)' : 'var(--text-secondary)', fontSize: 12, transition: 'background 0.1s' }}
+	                            onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = 'var(--surface-muted)'; }}
+	                            onMouseLeave={(e) => { if (!active) e.currentTarget.style.background = 'transparent'; }}
+	                          >{m.id}</button>
+	                        );
+	                      })
+	                    ) : (
+	                      <button onClick={() => handleModelChange('openrouter', openrouterModelName)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '7px 14px', border: 'none', cursor: 'pointer', background: currentProvider === 'openrouter' ? 'var(--accent-bg)' : 'transparent', color: currentProvider === 'openrouter' ? 'var(--accent-link)' : 'var(--text-secondary)', fontSize: 12, transition: 'background 0.1s' }}
+	                        onMouseEnter={(e) => { if (currentProvider !== 'openrouter') e.currentTarget.style.background = 'var(--surface-muted)'; }}
+	                        onMouseLeave={(e) => { if (currentProvider !== 'openrouter') e.currentTarget.style.background = 'transparent'; }}
+	                      >{openrouterModelName || 'Configure in Settings'}</button>
+	                    )}
                   </>
                 )}
                 {availableProviders.size === 0 && (

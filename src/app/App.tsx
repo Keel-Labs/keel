@@ -69,6 +69,8 @@ function SearchStub() {
 
 export default function App() {
   const [newChatSignal, setNewChatSignal] = useState(0);
+  const [settingsSyncSignal, setSettingsSyncSignal] = useState(0);
+  const [latestSettings, setLatestSettings] = useState<SettingsType | null>(null);
   const [loadSessionId, setLoadSessionId] = useState<string | null>(null);
   const [chatDraft, setChatDraft] = useState<string | undefined>(undefined);
   const [chatAutoSend, setChatAutoSend] = useState(false);
@@ -279,6 +281,7 @@ export default function App() {
     currentSessionIdRef.current = '';
     setChatDraft(undefined);
     setNewChatSignal((value) => value + 1);
+    setSettingsSyncSignal((value) => value + 1);
     navigateDesktop('chat', { mode: 'chat' });
   };
 
@@ -290,6 +293,7 @@ export default function App() {
     setChatDraft(draft);
     setChatAutoSend(autoSend);
     setNewChatSignal((value) => value + 1);
+    setSettingsSyncSignal((value) => value + 1);
     navigateDesktop('chat', { mode: 'chat' });
   };
 
@@ -382,7 +386,9 @@ export default function App() {
     navigateDesktop(view, { mode });
   };
 
-  const handleSettingsBack = useCallback(() => {
+  const handleSettingsBack = useCallback((settings?: SettingsType) => {
+    if (settings) setLatestSettings(settings);
+    setSettingsSyncSignal((value) => value + 1);
     if (desktopHistoryRef.current.index > 0) {
       stepDesktopHistory(-1);
       return;
@@ -492,7 +498,7 @@ export default function App() {
       case 'meetings':
         return <MeetingRecorder onOpenSettings={(section) => openSettings(section ? { section: section as any } : {})} />;
       case 'settings':
-        return <Settings onBack={handleSettingsBack} navigation={settingsNavigation} />;
+        return <Settings onBack={handleSettingsBack} navigation={settingsNavigation} onSettingsChange={setLatestSettings} />;
       default:
         return null;
     }
@@ -555,6 +561,8 @@ export default function App() {
           <div className={desktopView === 'chat' ? 'app-view' : 'app-view is-hidden'}>
             <Chat
               newChatSignal={newChatSignal}
+              settingsSyncSignal={settingsSyncSignal}
+              latestSettings={latestSettings}
               loadSessionId={loadSessionId}
               initialDraft={chatDraft}
               autoSendDraft={chatAutoSend}

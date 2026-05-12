@@ -2741,6 +2741,32 @@ function registerIpcHandlers() {
     }
   });
 
+  ipcMain.handle('keel:openrouter-list-models', async () => {
+    const baseUrl = (settings.openrouterBaseUrl || 'https://openrouter.ai/api/v1').replace(/\/$/, '');
+    try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (settings.openrouterApiKey) {
+        headers.Authorization = `Bearer ${settings.openrouterApiKey}`;
+      }
+      const response = await getElectronAwareFetch()(`${baseUrl}/models`, { headers });
+      if (!response.ok) {
+        const body = await response.text();
+        throw new Error(`HTTP ${response.status}: ${body.slice(0, 240)}`);
+      }
+      const data = await response.json() as { data?: Array<{ id: string; name?: string }> };
+      const models = (data.data || [])
+        .filter((m) => typeof m?.id === 'string' && m.id.length > 0)
+        .map((m) => ({ id: m.id, name: m.name || m.id }));
+      return { models, error: null };
+    } catch (err) {
+      console.error('[openrouter-list-models] fetch failed:', err);
+      return {
+        models: [],
+        error: err instanceof Error ? err.message : 'Could not fetch OpenRouter models',
+      };
+    }
+  });
+
   ipcMain.handle('keel:ollama-list-models', async () => {
     try {
       const { Ollama } = await import('ollama');

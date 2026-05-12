@@ -161,6 +161,7 @@ const api: KeelAPI = {
   xSyncBookmarks: () => ipcRenderer.invoke('keel:x-sync-bookmarks'),
   xPublishPost: (request) => ipcRenderer.invoke('keel:x-publish-post', request),
   openaiListModels: () => ipcRenderer.invoke('keel:openai-list-models'),
+  openrouterListModels: () => ipcRenderer.invoke('keel:openrouter-list-models'),
   ollamaListModels: () => ipcRenderer.invoke('keel:ollama-list-models'),
   getRecentActivity: (limit?: number) => ipcRenderer.invoke('keel:get-recent-activity', limit),
   fetchWeather: () => ipcRenderer.invoke('keel:fetch-weather'),
