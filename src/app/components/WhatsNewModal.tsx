@@ -78,7 +78,6 @@ export default function WhatsNewModal() {
     <div
       role="dialog"
       aria-modal="true"
-      onClick={dismiss}
       style={{
         position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -86,7 +85,6 @@ export default function WhatsNewModal() {
       }}
     >
       <div
-        onClick={(e) => e.stopPropagation()}
         style={{
           background: 'var(--bg-base)', color: 'var(--text-primary)',
           border: '1px solid var(--panel-border)', borderRadius: 12,

@@ -110,10 +110,10 @@ const SECTION_META: Record<SettingsSectionId, { title: string; description: stri
 
 const NAV_ITEMS: Array<{ id: SettingsSectionId; label: string }> = [
   { id: 'general-personal', label: 'Personal Settings' },
-  { id: 'general-personality', label: 'Personality' },
-  { id: 'general-scheduled-jobs', label: 'Scheduled Jobs' },
   { id: 'ai-setup', label: 'Model' },
   { id: 'integrations', label: 'Integrations' },
+  { id: 'general-scheduled-jobs', label: 'Scheduled Jobs' },
+  { id: 'general-personality', label: 'Personality' },
   { id: 'help-feedback', label: 'Help & Feedback' },
 ];
 
@@ -734,8 +734,120 @@ export default function Settings({ onBack, navigation }: Props) {
       ...bodyText, marginBottom: 8,
     };
 
+    const updateBusy = updateState?.status === 'checking'
+      || updateState?.status === 'downloading'
+      || updateState?.status === 'disabled';
+
+    const copyDiagnostics = async () => {
+      try {
+        if (typeof window.keel?.getDiagnostics !== 'function') {
+          throw new Error('Diagnostics IPC not available — running an older build that lacks the v0.1.1 main process');
+        }
+        const blob = await window.keel.getDiagnostics();
+        await navigator.clipboard.writeText(blob);
+        setCopyDiagnosticStatus('copied');
+        setTimeout(() => setCopyDiagnosticStatus('idle'), 2500);
+      } catch (err) {
+        console.error('[diagnostics] copy failed:', err);
+        setCopyDiagnosticStatus('error');
+        setTimeout(() => setCopyDiagnosticStatus('idle'), 2500);
+      }
+    };
+
     return (
       <>
+        <SectionCard
+          title="Updates"
+          description={`You're on ${versionLabel}.`}
+        >
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
+          }}>
+            <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+              {describeUpdateState(updateState)}
+            </div>
+            {updateState?.status === 'downloaded' ? (
+              <button
+                type="button"
+                onClick={() => window.keel.restartForUpdate?.()}
+                style={{
+                  padding: '8px 14px', borderRadius: 8, fontSize: 13, cursor: 'pointer',
+                  background: 'var(--accent, #1f6feb)', color: '#fff',
+                  border: '1px solid var(--accent, #1f6feb)', fontFamily: 'inherit',
+                }}
+              >
+                Restart to update
+              </button>
+            ) : (
+              <button
+                type="button"
+                disabled={updateBusy}
+                onClick={() => window.keel.checkForUpdates?.()}
+                style={{
+                  padding: '8px 14px', borderRadius: 8, fontSize: 13, cursor: 'pointer',
+                  background: 'var(--surface-muted)', color: 'var(--text-primary)',
+                  border: '1px solid var(--panel-border)', fontFamily: 'inherit',
+                  opacity: updateBusy ? 0.5 : 1,
+                }}
+              >
+                {updateState?.status === 'checking' ? 'Checking…'
+                  : updateState?.status === 'downloading' ? `Downloading${updateState.downloadPercent != null ? ` ${updateState.downloadPercent}%` : '…'}`
+                  : 'Check for updates'}
+              </button>
+            )}
+          </div>
+        </SectionCard>
+
+        <SectionCard
+          title="Share feedback or report a bug"
+          description="Submit feature requests, vote on what others have asked for, or report bugs — all on our public Fider board."
+        >
+          <button type="button" onClick={openBoard} style={linkButtonStyle}>
+            <span>
+              <strong style={{ color: 'var(--text-primary)' }}>Open feedback board</strong>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
+                {FEEDBACK_BOARD_URL.replace(/^https?:\/\//, '')} — opens in your browser
+              </div>
+            </span>
+            <span style={{ color: 'var(--text-tertiary)' }}>→</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={copyDiagnostics}
+            style={{ ...linkButtonStyle, marginTop: 10 }}
+          >
+            <span>
+              <strong style={{ color: 'var(--text-primary)' }}>
+                {copyDiagnosticStatus === 'copied'
+                  ? 'Copied — paste into your GitHub issue'
+                  : copyDiagnosticStatus === 'error'
+                  ? 'Couldn’t copy — try again'
+                  : 'Copy diagnostic info'}
+              </strong>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
+                App version, OS, configured providers, and the last 100 log lines. Stays on your machine until you paste it.
+              </div>
+            </span>
+            <span style={{ color: 'var(--text-tertiary)' }}>📋</span>
+          </button>
+        </SectionCard>
+
+        <SectionCard
+          title="README"
+          description="Architecture, contributing guide, and roadmap."
+        >
+          <button type="button" onClick={openReadme} style={linkButtonStyle}>
+            <span>
+              <strong style={{ color: 'var(--text-primary)' }}>Read the full README on GitHub</strong>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
+                github.com/Keel-Labs/keel — opens in your browser
+              </div>
+            </span>
+            <span style={{ color: 'var(--text-tertiary)' }}>→</span>
+          </button>
+        </SectionCard>
+
         <SectionCard
           title="What is Keel?"
           description="Your personal AI chief of staff — a local-first desktop assistant that owns its own memory."
@@ -771,7 +883,7 @@ export default function Settings({ onBack, navigation }: Props) {
             </ol>
 
             <div style={sectionHeading}>FAQ</div>
-            <div style={{ ...featureItem }}>
+            <div style={featureItem}>
               <strong style={{ color: 'var(--text-primary)' }}>Where is my data stored?</strong>
               <div>In the brain folder you chose during setup (default <code>~/Keel</code>). Plain markdown files plus a small SQLite db at <code>.config/keel.db</code>.</div>
             </div>
@@ -788,105 +900,6 @@ export default function Settings({ onBack, navigation }: Props) {
               <div>Mostly — local Whisper and Ollama work offline. Cloud providers (Claude, OpenAI) and Google integrations need internet.</div>
             </div>
           </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 12, gap: 12 }}>
-            <button type="button" onClick={openReadme} style={{ ...linkButtonStyle, flex: 1 }}>
-              <span>
-                <strong style={{ color: 'var(--text-primary)' }}>Read the full README on GitHub</strong>
-                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
-                  Architecture, contributing guide, and roadmap
-                </div>
-              </span>
-              <span style={{ color: 'var(--text-tertiary)' }}>→</span>
-            </button>
-          </div>
-          <div style={{
-            marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--panel-border)',
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
-          }}>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-              <div>Version {versionLabel}</div>
-              <div style={{ marginTop: 2 }}>{describeUpdateState(updateState)}</div>
-            </div>
-            {updateState?.status === 'downloaded' ? (
-              <button
-                type="button"
-                onClick={() => window.keel.restartForUpdate?.()}
-                style={{
-                  padding: '6px 12px', borderRadius: 8, fontSize: 12, cursor: 'pointer',
-                  background: 'var(--accent, #1f6feb)', color: '#fff',
-                  border: '1px solid var(--accent, #1f6feb)', fontFamily: 'inherit',
-                }}
-              >
-                Restart to update
-              </button>
-            ) : (
-              <button
-                type="button"
-                disabled={updateState?.status === 'checking' || updateState?.status === 'downloading' || updateState?.status === 'disabled'}
-                onClick={() => window.keel.checkForUpdates?.()}
-                style={{
-                  padding: '6px 12px', borderRadius: 8, fontSize: 12, cursor: 'pointer',
-                  background: 'var(--surface-muted)', color: 'var(--text-primary)',
-                  border: '1px solid var(--panel-border)', fontFamily: 'inherit',
-                  opacity: (updateState?.status === 'checking' || updateState?.status === 'downloading' || updateState?.status === 'disabled') ? 0.5 : 1,
-                }}
-              >
-                {updateState?.status === 'checking' ? 'Checking…'
-                  : updateState?.status === 'downloading' ? `Downloading${updateState.downloadPercent != null ? ` ${updateState.downloadPercent}%` : '…'}`
-                  : 'Check for updates'}
-              </button>
-            )}
-          </div>
-        </SectionCard>
-
-        <SectionCard
-          title="Share feedback or report a bug"
-          description="Submit feature requests, vote on what others have asked for, or report bugs — all on our public Fider board."
-        >
-          <button type="button" onClick={openBoard} style={linkButtonStyle}>
-            <span>
-              <strong style={{ color: 'var(--text-primary)' }}>Open feedback board</strong>
-              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
-                {FEEDBACK_BOARD_URL.replace(/^https?:\/\//, '')} — opens in your browser
-              </div>
-            </span>
-            <span style={{ color: 'var(--text-tertiary)' }}>→</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={async () => {
-              try {
-                if (typeof window.keel?.getDiagnostics !== 'function') {
-                  throw new Error('Diagnostics IPC not available — running an older build that lacks the v0.1.1 main process');
-                }
-                const blob = await window.keel.getDiagnostics();
-                await navigator.clipboard.writeText(blob);
-                setCopyDiagnosticStatus('copied');
-                setTimeout(() => setCopyDiagnosticStatus('idle'), 2500);
-              } catch (err) {
-                console.error('[diagnostics] copy failed:', err);
-                setCopyDiagnosticStatus('error');
-                setTimeout(() => setCopyDiagnosticStatus('idle'), 2500);
-              }
-            }}
-            style={{ ...linkButtonStyle, marginTop: 10 }}
-          >
-            <span>
-              <strong style={{ color: 'var(--text-primary)' }}>
-                {copyDiagnosticStatus === 'copied'
-                  ? 'Copied — paste into your GitHub issue'
-                  : copyDiagnosticStatus === 'error'
-                  ? 'Couldn’t copy — try again'
-                  : 'Copy diagnostic info'}
-              </strong>
-              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
-                App version, OS, configured providers, and the last 100 log lines. Stays on your machine until you paste it.
-              </div>
-            </span>
-            <span style={{ color: 'var(--text-tertiary)' }}>📋</span>
-          </button>
         </SectionCard>
       </>
     );
@@ -1176,6 +1189,79 @@ export default function Settings({ onBack, navigation }: Props) {
       case 'integrations':
         return (
           <>
+            <SectionCard title="Google" description="Sync Calendar events and export content to Google Docs.">
+              {!googleConfigured ? (
+                <div style={{ color: 'var(--text-muted)', fontSize: 14 }}>Google integration is not configured in this build yet.</div>
+              ) : (
+                <>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <StatusBadge label={googleConnected ? 'Connected' : 'Disconnected'} tone={googleConnected ? 'success' : 'warning'} />
+                      <span style={{ fontSize: 14, color: 'var(--text-muted)' }}>
+                        {googleConnected ? 'Your Google account is connected.' : 'Connect to sync Calendar events and export to Docs.'}
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      {!googleConnected ? (
+                        <button
+                          onClick={async () => {
+                            setGoogleMessage('');
+                            try {
+                              await window.keel.googleConnect();
+                              setGoogleConnected(true);
+                              setGoogleMessage('Connected successfully.');
+                            } catch (err) {
+                              setGoogleMessage(err instanceof Error ? err.message : 'Connection failed');
+                            }
+                          }}
+                          style={primaryButtonStyle(false)}
+                        >
+                          Connect Google Account
+                        </button>
+                      ) : (
+                        <>
+                          <button
+                            onClick={async () => {
+                              setGoogleSyncing(true);
+                              setGoogleMessage('');
+                              try {
+                                const result = await window.keel.googleSyncCalendar();
+                                setGoogleMessage(`Synced ${result.eventCount} events.`);
+                              } catch (err) {
+                                setGoogleMessage(err instanceof Error ? err.message : 'Sync failed');
+                              }
+                              setGoogleSyncing(false);
+                            }}
+                            disabled={googleSyncing}
+                            style={primaryButtonStyle(googleSyncing)}
+                          >
+                            {googleSyncing ? 'Syncing...' : 'Sync Calendar'}
+                          </button>
+                          <button
+                            onClick={async () => {
+                              await window.keel.googleDisconnect();
+                              setGoogleConnected(false);
+                              setGoogleMessage('Disconnected.');
+                            }}
+                            style={secondaryButtonStyle(false)}
+                          >
+                            Disconnect
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  {googleMessage && (
+                    <InlineMessage
+                      tone={googleMessage.toLowerCase().includes('fail') || googleMessage.toLowerCase().includes('error') ? 'danger' : 'success'}
+                    >
+                      {googleMessage}
+                    </InlineMessage>
+                  )}
+                </>
+              )}
+            </SectionCard>
+
             <SectionCard title="X" description="Sync bookmarks into your wiki base and publish posts from Keel.">
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -1266,79 +1352,6 @@ export default function Settings({ onBack, navigation }: Props) {
               )}
               {xStatus?.lastPublishError && (
                 <InlineMessage tone="danger">Last publish error: {xStatus.lastPublishError}</InlineMessage>
-              )}
-            </SectionCard>
-
-            <SectionCard title="Google" description="Sync Calendar events and export content to Google Docs.">
-              {!googleConfigured ? (
-                <div style={{ color: 'var(--text-muted)', fontSize: 14 }}>Google integration is not configured in this build yet.</div>
-              ) : (
-                <>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <StatusBadge label={googleConnected ? 'Connected' : 'Disconnected'} tone={googleConnected ? 'success' : 'warning'} />
-                      <span style={{ fontSize: 14, color: 'var(--text-muted)' }}>
-                        {googleConnected ? 'Your Google account is connected.' : 'Connect to sync Calendar events and export to Docs.'}
-                      </span>
-                    </div>
-                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                      {!googleConnected ? (
-                        <button
-                          onClick={async () => {
-                            setGoogleMessage('');
-                            try {
-                              await window.keel.googleConnect();
-                              setGoogleConnected(true);
-                              setGoogleMessage('Connected successfully.');
-                            } catch (err) {
-                              setGoogleMessage(err instanceof Error ? err.message : 'Connection failed');
-                            }
-                          }}
-                          style={primaryButtonStyle(false)}
-                        >
-                          Connect Google Account
-                        </button>
-                      ) : (
-                        <>
-                          <button
-                            onClick={async () => {
-                              setGoogleSyncing(true);
-                              setGoogleMessage('');
-                              try {
-                                const result = await window.keel.googleSyncCalendar();
-                                setGoogleMessage(`Synced ${result.eventCount} events.`);
-                              } catch (err) {
-                                setGoogleMessage(err instanceof Error ? err.message : 'Sync failed');
-                              }
-                              setGoogleSyncing(false);
-                            }}
-                            disabled={googleSyncing}
-                            style={primaryButtonStyle(googleSyncing)}
-                          >
-                            {googleSyncing ? 'Syncing...' : 'Sync Calendar'}
-                          </button>
-                          <button
-                            onClick={async () => {
-                              await window.keel.googleDisconnect();
-                              setGoogleConnected(false);
-                              setGoogleMessage('Disconnected.');
-                            }}
-                            style={secondaryButtonStyle(false)}
-                          >
-                            Disconnect
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                  {googleMessage && (
-                    <InlineMessage
-                      tone={googleMessage.toLowerCase().includes('fail') || googleMessage.toLowerCase().includes('error') ? 'danger' : 'success'}
-                    >
-                      {googleMessage}
-                    </InlineMessage>
-                  )}
-                </>
               )}
             </SectionCard>
           </>
