@@ -48,6 +48,7 @@ export function getDefaultSettings(): Settings {
     brainPath: getDefaultBrainPath(),
     userName: '',
     timezone: '',
+    mobileInboxEnabled: true,
   };
 }
 

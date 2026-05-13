@@ -56,6 +56,7 @@ import {
 } from '../src/core/db';
 import { listAllTasks, toggleTask, moveTask, acceptIncomingTask, appendTask, createProject, renameProject, deleteProject } from '../src/core/tasks';
 import { capture } from '../src/core/workflows/capture';
+import { startInboxWatcher, stopInboxWatcher } from './inboxWatcher';
 import { synthesizeMeeting, formatMeetingNote, formatDailyLogEntry } from '../src/core/workflows/meetingTranscription';
 import { isWhisperAvailable, getWhisperBinary, downloadWhisperBinary, transcribeAudioBuffer } from './transcriptionService';
 import { initLogger, logger, buildDiagnostics } from './logger';
@@ -3005,6 +3006,23 @@ app.whenReady().then(async () => {
     logger.error('KB auto-refresh watcher failed to start:', err);
   });
 
+  // Mobile companion inbox watcher: <workspace>/inbox/incoming/ → routed via
+  // capture()/ingestWikiSource(). Gated by the mobileInboxEnabled setting so
+  // users who don't use a phone companion don't pay the watcher cost.
+  if (settings.mobileInboxEnabled !== false) {
+    const googleConfig = (GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET)
+      ? { clientId: GOOGLE_CLIENT_ID, clientSecret: GOOGLE_CLIENT_SECRET, scopes: GOOGLE_SCOPES }
+      : undefined;
+    startInboxWatcher({
+      fileManager,
+      llmClient,
+      brainPath: settings.brainPath,
+      googleConfig,
+    }).catch((err) => {
+      logger.error('Mobile inbox watcher failed to start:', err);
+    });
+  }
+
   // Team Brain is deprecated — skipping init until feature is rebuilt
 
   // Start scheduler
@@ -3028,5 +3046,6 @@ app.on('window-all-closed', () => {
 
 app.on('will-quit', () => {
   globalShortcut.unregisterAll();
+  void stopInboxWatcher();
   closeDb();
 });
