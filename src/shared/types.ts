@@ -78,6 +78,8 @@ export interface Settings {
   userName: string;         // User's display name.
   // Locale
   timezone: string;        // IANA timezone, e.g. "America/New_York". Empty = auto-detect.
+  // Mobile companion
+  mobileInboxEnabled: boolean;  // Watch <workspace>/inbox/incoming/ for captures dropped by the Keel mobile app.
 }
 
 export interface EmbeddedChunk {

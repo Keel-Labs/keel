@@ -108,6 +108,16 @@ export function getDb(brainPath: string): Database.Database {
       updated_at       INTEGER NOT NULL
     );
 
+    -- Mobile companion: filenames already ingested from inbox/incoming/.
+    -- Used to detect cloud-sync resurrections (deleted file reappears) so
+    -- we never route the same capture twice. See docs/mobile-companion-spec.md.
+    CREATE TABLE IF NOT EXISTS inbox_seen (
+      filename     TEXT PRIMARY KEY,
+      processed_at INTEGER NOT NULL,
+      device_id    TEXT,
+      outcome      TEXT NOT NULL  -- 'processed' | 'failed' | 'duplicate'
+    );
+
     -- Scheduled recurring AI jobs
     CREATE TABLE IF NOT EXISTS scheduled_jobs (
       id            INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -172,6 +182,29 @@ export function updateFileIndex(
 export function removeFileIndex(brainPath: string, filePath: string): void {
   const d = getDb(brainPath);
   d.prepare('DELETE FROM file_index WHERE file_path = ?').run(filePath);
+}
+
+// --- Inbox dedupe (mobile companion) ---
+
+export type InboxOutcome = 'processed' | 'failed' | 'duplicate';
+
+export function isInboxSeen(brainPath: string, filename: string): boolean {
+  const d = getDb(brainPath);
+  const row = d.prepare('SELECT 1 FROM inbox_seen WHERE filename = ?').get(filename);
+  return !!row;
+}
+
+export function markInboxSeen(
+  brainPath: string,
+  filename: string,
+  outcome: InboxOutcome,
+  deviceId: string | null
+): void {
+  const d = getDb(brainPath);
+  d.prepare(
+    `INSERT OR REPLACE INTO inbox_seen (filename, processed_at, device_id, outcome)
+     VALUES (?, ?, ?, ?)`
+  ).run(filename, Date.now(), deviceId, outcome);
 }
 
 export function getAllFileIndexes(brainPath: string): FileIndex[] {

@@ -21,6 +21,7 @@ function makeSettings(overrides: Partial<Settings> = {}): Settings {
     brainPath: '/tmp/keel',
     userName: '',
     timezone: '',
+    mobileInboxEnabled: true,
     ...overrides,
   };
 }
