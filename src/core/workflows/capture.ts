@@ -321,22 +321,58 @@ ${content.slice(0, 3000)}
       // they enter the tasks.md files. The LLM doesn't get to ask
       // clarifying questions in this flow, so a review step pays.
       //
-      // `source_file` is the markdown path the task will be APPENDED
-      // to when the user taps Accept in the Inbox (see
-      // src/core/tasks.ts:acceptIncomingTask). It must be a writable
-      // workspace-relative path, NOT a human-readable provenance
-      // string. Mirrors how memoryExtract populates this field.
-      const targetTaskFile = projectFolder
+      // A second LLM call routes each task to its own destination
+      // (existing project / new project / unrouted), so a multi-project
+      // voice capture like "music: practice beethoven; tennis: practice
+      // serves; app dev: ship the mobile app" produces three separate
+      // incoming-task rows targeted at the right projects — not one
+      // big dump in the inbox.
+      const provenance = options.sourceLabel ?? 'mobile capture';
+      const fallbackSourceFile = projectFolder
         ? `projects/${projectFolder}/tasks.md`
         : 'tasks.md';
-      const provenance = options.sourceLabel ?? 'mobile capture';
-      for (const t of decision.tasks) {
-        insertIncomingTask(brainPath, t, projectFolder ?? null, targetTaskFile);
+      let routes: TaskRoute[];
+      try {
+        routes = await routeTasksPerProject(
+          { body: content, tasks: decision.tasks, catalog, fallbackSlug: projectFolder ?? null },
+          llmClient,
+        );
+      } catch (err) {
+        console.error('[capture] per-task router failed, falling back to single destination:', err);
+        routes = decision.tasks.map((t) => ({
+          text: t,
+          kind: 'inbox' as const,
+        }));
+      }
+      for (const route of routes) {
+        if (route.kind === 'existing') {
+          insertIncomingTask(brainPath, {
+            text: route.text,
+            project: route.slug,
+            sourceFile: `projects/${route.slug}/tasks.md`,
+            proposedNewProjectName: null,
+          });
+        } else if (route.kind === 'new') {
+          const slug = slugify(route.name);
+          insertIncomingTask(brainPath, {
+            text: route.text,
+            project: slug || null,
+            sourceFile: slug ? `projects/${slug}/tasks.md` : fallbackSourceFile,
+            proposedNewProjectName: route.name,
+          });
+        } else {
+          insertIncomingTask(brainPath, {
+            text: route.text,
+            project: null,
+            sourceFile: 'tasks.md',
+            proposedNewProjectName: null,
+          });
+        }
       }
       logActivity(
         brainPath,
         'capture-tasks-incoming',
-        `Queued ${decision.tasks.length} task(s) from ${provenance}`,
+        `Queued ${routes.length} task(s) from ${provenance}`,
       );
     } else if (projectFolder) {
       const tasksPath = `projects/${projectFolder}/tasks.md`;
@@ -374,4 +410,130 @@ ${content.slice(0, 3000)}
     return `Saved to new project **${projectDisplayName}**`;
   }
   return `Filed to inbox`;
+}
+
+// ---------------------------------------------------------------------------
+// Per-task router (mobile path only)
+//
+// When a mobile capture is being routed and there's > 0 extracted tasks, we
+// run a second LLM call to assign each task to its own destination. This is
+// what makes "I have three projects: music, tennis, app dev — practice
+// beethoven, practice serves, publish the mobile app" produce three properly-
+// routed incoming-task rows instead of one inbox dump.
+// ---------------------------------------------------------------------------
+
+export type TaskRoute =
+  | { kind: 'existing'; text: string; slug: string }
+  | { kind: 'new'; text: string; name: string }
+  | { kind: 'inbox'; text: string };
+
+interface RouteTasksInput {
+  body: string;
+  tasks: string[];
+  catalog: Awaited<ReturnType<typeof buildProjectCatalog>>;
+  fallbackSlug: string | null;
+}
+
+async function routeTasksPerProject(
+  input: RouteTasksInput,
+  llmClient: LLMClient,
+): Promise<TaskRoute[]> {
+  if (input.tasks.length === 0) return [];
+
+  const projectListText = input.catalog.length === 0
+    ? '(no existing projects)'
+    : input.catalog.map((p) => `- "${p.name}" (slug: ${p.slug})`).join('\n');
+
+  const taskListText = input.tasks
+    .map((t, i) => `${i + 1}. ${t}`)
+    .join('\n');
+
+  const systemPrompt = `You assign each extracted task from a captured note to its own destination — an existing project, a brand-new project the user implied, or the generic inbox.
+
+Existing projects:
+${projectListText}
+
+Rules:
+- Prefer an existing project when the task clearly belongs to one (matches its theme, people, or prior context).
+- Use a NEW project ONLY when the user clearly named a substantive area not already in the existing list. Examples of "clearly named": the capture says "I'm working on three things: music, tennis, and app development" — those are project names. Idle references ("I went to the gym") are NOT.
+- Use the inbox when neither rule applies — the task is generic ("water the plants") or you'd be guessing.
+- Output STRICTLY a single JSON object matching the schema below. No prose, no markdown fences.
+
+JSON schema:
+{
+  "routes": [
+    { "task": "<exact task text from the list>", "destination": "existing" | "new" | "inbox", "slug": "<existing project slug, only if destination=existing>", "newName": "<human display name like 'Tennis', only if destination=new>" }
+  ]
+}
+
+Every task in the user's list must appear exactly once. Use the exact task text. Slugs must come from the existing project list.`;
+
+  const userMessage = `Capture body:
+"""
+${input.body.slice(0, 4000)}
+"""
+
+Extracted tasks:
+${taskListText}
+
+Return JSON.`;
+
+  let raw: string;
+  try {
+    raw = await llmClient.chat(
+      [{ role: 'user', content: userMessage, timestamp: Date.now() }],
+      systemPrompt,
+    );
+  } catch (err) {
+    throw new Error(`per-task router LLM call failed: ${err instanceof Error ? err.message : err}`);
+  }
+
+  // Strip code fences if the model added them despite instructions.
+  const jsonText = raw.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim();
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(jsonText);
+  } catch {
+    throw new Error(`per-task router returned non-JSON: ${raw.slice(0, 200)}`);
+  }
+
+  const routesArray = (parsed as { routes?: unknown }).routes;
+  if (!Array.isArray(routesArray)) {
+    throw new Error('per-task router response missing "routes" array');
+  }
+
+  // Validate + normalize. Anything we can't make sense of falls through
+  // to inbox — never let the LLM lose a task entirely.
+  const knownSlugs = new Set(input.catalog.map((p) => p.slug));
+  const validated: TaskRoute[] = [];
+  for (const original of input.tasks) {
+    const match = (routesArray as Array<Record<string, unknown>>).find(
+      (r) => typeof r.task === 'string' && r.task.trim() === original.trim(),
+    );
+    if (!match) {
+      validated.push({ kind: 'inbox', text: original });
+      continue;
+    }
+    const dest = String(match.destination ?? '');
+    if (dest === 'existing') {
+      const slug = String(match.slug ?? '').trim();
+      if (slug && knownSlugs.has(slug)) {
+        validated.push({ kind: 'existing', text: original, slug });
+        continue;
+      }
+      // LLM made up a slug — fall to inbox.
+      validated.push({ kind: 'inbox', text: original });
+    } else if (dest === 'new') {
+      const name = String(match.newName ?? '').trim();
+      if (name) {
+        validated.push({ kind: 'new', text: original, name });
+        continue;
+      }
+      validated.push({ kind: 'inbox', text: original });
+    } else {
+      validated.push({ kind: 'inbox', text: original });
+    }
+  }
+
+  return validated;
 }

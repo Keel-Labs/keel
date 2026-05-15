@@ -94,9 +94,17 @@ function IncomingTaskRow({ task, onAccept, onDismiss }: IncomingTaskRowProps) {
     >
       <GripIcon />
       <span className="inbox-task-row__text">{task.text}</span>
-      {task.project && (
+      {task.proposedNewProjectName ? (
+        // New project the LLM proposed — won't exist on disk until Accept.
+        <span
+          className="inbox-task-row__project-badge inbox-task-row__project-badge--new"
+          title={`Accept will create projects/${task.project ?? ''}/`}
+        >
+          + {task.proposedNewProjectName}
+        </span>
+      ) : task.project ? (
         <span className="inbox-task-row__project-badge">{task.project}</span>
-      )}
+      ) : null}
       <div className="inbox-task-row__actions">
         <button
           className="inbox-task-row__action-btn inbox-task-row__action-btn--accept"

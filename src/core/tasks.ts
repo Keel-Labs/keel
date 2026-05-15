@@ -110,6 +110,13 @@ export async function toggleTask(
 
 /**
  * Accept an incoming task: append it to the target markdown file and remove from DB.
+ *
+ * When the row's `proposedNewProjectName` is set, the project folder
+ * doesn't exist yet — we create `projects/<slug>/context.md` (stub) and
+ * `projects/<slug>/tasks.md` before appending. This is the path the
+ * mobile per-task router takes for tasks like "publish the mobile app"
+ * where the user implied a new project ("app development") in their
+ * voice capture.
  */
 export async function acceptIncomingTask(
   fileManager: FileManager,
@@ -119,6 +126,22 @@ export async function acceptIncomingTask(
   const task = getIncomingTask(brainPath, id);
   if (!task) return;
 
+  // Materialize a brand-new project on demand.
+  if (task.proposedNewProjectName && task.project) {
+    const slug = task.project;
+    const displayName = task.proposedNewProjectName;
+    const contextPath = `projects/${slug}/context.md`;
+    try {
+      await fileManager.readFile(contextPath);
+    } catch {
+      // context.md doesn't exist — write a stub so the project is
+      // discoverable by the rest of the app (project catalog, KB
+      // refresh, etc.).
+      const stub = `# ${displayName}\n\nCreated from a mobile capture on ${new Date().toISOString().slice(0, 10)}.\n`;
+      await fileManager.writeFile(contextPath, stub);
+    }
+  }
+
   const newLine = `- [ ] ${task.text}`;
 
   try {
@@ -127,7 +150,7 @@ export async function acceptIncomingTask(
   } catch {
     // File doesn't exist yet — create it
     const header = task.project
-      ? `# ${slugToDisplayName(task.project)} — Tasks`
+      ? `# ${task.proposedNewProjectName ?? slugToDisplayName(task.project)} — Tasks`
       : '# Tasks';
     await fileManager.writeFile(task.sourceFile, `${header}\n\n${newLine}\n`);
   }

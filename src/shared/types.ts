@@ -341,6 +341,13 @@ export interface IncomingTask {
   text: string;
   project: string | null;
   sourceFile: string;
+  /**
+   * When non-null, this incoming task's project doesn't exist yet —
+   * acceptIncomingTask will create projects/<slug>/{context.md, tasks.md}
+   * on Accept. The Inbox UI uses this to render "→ new project: Tennis"
+   * instead of the existing-project chip.
+   */
+  proposedNewProjectName: string | null;
   createdAt: number;
 }
 
