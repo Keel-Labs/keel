@@ -373,6 +373,10 @@ body.is-windows .desktop-topbar__trailing {
   background: var(--accent);
   color: var(--button-primary-text);
   line-height: 1;
+  /* Pushes the badge to the right edge of the nav row without
+     forcing the label span to grow (which would inherit the
+     button's default text-align: center and re-center the label). */
+  margin-left: auto;
 }
 
 /* Transient banner when the inbox watcher routes a mobile capture.

@@ -195,7 +195,7 @@ function NavRow({
           </span>
         )}
       </span>
-      {!collapsed && <span style={{ flex: 1 }}>{label}</span>}
+      {!collapsed && <span>{label}</span>}
       {!collapsed && !!badge && badge > 0 && (
         <span className="desktop-sidebar__nav-badge">{badge > 99 ? '99+' : badge}</span>
       )}
