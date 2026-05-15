@@ -320,9 +320,18 @@ ${content.slice(0, 3000)}
       // queue so the user can review them in the Inbox view before
       // they enter the tasks.md files. The LLM doesn't get to ask
       // clarifying questions in this flow, so a review step pays.
+      //
+      // `source_file` is the markdown path the task will be APPENDED
+      // to when the user taps Accept in the Inbox (see
+      // src/core/tasks.ts:acceptIncomingTask). It must be a writable
+      // workspace-relative path, NOT a human-readable provenance
+      // string. Mirrors how memoryExtract populates this field.
+      const targetTaskFile = projectFolder
+        ? `projects/${projectFolder}/tasks.md`
+        : 'tasks.md';
       const provenance = options.sourceLabel ?? 'mobile capture';
       for (const t of decision.tasks) {
-        insertIncomingTask(brainPath, t, projectFolder ?? null, provenance);
+        insertIncomingTask(brainPath, t, projectFolder ?? null, targetTaskFile);
       }
       logActivity(
         brainPath,
