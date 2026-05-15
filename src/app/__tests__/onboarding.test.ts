@@ -22,6 +22,7 @@ function makeSettings(overrides: Partial<Settings> = {}): Settings {
     userName: '',
     timezone: '',
     mobileInboxEnabled: true,
+    defaultEodScheduled: false,
     ...overrides,
   };
 }

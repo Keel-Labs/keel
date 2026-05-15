@@ -80,6 +80,14 @@ export interface Settings {
   timezone: string;        // IANA timezone, e.g. "America/New_York". Empty = auto-detect.
   // Mobile companion
   mobileInboxEnabled: boolean;  // Watch <workspace>/inbox/incoming/ for captures dropped by the Keel mobile app.
+  /**
+   * Whether the default nightly "End-of-day brief" scheduled job has
+   * been seeded into this workspace. Set to true the first time we
+   * insert it so a deleted job isn't recreated on every launch. Users
+   * who don't want any default brief can delete the job and we'll
+   * leave them alone.
+   */
+  defaultEodScheduled: boolean;
 }
 
 export interface EmbeddedChunk {

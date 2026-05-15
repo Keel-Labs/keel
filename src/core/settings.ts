@@ -49,6 +49,7 @@ export function getDefaultSettings(): Settings {
     userName: '',
     timezone: '',
     mobileInboxEnabled: true,
+    defaultEodScheduled: false,
   };
 }
 

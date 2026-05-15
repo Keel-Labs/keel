@@ -3057,6 +3057,37 @@ app.whenReady().then(async () => {
 
   // Team Brain is deprecated — skipping init until feature is rebuilt
 
+  // Seed the default "End-of-day brief" scheduled job on first launch.
+  // Gated by settings.defaultEodScheduled so a user who deletes the job
+  // doesn't have us re-create it next launch. Populates daily-log/<date>.md
+  // each night at 10pm so the mobile app's "Today's brief" surface has
+  // content by next morning.
+  if (settings.defaultEodScheduled !== true) {
+    try {
+      upsertScheduledJob(settings.brainPath, {
+        name: 'End-of-day brief',
+        prompt:
+          "It's the end of the day. Using the profile and open tasks above, write a brief end-of-day summary. " +
+          "Use two short sections in markdown:\n\n" +
+          "## Today\n" +
+          "1-3 bullets reflecting what likely got attention today (infer from open vs closed task progress and any recent context). Be honest about what you don't know.\n\n" +
+          "## Tomorrow\n" +
+          "3-5 concrete priorities for tomorrow, drawn from the open tasks list. Order by what matters most. " +
+          "Keep the whole response under 200 words. No preamble, no closing.",
+        scheduleType: 'daily',
+        time: '22:00',
+        dayOfWeek: null,
+        enabled: true,
+        lastRunDate: null,
+      });
+      settings.defaultEodScheduled = true;
+      saveSettingsToFile(settings);
+      logger.info('[scheduler] seeded default End-of-day brief job');
+    } catch (err) {
+      logger.error('[scheduler] failed to seed default EOD job:', err);
+    }
+  }
+
   // Start scheduler
   startScheduler();
 
