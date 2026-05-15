@@ -120,6 +120,27 @@ const api: KeelAPI = {
     return () => ipcRenderer.off('keel:memory-updated', handler);
   },
 
+  /**
+   * Fires when the mobile-companion inbox watcher finishes routing a
+   * capture. The renderer uses this to show a transient toast and
+   * refresh the Inbox view's incoming-tasks count.
+   */
+  onMobileCaptureRouted: (callback: (event: { filename: string; kind: string; device: string; routedTo: string }) => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, payload: { filename: string; kind: string; device: string; routedTo: string }) => callback(payload);
+    ipcRenderer.on('keel:mobile-capture-routed', handler);
+    return () => ipcRenderer.off('keel:mobile-capture-routed', handler);
+  },
+
+  /**
+   * Fired when the user clicks a mobile-capture notification — main
+   * asks the renderer to navigate to the Inbox view.
+   */
+  onOpenView: (callback: (payload: { view: string }) => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, payload: { view: string }) => callback(payload);
+    ipcRenderer.on('keel:open-view', handler);
+    return () => ipcRenderer.off('keel:open-view', handler);
+  },
+
   // Tasks
   listTasks: () => ipcRenderer.invoke('keel:list-tasks'),
   toggleTask: (filePath: string, taskText: string, completed: boolean) =>

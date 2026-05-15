@@ -2,7 +2,7 @@ import { JSDOM } from 'jsdom';
 import { Readability } from '@mozilla/readability';
 import { FileManager } from '../fileManager';
 import { LLMClient, ToolExecutor } from '../llmClient';
-import { logActivity } from '../db';
+import { logActivity, insertIncomingTask } from '../db';
 import { isGoogleDocUrl, READ_EXISTING_DOC_UNSUPPORTED } from '../connectors/googleDocs';
 import { ingestWikiSource } from './wikiIngest';
 import { buildProjectCatalog } from '../projectCatalog';
@@ -15,11 +15,30 @@ function slugify(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 }
 
+export interface CaptureOptions {
+  /**
+   * When set, extracted tasks are routed to the `incoming_tasks` triage
+   * queue (visible in the Inbox view's "Incoming" section) instead of
+   * being appended directly to `tasks.md` / `projects/<slug>/tasks.md`.
+   *
+   * Use this for captures the user can't immediately review — the
+   * mobile companion is the canonical case. Desktop chat captures
+   * leave it false so tasks land directly.
+   */
+  routeTasksToIncoming?: boolean;
+  /**
+   * Optional label written to `incoming_tasks.source_file` so the
+   * Inbox row can show provenance (e.g. "iPhone 17 Pro").
+   */
+  sourceLabel?: string;
+}
+
 export async function capture(
   input: string,
   fileManager: FileManager,
   llmClient: LLMClient,
-  googleConfig?: GoogleOAuthConfig
+  googleConfig?: GoogleOAuthConfig,
+  options: CaptureOptions = {}
 ): Promise<string> {
   const brainPath = fileManager.getBrainPath();
   let content: string;
@@ -296,7 +315,21 @@ ${content.slice(0, 3000)}
 
   // ─── Tasks ───────────────────────────────────────────────────────────────
   if (decision.tasks.length > 0) {
-    if (projectFolder) {
+    if (options.routeTasksToIncoming) {
+      // Mobile / share-sheet captures — push tasks into the triage
+      // queue so the user can review them in the Inbox view before
+      // they enter the tasks.md files. The LLM doesn't get to ask
+      // clarifying questions in this flow, so a review step pays.
+      const provenance = options.sourceLabel ?? 'mobile capture';
+      for (const t of decision.tasks) {
+        insertIncomingTask(brainPath, t, projectFolder ?? null, provenance);
+      }
+      logActivity(
+        brainPath,
+        'capture-tasks-incoming',
+        `Queued ${decision.tasks.length} task(s) from ${provenance}`,
+      );
+    } else if (projectFolder) {
       const tasksPath = `projects/${projectFolder}/tasks.md`;
       let existing = '';
       try { existing = await fileManager.readFile(tasksPath); } catch {
@@ -307,6 +340,7 @@ ${content.slice(0, 3000)}
         if (!existing.includes(t)) next += `\n- [ ] ${t}`;
       }
       await fileManager.writeFile(tasksPath, next + '\n');
+      logActivity(brainPath, 'capture-tasks', `Recorded ${decision.tasks.length} task(s) from capture`);
     } else {
       let existing = '';
       try { existing = await fileManager.readFile('tasks.md'); } catch {
@@ -317,8 +351,8 @@ ${content.slice(0, 3000)}
         if (!existing.includes(t)) next += `\n- [ ] ${t}`;
       }
       await fileManager.writeFile('tasks.md', next + '\n');
+      logActivity(brainPath, 'capture-tasks', `Recorded ${decision.tasks.length} task(s) from capture`);
     }
-    logActivity(brainPath, 'capture-tasks', `Recorded ${decision.tasks.length} task(s) from capture`);
   }
 
   // ─── Human-friendly response ─────────────────────────────────────────────

@@ -43,11 +43,28 @@ import { logger } from './logger';
 // Module state
 // ---------------------------------------------------------------------------
 
+export interface InboxRoutedEvent {
+  /** Filename of the original capture file written by the phone. */
+  filename: string;
+  /** 'capture' or 'kb-source' — which dispatch path ran. */
+  kind: string;
+  /** Human-readable device label from the capture's frontmatter. */
+  device: string;
+  /** Free-form one-liner from the router, e.g. "Saved to Fitness". Empty for kb-source. */
+  routedTo: string;
+}
+
 export interface InboxWatcherDeps {
   fileManager: FileManager;
   llmClient: LLMClient;
   brainPath: string;
   googleConfig?: GoogleOAuthConfig;
+  /**
+   * Fired after each capture is successfully routed. Used by main.ts
+   * to surface a macOS notification and a renderer-side toast. The
+   * watcher itself stays UI-free so it can be unit-tested.
+   */
+  onRouted?: (event: InboxRoutedEvent) => void;
 }
 
 interface InboxLayout {
@@ -211,14 +228,25 @@ async function processOne(
     const processingPath = path.join(layout.processing, filename);
     await safeRename(incomingPath, processingPath);
 
+    const device = String(frontmatter.device || 'mobile');
+    let routedTo = '';
     try {
       if (kind === 'capture') {
-        await routeCapture(deps, frontmatter, body);
+        routedTo = await routeCapture(deps, frontmatter, body);
       } else if (kind === 'kb-source') {
         await routeKbSource(deps, frontmatter, body);
+        const target = String(frontmatter['target-kb'] ?? '');
+        routedTo = `Added KB source to ${target}`;
       } else {
         // Shouldn't happen — validation rejects unknown kinds.
         throw new Error(`unsupported kind: ${kind}`);
+      }
+
+      // Fire the success hook (notification + toast surface).
+      try {
+        deps.onRouted?.({ filename, kind, device, routedTo });
+      } catch (err) {
+        logger.error('[inbox] onRouted callback threw:', err);
       }
 
       await archive(layout, [processingPath]);
@@ -240,10 +268,22 @@ async function routeCapture(
   deps: InboxWatcherDeps,
   frontmatter: Frontmatter,
   body: string
-): Promise<void> {
+): Promise<string> {
   const deviceLabel = String(frontmatter.device || 'mobile');
   const input = `[Captured from ${deviceLabel} via Keel mobile]\n\n${body.trim()}`;
-  await capture(input, deps.fileManager, deps.llmClient, deps.googleConfig);
+  // capture() returns a terse one-liner like "Saved to **Fitness**" or
+  // "Filed to inbox" — surface it so the notification + toast can show
+  // *where* the capture landed without re-routing on the renderer side.
+  const result = await capture(input, deps.fileManager, deps.llmClient, deps.googleConfig, {
+    // Tasks the LLM extracts from a mobile capture go to the
+    // `incoming_tasks` triage queue so the user can review them in
+    // the Inbox view before they enter tasks.md. See
+    // docs/mobile-companion-spec.md §"Mac watcher behavior".
+    routeTasksToIncoming: true,
+    sourceLabel: deviceLabel,
+  });
+  // Strip markdown bold for plain-string consumers (notification body).
+  return result.replace(/\*\*/g, '');
 }
 
 async function routeKbSource(

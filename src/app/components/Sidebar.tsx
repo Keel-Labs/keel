@@ -170,12 +170,15 @@ function NavRow({
   icon,
   label,
   onClick,
+  badge,
 }: {
   active?: boolean;
   collapsed: boolean;
   icon: React.ReactNode;
   label: string;
   onClick: () => void;
+  /** Numeric badge — e.g. unread Incoming tasks count. Hidden when 0/undefined. */
+  badge?: number;
 }) {
   return (
     <button
@@ -184,8 +187,18 @@ function NavRow({
       className={active ? 'desktop-sidebar__nav is-active' : 'desktop-sidebar__nav'}
       style={{ justifyContent: collapsed ? 'center' : 'flex-start' }}
     >
-      <span className="desktop-sidebar__nav-icon">{icon}</span>
-      {!collapsed && <span>{label}</span>}
+      <span className="desktop-sidebar__nav-icon" style={{ position: 'relative' }}>
+        {icon}
+        {!!badge && badge > 0 && collapsed && (
+          <span className="desktop-sidebar__nav-badge desktop-sidebar__nav-badge--corner">
+            {badge > 99 ? '99+' : badge}
+          </span>
+        )}
+      </span>
+      {!collapsed && <span style={{ flex: 1 }}>{label}</span>}
+      {!collapsed && !!badge && badge > 0 && (
+        <span className="desktop-sidebar__nav-badge">{badge > 99 ? '99+' : badge}</span>
+      )}
     </button>
   );
 }
@@ -265,10 +278,34 @@ export default function Sidebar({
   onWikiCreateBase,
 }: Props) {
   const [sessions, setSessions] = useState<Session[]>([]);
+  const [incomingCount, setIncomingCount] = useState(0);
 
   useEffect(() => {
     window.keel.listSessions().then(setSessions).catch(() => {});
   }, [refreshSignal, currentSessionId]);
+
+  // Poll the incoming-tasks count so the Inbox/Tasks nav row can show
+  // a badge for unreviewed mobile captures. Refresh on every nav, on
+  // every mobile-capture-routed IPC event, and every 30s as a fallback.
+  useEffect(() => {
+    let cancelled = false;
+    const refresh = () => {
+      window.keel
+        .listIncomingTasks()
+        .then((tasks) => {
+          if (!cancelled) setIncomingCount(tasks.length);
+        })
+        .catch(() => {});
+    };
+    refresh();
+    const unsubscribe = window.keel.onMobileCaptureRouted?.(refresh);
+    const interval = setInterval(refresh, 30_000);
+    return () => {
+      cancelled = true;
+      unsubscribe?.();
+      clearInterval(interval);
+    };
+  }, [activeView]);
 
   const recentSessions = sessions;
   const isWikiMode = activeView === 'wiki';
@@ -309,6 +346,7 @@ export default function Sidebar({
               icon={item.icon}
               label={item.label}
               onClick={() => onNavigate(item.id)}
+              badge={item.id === 'inbox' ? incomingCount : undefined}
             />
           ))}
       </div>

@@ -357,6 +357,106 @@ body.is-windows .desktop-topbar__trailing {
   flex-shrink: 0;
 }
 
+/* Numeric badge on sidebar nav items — e.g. unreviewed Incoming tasks.
+   Expanded sidebar: pill at the end of the row.
+   Collapsed sidebar: small dot overlapping the icon's top-right corner. */
+.desktop-sidebar__nav-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: 9px;
+  font-size: 11px;
+  font-weight: 600;
+  background: var(--accent);
+  color: var(--button-primary-text);
+  line-height: 1;
+}
+
+/* Transient banner when the inbox watcher routes a mobile capture.
+   Pinned to the top center, slides in from above, click to open Inbox. */
+.mobile-capture-toast {
+  position: fixed;
+  top: calc(var(--topbar-height) + 12px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background: var(--surface-elevated);
+  color: var(--text-primary);
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+  animation: keel-toast-in 220ms ease-out;
+  font-size: var(--text-sm);
+}
+
+@keyframes keel-toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -8px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+.mobile-capture-toast__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 12px;
+  background: var(--accent-bg);
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.mobile-capture-toast__body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  line-height: 1.2;
+}
+
+.mobile-capture-toast__title {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.mobile-capture-toast__subtitle {
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+}
+
+.mobile-capture-toast__cta {
+  color: var(--accent);
+  font-weight: 600;
+  margin-left: 8px;
+  white-space: nowrap;
+}
+
+.desktop-sidebar__nav-badge--corner {
+  position: absolute;
+  top: -6px;
+  right: -8px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  font-size: 10px;
+  border: 1.5px solid var(--bg-sidebar);
+}
+
 .desktop-sidebar__history {
   flex: 1;
   min-height: 0;

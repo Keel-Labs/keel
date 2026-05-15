@@ -529,6 +529,13 @@ export interface ScanFolderResult {
 }
 
 // Preload API exposed to renderer
+export interface MobileCaptureRoutedEvent {
+  filename: string;
+  kind: string;          // 'capture' | 'kb-source'
+  device: string;
+  routedTo: string;      // human one-liner like "Saved to Fitness"
+}
+
 export interface KeelAPI {
   cancelStream: (requestId: string) => Promise<void>;
   chat: (request: ChatRequest) => Promise<string>;
@@ -583,6 +590,8 @@ export interface KeelAPI {
   removeScheduledNotificationListener: () => void;
   onAutoCaptureDone: (callback: (event: { requestId: string; summary: string }) => void) => () => void;
   onMemoryUpdated: (callback: (event: { requestId: string; summary: string }) => void) => () => void;
+  onMobileCaptureRouted: (callback: (event: MobileCaptureRoutedEvent) => void) => () => void;
+  onOpenView: (callback: (event: { view: string }) => void) => () => void;
   // Tasks
   listTasks: () => Promise<TaskGroup[]>;
   toggleTask: (filePath: string, taskText: string, completed: boolean) => Promise<void>;
