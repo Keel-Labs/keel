@@ -139,6 +139,16 @@ export function getDb(brainPath: string): Database.Database {
     // Column already exists — ignore
   }
 
+  // Migrate incoming_tasks: add proposed_new_project_name column for the
+  // mobile per-task router. NULL for tasks routed to an existing project
+  // or unrouted; set to a human-readable display name when the LLM wants
+  // a new project created on Accept (see acceptIncomingTask in tasks.ts).
+  try {
+    db.exec(`ALTER TABLE incoming_tasks ADD COLUMN proposed_new_project_name TEXT`);
+  } catch {
+    // Column already exists — ignore
+  }
+
   return db;
 }
 
@@ -614,49 +624,79 @@ export interface IncomingTaskRow {
   text: string;
   project: string | null;
   sourceFile: string;
+  /**
+   * When non-null, the LLM proposed a new project for this task. The
+   * `project` field still holds the slug derived from this name, and
+   * `sourceFile` is `projects/<slug>/tasks.md`, but neither the project
+   * folder nor the tasks file exists yet. acceptIncomingTask creates
+   * them on demand.
+   */
+  proposedNewProjectName: string | null;
   createdAt: number;
+}
+
+interface IncomingTaskInput {
+  text: string;
+  project: string | null;
+  sourceFile: string;
+  proposedNewProjectName?: string | null;
 }
 
 export function insertIncomingTask(
   brainPath: string,
-  text: string,
-  project: string | null,
-  sourceFile: string,
+  textOrInput: string | IncomingTaskInput,
+  project?: string | null,
+  sourceFile?: string,
 ): number {
   const d = getDb(brainPath);
+  // Two call shapes for backwards compatibility:
+  //   insertIncomingTask(brainPath, text, project, sourceFile)         (legacy)
+  //   insertIncomingTask(brainPath, { text, project, sourceFile, proposedNewProjectName })
+  const input: IncomingTaskInput = typeof textOrInput === 'string'
+    ? { text: textOrInput, project: project ?? null, sourceFile: sourceFile ?? '' }
+    : textOrInput;
   const result = d.prepare(
-    'INSERT INTO incoming_tasks (text, project, source_file) VALUES (?, ?, ?)'
-  ).run(text, project, sourceFile);
+    `INSERT INTO incoming_tasks (text, project, source_file, proposed_new_project_name)
+     VALUES (?, ?, ?, ?)`
+  ).run(input.text, input.project, input.sourceFile, input.proposedNewProjectName ?? null);
   return Number(result.lastInsertRowid);
+}
+
+type IncomingTaskDbRow = {
+  id: number;
+  text: string;
+  project: string | null;
+  source_file: string;
+  proposed_new_project_name: string | null;
+  created_at: number;
+};
+
+function rowToIncoming(row: IncomingTaskDbRow): IncomingTaskRow {
+  return {
+    id: row.id,
+    text: row.text,
+    project: row.project,
+    sourceFile: row.source_file,
+    proposedNewProjectName: row.proposed_new_project_name,
+    createdAt: row.created_at * 1000,
+  };
 }
 
 export function listIncomingTasksDb(brainPath: string): IncomingTaskRow[] {
   const d = getDb(brainPath);
   const rows = d.prepare(
     'SELECT * FROM incoming_tasks ORDER BY created_at DESC'
-  ).all() as Array<{ id: number; text: string; project: string | null; source_file: string; created_at: number }>;
-  return rows.map((r) => ({
-    id: r.id,
-    text: r.text,
-    project: r.project,
-    sourceFile: r.source_file,
-    createdAt: r.created_at * 1000,
-  }));
+  ).all() as IncomingTaskDbRow[];
+  return rows.map(rowToIncoming);
 }
 
 export function getIncomingTask(brainPath: string, id: number): IncomingTaskRow | null {
   const d = getDb(brainPath);
   const row = d.prepare('SELECT * FROM incoming_tasks WHERE id = ?').get(id) as
-    | { id: number; text: string; project: string | null; source_file: string; created_at: number }
+    | IncomingTaskDbRow
     | undefined;
   if (!row) return null;
-  return {
-    id: row.id,
-    text: row.text,
-    project: row.project,
-    sourceFile: row.source_file,
-    createdAt: row.created_at * 1000,
-  };
+  return rowToIncoming(row);
 }
 
 export function deleteIncomingTask(brainPath: string, id: number): void {

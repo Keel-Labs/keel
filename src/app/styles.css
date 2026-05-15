@@ -3863,6 +3863,16 @@ body.is-windows .desktop-topbar__trailing {
   margin-top: 1px;
 }
 
+/* Variant: project doesn't exist yet — Accept will create it. Slightly
+   more emphasis (dashed border) to signal it's a proposal, not a real
+   project, without going as far as a different color (which would
+   suggest danger / error). */
+.inbox-task-row__project-badge--new {
+  background: transparent;
+  color: var(--accent);
+  border: 1px dashed var(--accent-border);
+}
+
 /* Incoming row actions */
 
 .inbox-task-row--incoming {
