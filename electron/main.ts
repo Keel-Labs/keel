@@ -3019,9 +3019,12 @@ app.whenReady().then(async () => {
       brainPath: settings.brainPath,
       googleConfig,
       onRouted: (event) => {
-        // 1. Native macOS notification so the user sees evidence even
-        //    when the app isn't focused.
-        if (Notification.isSupported()) {
+        // 1. Native macOS notification — only when the user can't
+        //    already see the in-app toast. If a Keel window is
+        //    currently focused, the toast is sufficient and a system
+        //    notification on top of it is a double-signal.
+        const aKeelWindowIsFocused = BrowserWindow.getFocusedWindow() !== null;
+        if (Notification.isSupported() && !aKeelWindowIsFocused) {
           const title = `Captured from ${event.device}`;
           const body = event.routedTo || 'Routed by Keel.';
           try {
