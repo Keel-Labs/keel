@@ -3018,6 +3018,35 @@ app.whenReady().then(async () => {
       llmClient,
       brainPath: settings.brainPath,
       googleConfig,
+      onRouted: (event) => {
+        // 1. Native macOS notification so the user sees evidence even
+        //    when the app isn't focused.
+        if (Notification.isSupported()) {
+          const title = `Captured from ${event.device}`;
+          const body = event.routedTo || 'Routed by Keel.';
+          try {
+            const notif = new Notification({ title, body, silent: false });
+            notif.on('click', () => {
+              const win = BrowserWindow.getAllWindows()[0];
+              if (win) {
+                if (win.isMinimized()) win.restore();
+                win.focus();
+                win.webContents.send('keel:open-view', { view: 'inbox' });
+              }
+            });
+            notif.show();
+          } catch (err) {
+            logger.error('[inbox] notification failed:', err);
+          }
+        }
+        // 2. Renderer-side toast via IPC. The Inbox component listens
+        //    for this and shows a transient terracotta banner.
+        for (const win of BrowserWindow.getAllWindows()) {
+          if (!win.isDestroyed()) {
+            win.webContents.send('keel:mobile-capture-routed', event);
+          }
+        }
+      },
     }).catch((err) => {
       logger.error('Mobile inbox watcher failed to start:', err);
     });

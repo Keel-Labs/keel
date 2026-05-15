@@ -8,6 +8,7 @@ import Onboarding from './components/Onboarding';
 import DesktopTopBar from './components/DesktopTopBar';
 import PlaceholderPane from './components/PlaceholderPane';
 import Inbox from './components/Inbox';
+import MobileCaptureToast from './components/MobileCaptureToast';
 import KnowledgeBrowser from './components/KnowledgeBrowser';
 import Dashboard from './components/Dashboard';
 import ChatsIndex from './components/ChatsIndex';
@@ -359,6 +360,19 @@ export default function App() {
     navigateDesktop('settings');
   }, [markCurrentSessionUnreadIfStreaming, navigateDesktop]);
 
+  // Main process asks us to switch views — currently fires when the
+  // user clicks the native notification for a mobile capture, so we
+  // can take them straight to the Inbox.
+  useEffect(() => {
+    const unsubscribe = window.keel.onOpenView?.((payload) => {
+      const view = payload.view as DesktopView;
+      if (view === 'inbox') {
+        setDesktopView('inbox');
+      }
+    });
+    return () => unsubscribe?.();
+  }, []);
+
   const handleDesktopNavigation = (view: DesktopView) => {
     if (view === 'settings') {
       openSettings();
@@ -516,6 +530,7 @@ export default function App() {
 
   return (
     <div className="desktop-shell">
+      <MobileCaptureToast onOpenInbox={() => handleDesktopNavigation('inbox')} />
       <DesktopTopBar
         activeMode={desktopMode}
         canGoBack={desktopHistory.index > 0}
