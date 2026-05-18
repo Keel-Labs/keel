@@ -1,5 +1,7 @@
 # Privacy Policy
 
+**Canonical URL:** https://keel-labs.org/privacy — that is the authoritative version. This file is mirrored in the repository for convenience; if the two ever diverge, the hosted version wins.
+
 **Last Updated:** April 2026
 
 ## Overview

@@ -230,7 +230,7 @@ Please read [the note on this being a one-person project](#a-note-on-this-being-
 
 ## Privacy & legal
 
-- [Privacy Policy](./PRIVACY.md)
+- [Privacy Policy](https://keel-labs.org/privacy)
 - [Terms of Service](./TERMS.md)
 - [Code of Conduct](./CODE_OF_CONDUCT.md)
 
