@@ -270,7 +270,13 @@ async function routeCapture(
   body: string
 ): Promise<string> {
   const deviceLabel = String(frontmatter.device || 'mobile');
-  const input = `[Captured from ${deviceLabel} via Keel mobile]\n\n${body.trim()}`;
+  // Pass the body raw — no '[Captured from iPhone via Keel mobile]'
+  // wrapper. That prefix used to leak into the `## Capture — date:
+  // <sourceLabel>` heading as the title because capture() derives
+  // sourceLabel from input.slice(0, 50). Now the wrapper isn't in the
+  // input, and we tell capture() the source via options.sourceLabel
+  // (set below) so the heading reads `## Capture — date: iPhone`.
+  const input = body.trim();
   // capture() returns a terse one-liner like "Saved to **Fitness**" or
   // "Filed to inbox" — surface it so the notification + toast can show
   // *where* the capture landed without re-routing on the renderer side.

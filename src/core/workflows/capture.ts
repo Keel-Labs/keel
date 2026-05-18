@@ -68,7 +68,11 @@ export async function capture(
     }
   } else {
     content = input;
-    sourceLabel = input.slice(0, 50);
+    // Prefer an explicit source label from the caller (mobile inbox
+    // watcher passes the device name, e.g. "iPhone"). Falls back to
+    // the first ~50 chars of the input for the desktop-typed path,
+    // matching pre-existing behavior.
+    sourceLabel = options.sourceLabel?.trim() || input.slice(0, 50);
   }
 
   // Summarize with the LLM (used in both the routed write and the chat reply).
