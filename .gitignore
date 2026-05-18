@@ -30,3 +30,17 @@ keel.md
 # Local agent worktrees — created by Claude Code / similar tools. Never source.
 .claude/worktrees/
 .claude/scheduled_tasks.lock
+
+# iOS / Xcode asset scratch — the mobile companion's app icon source files,
+# Capacitor working directory, and downloaded icon-generator bundles. These
+# belong in the Keel-Labs/keel-ios repo, not this one. Asset PNGs that
+# eventually go to App Store / Play Store listings (Keel.png, appstore.png,
+# playstore.png) are deliberately NOT ignored so they can be committed when
+# the user is ready.
+AppIcon.iconset/
+AppIcons*.zip
+Assets.xcassets/
+ios/
+build/icon_1024.png
+build/icon_master.png
+build/k-crop.png
