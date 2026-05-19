@@ -21,7 +21,7 @@ interface Status {
   apiBase: string;
 }
 
-const DEFAULT_API_BASE = 'https://api.keel.app';
+const DEFAULT_API_BASE = 'https://api.keel-labs.org';
 
 export default function KeelCloudPanel() {
   const [status, setStatus] = useState<Status | null>(null);
