@@ -52,7 +52,7 @@ export function getDefaultSettings(): Settings {
     defaultEodScheduled: false,
     cloudEnabled: false,
     cloudUserEmail: '',
-    cloudApiBase: 'https://api.keel.app',
+    cloudApiBase: 'https://api.keel-labs.org',
   };
 }
 
