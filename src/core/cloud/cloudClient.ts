@@ -4,12 +4,15 @@
 //   - Read the configured base URL (Settings → cloudApiBase, default
 //     https://api.keel.app, overridable for dev → http://localhost:8080)
 //   - Attach the Authorization header from tokenStore
-//   - Surface 401s as a typed error so callers can sign the user out
+//   - Transparently refresh on 401 once before surfacing
+//     CloudUnauthorizedError to the caller
 //
-// Intentionally does not retry or refresh tokens in v1. A 401 means
-// the access token has expired (Supabase default: 1 hour). The
-// renderer reacts by prompting the user to sign in again. Refresh
-// token support is a follow-up.
+// Refresh policy: on a 401 from a protected route we try a single
+// refresh via refreshAccessToken and retry the original request. If
+// the refresh itself fails (or the retry also returns 401), we
+// surface CloudUnauthorizedError so the caller can sign the user
+// out. This means callers don't need to know about refresh tokens —
+// they just see "401 → sign out" or success.
 
 import * as tokenStore from './tokenStore';
 
@@ -30,19 +33,24 @@ interface RequestOptions {
 }
 
 export async function request<T>(options: RequestOptions): Promise<T> {
-  const url = options.baseUrl.replace(/\/$/, '') + options.path;
-  const headers: Record<string, string> = { 'content-type': 'application/json' };
-  if (options.auth !== false) {
-    const session = tokenStore.load();
-    if (!session) throw new CloudUnauthorizedError();
-    headers['authorization'] = `Bearer ${session.accessToken}`;
-  }
+  // First attempt with the current access token.
+  let res = await sendOnce(options);
 
-  const res = await fetch(url, {
-    method: options.method ?? 'GET',
-    headers,
-    body: options.body === undefined ? undefined : JSON.stringify(options.body),
-  });
+  if (res.status === 401 && options.auth !== false) {
+    // Try a single silent refresh, then retry once. Imported lazily
+    // to avoid a circular import (cloudAuth imports tokenStore which
+    // is imported here).
+    const session = tokenStore.load();
+    if (session?.refreshToken) {
+      try {
+        const { refreshAccessToken } = await import('./cloudAuth.js');
+        await refreshAccessToken(options.baseUrl, session.refreshToken);
+        res = await sendOnce(options);
+      } catch {
+        throw new CloudUnauthorizedError();
+      }
+    }
+  }
 
   if (res.status === 401) throw new CloudUnauthorizedError();
   if (!res.ok) {
@@ -51,4 +59,20 @@ export async function request<T>(options: RequestOptions): Promise<T> {
   }
   if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;
+}
+
+async function sendOnce(options: RequestOptions): Promise<Response> {
+  const url = options.baseUrl.replace(/\/$/, '') + options.path;
+  const headers: Record<string, string> = { 'content-type': 'application/json' };
+  if (options.auth !== false) {
+    const session = tokenStore.load();
+    if (!session) throw new CloudUnauthorizedError();
+    headers['authorization'] = `Bearer ${session.accessToken}`;
+  }
+
+  return fetch(url, {
+    method: options.method ?? 'GET',
+    headers,
+    body: options.body === undefined ? undefined : JSON.stringify(options.body),
+  });
 }

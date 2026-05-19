@@ -1,18 +1,18 @@
 // Settings → Keel Cloud panel.
 //
 // Three states the user can be in:
-//   1. signed out  — show explainer + email form
-//   2. pending verify  — show 6-8 digit code input
-//   3. signed in  — show email + sign-out + API base override
+//   1. signed out      — explainer + email form
+//   2. waiting-link    — "Check your email" with cancel + spinner
+//   3. signed in       — email + sign-out + API base override
 //
-// The actual auth round-trips go through the main process via the
-// preload bridge (window.keel.cloud*). This component is renderer-
-// only and stateless about the session itself — main.ts is the
-// source of truth via cloudStatus().
+// Auth round-trips happen in main; this component is a thin view.
+// Main pushes `keel:cloud-signin-status` events for sent-email →
+// signed-in (or error/cancelled), and we react to those.
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import type { CloudSignInStatusEvent } from '../../shared/types';
 
-type Stage = 'signed-out' | 'pending' | 'signed-in';
+type Stage = 'signed-out' | 'waiting-link' | 'signed-in';
 
 interface Status {
   enabled: boolean;
@@ -27,10 +27,14 @@ export default function KeelCloudPanel() {
   const [status, setStatus] = useState<Status | null>(null);
   const [stage, setStage] = useState<Stage>('signed-out');
   const [email, setEmail] = useState('');
-  const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ tone: 'info' | 'error'; text: string } | null>(null);
   const [apiBaseDraft, setApiBaseDraft] = useState('');
+
+  // Keep the latest email handy for status-event handlers without
+  // re-binding the subscription on every keystroke.
+  const emailRef = useRef('');
+  useEffect(() => { emailRef.current = email; }, [email]);
 
   // Initial status fetch + react to background sign-out from main.
   useEffect(() => {
@@ -48,12 +52,36 @@ export default function KeelCloudPanel() {
       }
     };
     void refresh();
-    const off = window.keel.onCloudSignedOut(() => {
+    const offSignedOut = window.keel.onCloudSignedOut(() => {
       setStage('signed-out');
       setMessage({ tone: 'info', text: 'Your session expired. Sign in again to keep using Keel Cloud.' });
       void refresh();
     });
-    return () => { cancelled = true; off?.(); };
+
+    const offStatus = window.keel.onCloudSignInStatus((payload: CloudSignInStatusEvent) => {
+      switch (payload.status) {
+        case 'sent-email':
+          setStage('waiting-link');
+          setBusy(false);
+          setMessage({ tone: 'info', text: `Open the link we sent to ${payload.email}. We'll sign you in automatically — keep this window open.` });
+          break;
+        case 'signed-in':
+          setStage('signed-in');
+          setMessage({ tone: 'info', text: `Signed in as ${payload.email}.` });
+          void refresh();
+          break;
+        case 'cancelled':
+          setStage('signed-out');
+          setMessage(null);
+          break;
+        case 'error':
+          setStage('signed-out');
+          setMessage({ tone: 'error', text: payload.error });
+          break;
+      }
+    });
+
+    return () => { cancelled = true; offSignedOut?.(); offStatus?.(); };
   }, []);
 
   const requestLink = async () => {
@@ -62,33 +90,25 @@ export default function KeelCloudPanel() {
     setBusy(true);
     setMessage(null);
     try {
-      await window.keel.cloudRequestMagicLink(trimmed);
-      setStage('pending');
-      setMessage({ tone: 'info', text: `We sent a sign-in code to ${trimmed}. Check your inbox.` });
+      await window.keel.cloudStartSignIn(trimmed);
+      // From here, the 'sent-email' status event flips us into
+      // waiting-link. We leave `busy` true until that lands so the
+      // button doesn't briefly enable.
     } catch (err) {
-      setMessage({ tone: 'error', text: err instanceof Error ? err.message : 'Send failed' });
-    } finally {
       setBusy(false);
+      setMessage({ tone: 'error', text: err instanceof Error ? err.message : 'Send failed' });
     }
   };
 
-  const verify = async () => {
-    const trimmedCode = code.trim();
-    if (!trimmedCode) return;
-    setBusy(true);
-    setMessage(null);
+  const cancelSignIn = async () => {
     try {
-      const result = await window.keel.cloudVerify(email.trim(), trimmedCode);
-      setStage('signed-in');
-      setCode('');
-      setMessage({ tone: 'info', text: `Signed in as ${result.email}.` });
-      const s = await window.keel.cloudStatus();
-      setStatus(s);
-    } catch (err) {
-      setMessage({ tone: 'error', text: err instanceof Error ? err.message : 'Verification failed' });
-    } finally {
-      setBusy(false);
+      await window.keel.cloudCancelSignIn();
+    } catch {
+      // Even if cancel IPC errors, fall back to the signed-out view.
     }
+    setStage('signed-out');
+    setBusy(false);
+    setMessage(null);
   };
 
   const signOut = async () => {
@@ -97,7 +117,6 @@ export default function KeelCloudPanel() {
     try {
       await window.keel.cloudSignOut();
       setStage('signed-out');
-      setCode('');
       setMessage({ tone: 'info', text: 'Signed out. Captures stay local until you sign in again.' });
       const s = await window.keel.cloudStatus();
       setStatus(s);
@@ -124,6 +143,10 @@ export default function KeelCloudPanel() {
     }
   };
 
+  // Silence unused-warning while keeping emailRef wired for future
+  // handlers that want it.
+  void emailRef;
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       <SectionCard
@@ -145,35 +168,26 @@ export default function KeelCloudPanel() {
             />
             <div>
               <button onClick={requestLink} disabled={busy || !email.trim()} style={buttonPrimary}>
-                {busy ? 'Sending…' : 'Send sign-in code'}
+                {busy ? 'Sending…' : 'Send sign-in link'}
               </button>
             </div>
           </div>
         )}
 
-        {stage === 'pending' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
-              Sent a code to <strong>{email.trim()}</strong>. Paste it below.
+        {stage === 'waiting-link' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <Spinner />
+              <div style={{ fontSize: 14 }}>
+                Check your email — we sent a sign-in link to <strong>{email.trim()}</strong>.
+              </div>
             </div>
-            <input
-              type="text"
-              value={code}
-              onChange={(e) => setCode(e.target.value)}
-              placeholder="123456"
-              autoFocus
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              style={{ ...inputStyle, fontFamily: 'var(--font-mono)', letterSpacing: 4 }}
-              disabled={busy}
-              onKeyDown={(e) => { if (e.key === 'Enter') void verify(); }}
-            />
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={verify} disabled={busy || !code.trim()} style={buttonPrimary}>
-                {busy ? 'Verifying…' : 'Sign in'}
-              </button>
-              <button onClick={() => { setStage('signed-out'); setCode(''); setMessage(null); }} disabled={busy} style={buttonSecondary}>
-                Use a different email
+            <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+              Click the link and Keel will sign you in automatically. You can close this window once you do.
+            </div>
+            <div>
+              <button onClick={cancelSignIn} style={buttonSecondary}>
+                Cancel / use a different email
               </button>
             </div>
           </div>
@@ -243,6 +257,26 @@ export default function KeelCloudPanel() {
         </div>
       </SectionCard>
     </div>
+  );
+}
+
+// Lightweight CSS-only spinner so we don't pull in a dep.
+function Spinner() {
+  return (
+    <span
+      aria-hidden
+      style={{
+        width: 16,
+        height: 16,
+        borderRadius: '50%',
+        border: '2px solid var(--border-default)',
+        borderTopColor: 'var(--accent)',
+        animation: 'keel-spin 0.8s linear infinite',
+        display: 'inline-block',
+      }}
+    >
+      <style>{`@keyframes keel-spin { to { transform: rotate(360deg); } }`}</style>
+    </span>
   );
 }
 

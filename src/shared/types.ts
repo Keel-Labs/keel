@@ -108,6 +108,19 @@ export interface Settings {
   cloudApiBase: string;
 }
 
+/**
+ * Lifecycle events emitted by main during the magic-link sign-in flow.
+ *   sent-email → user should check inbox; main is polling /auth/poll
+ *   signed-in  → poll returned a session and tokens are persisted
+ *   cancelled  → user (or app quit) aborted before completion
+ *   error      → timeout or server error; show message + offer retry
+ */
+export type CloudSignInStatusEvent =
+  | { status: 'sent-email'; email: string }
+  | { status: 'signed-in'; email: string }
+  | { status: 'cancelled' }
+  | { status: 'error'; error: string };
+
 export interface EmbeddedChunk {
   id: string;
   filePath: string;
@@ -643,11 +656,17 @@ export interface KeelAPI {
   deleteReminder: (id: number) => Promise<void>;
   // Keel Cloud (opt-in paid tier)
   cloudStatus: () => Promise<{ enabled: boolean; signedIn: boolean; email: string; apiBase: string }>;
-  cloudRequestMagicLink: (email: string) => Promise<{ ok: boolean }>;
-  cloudVerify: (email: string, token: string) => Promise<{ email: string }>;
+  /**
+   * Kicks off the magic-link sign-in. The main process emits
+   * `onCloudSignInStatus` events ('sent-email' → 'signed-in' | 'error' | 'cancelled')
+   * for the rest of the flow.
+   */
+  cloudStartSignIn: (email: string) => Promise<{ ok: boolean }>;
+  cloudCancelSignIn: () => Promise<{ ok: boolean }>;
   cloudSignOut: () => Promise<{ ok: boolean }>;
   cloudSetApiBase: (apiBase: string) => Promise<{ apiBase: string }>;
   onCloudSignedOut: (callback: () => void) => () => void;
+  onCloudSignInStatus: (callback: (payload: CloudSignInStatusEvent) => void) => () => void;
   // Google Integration
   googleConnect: () => Promise<void>;
   googleDisconnect: () => Promise<void>;

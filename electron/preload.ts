@@ -168,14 +168,22 @@ const api: KeelAPI = {
 
   // Keel Cloud — opt-in paid tier (push reminders + capture queue).
   cloudStatus: () => ipcRenderer.invoke('keel:cloud-status'),
-  cloudRequestMagicLink: (email: string) => ipcRenderer.invoke('keel:cloud-request-magic-link', email),
-  cloudVerify: (email: string, token: string) => ipcRenderer.invoke('keel:cloud-verify', email, token),
+  cloudStartSignIn: (email: string) => ipcRenderer.invoke('keel:cloud-start-signin', email),
+  cloudCancelSignIn: () => ipcRenderer.invoke('keel:cloud-cancel-signin'),
   cloudSignOut: () => ipcRenderer.invoke('keel:cloud-sign-out'),
   cloudSetApiBase: (apiBase: string) => ipcRenderer.invoke('keel:cloud-set-api-base', apiBase),
   onCloudSignedOut: (callback: () => void) => {
     const handler = () => callback();
     ipcRenderer.on('keel:cloud-signed-out', handler);
     return () => ipcRenderer.off('keel:cloud-signed-out', handler);
+  },
+  onCloudSignInStatus: (callback) => {
+    const handler = (
+      _event: Electron.IpcRendererEvent,
+      payload: import('../src/shared/types').CloudSignInStatusEvent,
+    ) => callback(payload);
+    ipcRenderer.on('keel:cloud-signin-status', handler);
+    return () => ipcRenderer.off('keel:cloud-signin-status', handler);
   },
 
   googleConnect: () => ipcRenderer.invoke('keel:google-connect'),
