@@ -59,6 +59,7 @@ import { capture } from '../src/core/workflows/capture';
 import { startInboxWatcher, stopInboxWatcher } from './inboxWatcher';
 import * as cloudAuth from '../src/core/cloud/cloudAuth';
 import * as cloudTokenStore from '../src/core/cloud/tokenStore';
+import * as cloudRefreshScheduler from '../src/core/cloud/refreshScheduler';
 import { startCloudCaptureDrain, stopCloudCaptureDrain } from '../src/core/cloud/cloudCaptureDrain';
 import { mirrorReminder } from '../src/core/cloud/cloudReminderMirror';
 import { synthesizeMeeting, formatMeetingNote, formatDailyLogEntry } from '../src/core/workflows/meetingTranscription';
@@ -2506,29 +2507,83 @@ function registerIpcHandlers() {
     };
   });
 
-  ipcMain.handle('keel:cloud-request-magic-link', async (_event, email: string) => {
-    await cloudAuth.requestMagicLink(settings.cloudApiBase, email);
+  // New magic-link callback flow: a single IPC kicks off /auth/magic-link
+  // and then polls /auth/poll in the main process until the user clicks
+  // the email link. Status updates are pushed to the renderer via
+  // `keel:cloud-signin-status` events so the UI stays a thin view.
+  //
+  // The polling lives here (not the renderer) so that:
+  //   1. We can cancel cleanly on app quit (AbortController below).
+  //   2. The encrypted session blob is written from main where
+  //      safeStorage is available.
+  ipcMain.handle('keel:cloud-start-signin', async (_event, email: string) => {
+    // Cancel any in-flight sign-in before starting a new one. This
+    // covers the "Use a different email" reset path.
+    if (cloudSignInController) {
+      cloudSignInController.abort();
+      cloudSignInController = null;
+    }
+
+    const trimmed = (email ?? '').trim();
+    if (!trimmed) throw new Error('Email is required');
+
+    const baseUrl = settings.cloudApiBase;
+    const nonce = await cloudAuth.startSignIn(baseUrl, trimmed);
+
+    const controller = new AbortController();
+    cloudSignInController = controller;
+
+    // Notify the renderer that the email is on its way.
+    broadcastSignInStatus({ status: 'sent-email', email: trimmed });
+
+    // Detach the poll so the IPC call returns promptly. The renderer
+    // listens for status events for the rest of the flow.
+    void (async () => {
+      try {
+        const result = await cloudAuth.pollForSession(baseUrl, nonce, { signal: controller.signal });
+        settings.cloudUserEmail = result.email || trimmed;
+        settings.cloudEnabled = true;
+        saveSettingsToFile(settings);
+        maybeStartCloudDrain();
+        // Kick off (or restart) the silent-refresh loop — the
+        // scheduler is a no-op if already running for this session.
+        cloudRefreshScheduler.stop();
+        startCloudRefreshScheduler();
+        broadcastSignInStatus({ status: 'signed-in', email: result.email || trimmed });
+      } catch (err) {
+        if ((err as { name?: string }).name === 'AbortError') {
+          broadcastSignInStatus({ status: 'cancelled' });
+        } else {
+          const message = err instanceof Error ? err.message : 'Sign-in failed';
+          broadcastSignInStatus({ status: 'error', error: message });
+        }
+      } finally {
+        if (cloudSignInController === controller) cloudSignInController = null;
+      }
+    })();
+
     return { ok: true };
   });
 
-  ipcMain.handle('keel:cloud-verify', async (_event, email: string, token: string) => {
-    const result = await cloudAuth.verifyCode(settings.cloudApiBase, email, token);
-    // Persist the email + flip cloudEnabled on. Drain starts on next
-    // restart, OR we could start it inline — start inline for the
-    // best first-time-signed-in UX.
-    settings.cloudUserEmail = result.email;
-    settings.cloudEnabled = true;
-    saveSettingsToFile(settings);
-    maybeStartCloudDrain();
-    return { email: result.email };
+  ipcMain.handle('keel:cloud-cancel-signin', async () => {
+    if (cloudSignInController) {
+      cloudSignInController.abort();
+      cloudSignInController = null;
+    }
+    return { ok: true };
   });
 
   ipcMain.handle('keel:cloud-sign-out', async () => {
+    if (cloudSignInController) {
+      cloudSignInController.abort();
+      cloudSignInController = null;
+    }
     cloudAuth.signOut();
     settings.cloudUserEmail = '';
     settings.cloudEnabled = false;
     saveSettingsToFile(settings);
     stopCloudCaptureDrain();
+    cloudRefreshScheduler.stop();
     return { ok: true };
   });
 
@@ -3019,6 +3074,39 @@ function checkScheduledJobs(): void {
  * Starts the cloud capture drain loop if the user is opted in and has
  * a valid session. Idempotent — safe to call multiple times.
  */
+// In-flight sign-in polling — cancelled on quit, sign-out, or
+// before kicking off a new sign-in attempt. Lives in main so a
+// renderer reload can't orphan a poll loop.
+let cloudSignInController: AbortController | null = null;
+
+type CloudSignInStatusEvent =
+  | { status: 'sent-email'; email: string }
+  | { status: 'signed-in'; email: string }
+  | { status: 'cancelled' }
+  | { status: 'error'; error: string };
+
+function broadcastSignInStatus(payload: CloudSignInStatusEvent): void {
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (!win.isDestroyed()) win.webContents.send('keel:cloud-signin-status', payload);
+  }
+}
+
+function startCloudRefreshScheduler(): void {
+  cloudRefreshScheduler.start({
+    getBaseUrl: () => settings.cloudApiBase,
+    onUnauthorized: () => {
+      cloudAuth.signOut();
+      settings.cloudEnabled = false;
+      settings.cloudUserEmail = '';
+      saveSettingsToFile(settings);
+      stopCloudCaptureDrain();
+      for (const win of BrowserWindow.getAllWindows()) {
+        if (!win.isDestroyed()) win.webContents.send('keel:cloud-signed-out');
+      }
+    },
+  });
+}
+
 function maybeStartCloudDrain(): void {
   if (!settings.cloudEnabled) return;
   if (!cloudTokenStore.hasValidSession()) {
@@ -3112,6 +3200,12 @@ app.whenReady().then(async () => {
 
   // Keel Cloud capture drain — only when opted in AND signed in.
   maybeStartCloudDrain();
+
+  // Silent refresh: if there's a session at boot, schedule the next
+  // refresh so the access token stays valid without user action.
+  if (cloudTokenStore.hasValidSession()) {
+    startCloudRefreshScheduler();
+  }
 
   // Mobile companion inbox watcher: <workspace>/inbox/incoming/ → routed via
   // capture()/ingestWikiSource(). Gated by the mobileInboxEnabled setting so
@@ -3217,5 +3311,12 @@ app.on('window-all-closed', () => {
 app.on('will-quit', () => {
   globalShortcut.unregisterAll();
   void stopInboxWatcher();
+  // Cancel any in-flight sign-in poll and the refresh timer so we
+  // don't leave dangling intervals during shutdown.
+  if (cloudSignInController) {
+    cloudSignInController.abort();
+    cloudSignInController = null;
+  }
+  cloudRefreshScheduler.stop();
   closeDb();
 });
