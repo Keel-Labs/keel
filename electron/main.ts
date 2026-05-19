@@ -2588,7 +2588,7 @@ function registerIpcHandlers() {
   });
 
   ipcMain.handle('keel:cloud-set-api-base', async (_event, apiBase: string) => {
-    settings.cloudApiBase = apiBase.trim() || 'https://api.keel.app';
+    settings.cloudApiBase = apiBase.trim() || 'https://api.keel-labs.org';
     saveSettingsToFile(settings);
     // Bouncing the drain means the next tick uses the new URL.
     if (settings.cloudEnabled && cloudTokenStore.hasValidSession()) {
