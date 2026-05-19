@@ -23,6 +23,9 @@ function makeSettings(overrides: Partial<Settings> = {}): Settings {
     timezone: '',
     mobileInboxEnabled: true,
     defaultEodScheduled: false,
+    cloudEnabled: false,
+    cloudUserEmail: '',
+    cloudApiBase: 'https://api.keel.app',
     ...overrides,
   };
 }

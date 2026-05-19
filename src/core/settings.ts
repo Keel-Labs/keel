@@ -50,6 +50,9 @@ export function getDefaultSettings(): Settings {
     timezone: '',
     mobileInboxEnabled: true,
     defaultEodScheduled: false,
+    cloudEnabled: false,
+    cloudUserEmail: '',
+    cloudApiBase: 'https://api.keel.app',
   };
 }
 
