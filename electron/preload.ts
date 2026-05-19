@@ -166,6 +166,18 @@ const api: KeelAPI = {
 
   deleteReminder: (id: number) => ipcRenderer.invoke('keel:delete-reminder', id),
 
+  // Keel Cloud — opt-in paid tier (push reminders + capture queue).
+  cloudStatus: () => ipcRenderer.invoke('keel:cloud-status'),
+  cloudRequestMagicLink: (email: string) => ipcRenderer.invoke('keel:cloud-request-magic-link', email),
+  cloudVerify: (email: string, token: string) => ipcRenderer.invoke('keel:cloud-verify', email, token),
+  cloudSignOut: () => ipcRenderer.invoke('keel:cloud-sign-out'),
+  cloudSetApiBase: (apiBase: string) => ipcRenderer.invoke('keel:cloud-set-api-base', apiBase),
+  onCloudSignedOut: (callback: () => void) => {
+    const handler = () => callback();
+    ipcRenderer.on('keel:cloud-signed-out', handler);
+    return () => ipcRenderer.off('keel:cloud-signed-out', handler);
+  },
+
   googleConnect: () => ipcRenderer.invoke('keel:google-connect'),
 
   googleDisconnect: () => ipcRenderer.invoke('keel:google-disconnect'),

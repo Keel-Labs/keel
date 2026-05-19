@@ -88,6 +88,24 @@ export interface Settings {
    * leave them alone.
    */
   defaultEodScheduled: boolean;
+
+  // Keel Cloud — opt-in paid tier (push reminders + capture queue).
+  /**
+   * When true, the desktop polls the cloud server for unclaimed
+   * captures every 30s and mirrors locally-created reminders to the
+   * server. Flipped by the sign-in flow + Keel Cloud Settings panel.
+   */
+  cloudEnabled: boolean;
+  /**
+   * Display-only; shows the user which email they're signed in as.
+   * Session truth lives in the encrypted token file under userData.
+   */
+  cloudUserEmail: string;
+  /**
+   * Base URL of the Keel Cloud API. Default `https://api.keel.app`,
+   * overridable to `http://localhost:8080` (or staging) for dev.
+   */
+  cloudApiBase: string;
 }
 
 export interface EmbeddedChunk {
@@ -623,6 +641,13 @@ export interface KeelAPI {
   createReminder: (message: string, dueAt: number, recurring?: string) => Promise<number>;
   listReminders: () => Promise<Reminder[]>;
   deleteReminder: (id: number) => Promise<void>;
+  // Keel Cloud (opt-in paid tier)
+  cloudStatus: () => Promise<{ enabled: boolean; signedIn: boolean; email: string; apiBase: string }>;
+  cloudRequestMagicLink: (email: string) => Promise<{ ok: boolean }>;
+  cloudVerify: (email: string, token: string) => Promise<{ email: string }>;
+  cloudSignOut: () => Promise<{ ok: boolean }>;
+  cloudSetApiBase: (apiBase: string) => Promise<{ apiBase: string }>;
+  onCloudSignedOut: (callback: () => void) => () => void;
   // Google Integration
   googleConnect: () => Promise<void>;
   googleDisconnect: () => Promise<void>;

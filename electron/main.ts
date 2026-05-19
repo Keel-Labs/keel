@@ -57,6 +57,10 @@ import {
 import { listAllTasks, toggleTask, moveTask, acceptIncomingTask, appendTask, createProject, renameProject, deleteProject } from '../src/core/tasks';
 import { capture } from '../src/core/workflows/capture';
 import { startInboxWatcher, stopInboxWatcher } from './inboxWatcher';
+import * as cloudAuth from '../src/core/cloud/cloudAuth';
+import * as cloudTokenStore from '../src/core/cloud/tokenStore';
+import { startCloudCaptureDrain, stopCloudCaptureDrain } from '../src/core/cloud/cloudCaptureDrain';
+import { mirrorReminder } from '../src/core/cloud/cloudReminderMirror';
 import { synthesizeMeeting, formatMeetingNote, formatDailyLogEntry } from '../src/core/workflows/meetingTranscription';
 import { isWhisperAvailable, getWhisperBinary, downloadWhisperBinary, transcribeAudioBuffer } from './transcriptionService';
 import { initLogger, logger, buildDiagnostics } from './logger';
@@ -2474,11 +2478,69 @@ function registerIpcHandlers() {
   ipcMain.handle('keel:create-reminder', async (_event, message: string, dueAt: number, recurring?: string) => {
     const id = createReminder(settings.brainPath, message, dueAt, recurring);
     logActivity(settings.brainPath, 'reminder-created', message);
+    // Mirror to Keel Cloud so the cron worker can fire a push even
+    // when this Mac is asleep. Failures are logged but don't undo
+    // the local insert — local-only reminders remain a valid fallback.
+    if (settings.cloudEnabled && cloudTokenStore.hasValidSession()) {
+      void mirrorReminder({
+        baseUrl: settings.cloudApiBase,
+        message,
+        dueAt,
+      }).catch((err) => logger.error('[cloud] reminder mirror failed:', err));
+    }
     return id;
   });
 
   ipcMain.handle('keel:list-reminders', async () => {
     return listUpcomingReminders(settings.brainPath);
+  });
+
+  // --- Keel Cloud ---
+
+  ipcMain.handle('keel:cloud-status', async () => {
+    return {
+      enabled: settings.cloudEnabled,
+      signedIn: cloudTokenStore.hasValidSession(),
+      email: settings.cloudUserEmail || cloudAuth.currentEmail() || '',
+      apiBase: settings.cloudApiBase,
+    };
+  });
+
+  ipcMain.handle('keel:cloud-request-magic-link', async (_event, email: string) => {
+    await cloudAuth.requestMagicLink(settings.cloudApiBase, email);
+    return { ok: true };
+  });
+
+  ipcMain.handle('keel:cloud-verify', async (_event, email: string, token: string) => {
+    const result = await cloudAuth.verifyCode(settings.cloudApiBase, email, token);
+    // Persist the email + flip cloudEnabled on. Drain starts on next
+    // restart, OR we could start it inline — start inline for the
+    // best first-time-signed-in UX.
+    settings.cloudUserEmail = result.email;
+    settings.cloudEnabled = true;
+    saveSettingsToFile(settings);
+    maybeStartCloudDrain();
+    return { email: result.email };
+  });
+
+  ipcMain.handle('keel:cloud-sign-out', async () => {
+    cloudAuth.signOut();
+    settings.cloudUserEmail = '';
+    settings.cloudEnabled = false;
+    saveSettingsToFile(settings);
+    stopCloudCaptureDrain();
+    return { ok: true };
+  });
+
+  ipcMain.handle('keel:cloud-set-api-base', async (_event, apiBase: string) => {
+    settings.cloudApiBase = apiBase.trim() || 'https://api.keel.app';
+    saveSettingsToFile(settings);
+    // Bouncing the drain means the next tick uses the new URL.
+    if (settings.cloudEnabled && cloudTokenStore.hasValidSession()) {
+      stopCloudCaptureDrain();
+      maybeStartCloudDrain();
+    }
+    return { apiBase: settings.cloudApiBase };
   });
 
   ipcMain.handle('keel:delete-reminder', async (_event, id: number) => {
@@ -2953,6 +3015,48 @@ function checkScheduledJobs(): void {
   }
 }
 
+/**
+ * Starts the cloud capture drain loop if the user is opted in and has
+ * a valid session. Idempotent — safe to call multiple times.
+ */
+function maybeStartCloudDrain(): void {
+  if (!settings.cloudEnabled) return;
+  if (!cloudTokenStore.hasValidSession()) {
+    logger.info('[cloud] enabled in settings but no valid session — skipping drain');
+    return;
+  }
+  startCloudCaptureDrain({
+    fileManager,
+    llmClient,
+    brainPath: settings.brainPath,
+    getBaseUrl: () => settings.cloudApiBase,
+    onUnauthorized: () => {
+      // Session expired or revoked — clear and tell the renderer
+      // so the Cloud Settings panel reflects the signed-out state.
+      cloudAuth.signOut();
+      settings.cloudEnabled = false;
+      settings.cloudUserEmail = '';
+      saveSettingsToFile(settings);
+      for (const win of BrowserWindow.getAllWindows()) {
+        if (!win.isDestroyed()) win.webContents.send('keel:cloud-signed-out');
+      }
+    },
+    onRouted: (event) => {
+      // Pipe through the same toast/badge UI the file-sync watcher uses.
+      for (const win of BrowserWindow.getAllWindows()) {
+        if (!win.isDestroyed()) {
+          win.webContents.send('keel:mobile-capture-routed', {
+            filename: '',
+            kind: 'capture',
+            device: event.device,
+            routedTo: event.routedTo,
+          });
+        }
+      }
+    },
+  });
+}
+
 function startScheduler(): void {
   if (schedulerInterval) clearInterval(schedulerInterval);
 
@@ -3005,6 +3109,9 @@ app.whenReady().then(async () => {
   startKBAutoRefreshWatcher().catch((err) => {
     logger.error('KB auto-refresh watcher failed to start:', err);
   });
+
+  // Keel Cloud capture drain — only when opted in AND signed in.
+  maybeStartCloudDrain();
 
   // Mobile companion inbox watcher: <workspace>/inbox/incoming/ → routed via
   // capture()/ingestWikiSource(). Gated by the mobileInboxEnabled setting so

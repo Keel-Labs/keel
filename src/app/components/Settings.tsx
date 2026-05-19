@@ -12,6 +12,7 @@ import type {
 import { applyTheme } from '../theme';
 import { BUILT_IN_PERSONALITIES } from '../../core/personalities';
 import { BetaBadge } from './BetaBadge';
+import KeelCloudPanel from './KeelCloudPanel';
 
 const isElectron = typeof window !== 'undefined' && !!(window as any).keelMigrate;
 
@@ -71,6 +72,7 @@ export type SettingsSectionId =
   | 'general-scheduled-jobs'
   | 'ai-setup'
   | 'integrations'
+  | 'keel-cloud'
   | 'help-feedback';
 
 const SETTINGS_SECTION_IDS: SettingsSectionId[] = [
@@ -79,6 +81,7 @@ const SETTINGS_SECTION_IDS: SettingsSectionId[] = [
   'general-scheduled-jobs',
   'ai-setup',
   'integrations',
+  'keel-cloud',
   'help-feedback',
 ];
 
@@ -103,6 +106,10 @@ const SECTION_META: Record<SettingsSectionId, { title: string; description: stri
     title: 'Integrations',
     description: 'Connect external services to sync data and extend what Keel can do.',
   },
+  'keel-cloud': {
+    title: 'Keel Cloud',
+    description: 'Push reminders and fast capture queue across your devices. Opt-in.',
+  },
   'help-feedback': {
     title: 'Help & Feedback',
     description: 'Keel is in beta. We read every request and bug report.',
@@ -113,6 +120,7 @@ const NAV_ITEMS: Array<{ id: SettingsSectionId; label: string }> = [
   { id: 'general-personal', label: 'Personal Settings' },
   { id: 'ai-setup', label: 'Model' },
   { id: 'integrations', label: 'Integrations' },
+  { id: 'keel-cloud', label: 'Keel Cloud' },
   { id: 'general-scheduled-jobs', label: 'Scheduled Jobs' },
   { id: 'general-personality', label: 'Personality' },
   { id: 'help-feedback', label: 'Help & Feedback' },
@@ -1462,6 +1470,9 @@ export default function Settings({ onBack, navigation, onSettingsChange }: Props
             </SectionCard>
           </>
         );
+
+      case 'keel-cloud':
+        return <KeelCloudPanel />;
 
       case 'help-feedback':
         return renderHelpFeedback();
