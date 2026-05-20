@@ -21,15 +21,12 @@ interface Status {
   apiBase: string;
 }
 
-const DEFAULT_API_BASE = 'https://api.keel-labs.org';
-
 export default function KeelCloudPanel() {
   const [status, setStatus] = useState<Status | null>(null);
   const [stage, setStage] = useState<Stage>('signed-out');
   const [email, setEmail] = useState('');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ tone: 'info' | 'error'; text: string } | null>(null);
-  const [apiBaseDraft, setApiBaseDraft] = useState('');
 
   // Keep the latest email handy for status-event handlers without
   // re-binding the subscription on every keystroke.
@@ -45,7 +42,6 @@ export default function KeelCloudPanel() {
         if (cancelled) return;
         setStatus(s);
         setStage(s.signedIn ? 'signed-in' : 'signed-out');
-        setApiBaseDraft(s.apiBase);
         if (s.email) setEmail(s.email);
       } catch {
         // first render before main is ready, etc.
@@ -122,22 +118,6 @@ export default function KeelCloudPanel() {
       setStatus(s);
     } catch (err) {
       setMessage({ tone: 'error', text: err instanceof Error ? err.message : 'Sign-out failed' });
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const saveApiBase = async () => {
-    setBusy(true);
-    setMessage(null);
-    try {
-      const next = (apiBaseDraft.trim() || DEFAULT_API_BASE).replace(/\/$/, '');
-      const { apiBase } = await window.keel.cloudSetApiBase(next);
-      setStatus((prev) => prev ? { ...prev, apiBase } : prev);
-      setApiBaseDraft(apiBase);
-      setMessage({ tone: 'info', text: `API base set to ${apiBase}.` });
-    } catch (err) {
-      setMessage({ tone: 'error', text: err instanceof Error ? err.message : 'Could not save API base' });
     } finally {
       setBusy(false);
     }
@@ -223,39 +203,14 @@ export default function KeelCloudPanel() {
         )}
       </SectionCard>
 
-      <SectionCard
-        title="API endpoint"
-        description="Where this Mac sends captures and reminders. Change only if you're testing against a local or staging server."
-      >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <input
-            type="text"
-            value={apiBaseDraft}
-            onChange={(e) => setApiBaseDraft(e.target.value)}
-            placeholder={DEFAULT_API_BASE}
-            spellCheck={false}
-            autoComplete="off"
-            style={{ ...inputStyle, fontFamily: 'var(--font-mono)' }}
-            disabled={busy}
-          />
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button
-              onClick={saveApiBase}
-              disabled={busy || apiBaseDraft.trim() === status?.apiBase}
-              style={buttonPrimary}
-            >
-              Save endpoint
-            </button>
-            <button
-              onClick={() => setApiBaseDraft(DEFAULT_API_BASE)}
-              disabled={busy}
-              style={buttonSecondary}
-            >
-              Reset to default
-            </button>
-          </div>
-        </div>
-      </SectionCard>
+      {/* The "API endpoint" override that used to live here was useful
+          for testing against a local or staging server, but confused
+          real users and created support load. Removed from the UI for
+          v0.4.x. Power users / contributors can still override the
+          endpoint by editing `cloudApiBase` in:
+            ~/Library/Application Support/Keel/settings.json
+          The IPC + setting + cloudSetApiBase preload bridge are still
+          wired — only the visible panel is gone. */}
     </div>
   );
 }
