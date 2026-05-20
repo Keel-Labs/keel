@@ -2976,9 +2976,11 @@ function registerIpcHandlers() {
   });
 
   ipcMain.handle('keel:report-bug', async (_event, context?: { title?: string; error?: string }) => {
-    // Build a prefilled GitHub issue URL. Body includes buildDiagnostics()
-    // truncated to keep the URL under ~7KB (browsers/servers vary, but
-    // GitHub itself accepts ~8KB query strings reliably).
+    // Build a prefilled GitHub issue URL. GitHub rejects URLs over ~8KB
+    // ("Whoa there! Your request URL is too long"), and url-encoding markdown
+    // bloats by ~2-3x (newlines, backticks, colons all become %XX). So we
+    // budget by the *encoded* length, not the raw body length, and trim the
+    // log tail until the whole URL fits.
     const { shell } = await import('electron');
 
     const diagnostics = buildDiagnostics();
@@ -2986,17 +2988,35 @@ function registerIpcHandlers() {
       ? `\n### Error\n\n\`\`\`\n${context.error}\n\`\`\`\n`
       : '';
     const header = '<!-- Auto-generated from Keel desktop. Please describe what you were doing above this line. -->\n\n';
-    const fullBody = `${header}### What happened?\n\n(describe)\n${errorBlock}\n${diagnostics}\n`;
+    const title = context?.title || 'Bug report from desktop app';
 
-    const MAX_BODY = 6500;
-    let body = fullBody;
-    if (body.length > MAX_BODY) {
-      const note = '\n\n_(Log tail truncated to fit URL — open Settings → Share feedback → Copy diagnostic info for the full version.)_\n';
-      body = body.slice(0, MAX_BODY - note.length) + note;
+    const baseUrl = 'https://github.com/Keel-Labs/keel/issues/new';
+    const titlePart = `title=${encodeURIComponent(title)}`;
+    const labelsPart = `labels=${encodeURIComponent('bug,from-app')}`;
+    // Reserve headroom for the base URL + title + labels + "?&&body=".
+    const fixedOverhead = baseUrl.length + titlePart.length + labelsPart.length + 10;
+    const MAX_URL = 7500;
+    const bodyBudget = MAX_URL - fixedOverhead;
+
+    const truncationNote = '\n\n_(Log tail truncated to fit URL — open Settings → Share feedback → Copy diagnostic info for the full version.)_\n';
+
+    const compose = (diag: string) => `${header}### What happened?\n\n(describe)\n${errorBlock}\n${diag}\n`;
+
+    let body = compose(diagnostics);
+    let diag = diagnostics;
+    // Shrink the diagnostics tail (which is by far the biggest contributor)
+    // until the encoded body fits. We chop ~500 chars off the end per pass.
+    while (encodeURIComponent(body).length > bodyBudget && diag.length > 200) {
+      diag = diag.slice(0, Math.max(200, diag.length - 500));
+      body = compose(diag + truncationNote);
+    }
+    // Final safety net if even minimal diagnostics overflow (e.g. enormous
+    // error stack passed in): drop diagnostics entirely.
+    if (encodeURIComponent(body).length > bodyBudget) {
+      body = compose('_(Diagnostics omitted — URL too long. Use Settings → Copy diagnostic info instead.)_');
     }
 
-    const title = context?.title || 'Bug report from desktop app';
-    const url = `https://github.com/Keel-Labs/keel/issues/new?title=${encodeURIComponent(title)}&body=${encodeURIComponent(body)}&labels=${encodeURIComponent('bug,from-app')}`;
+    const url = `${baseUrl}?${titlePart}&body=${encodeURIComponent(body)}&${labelsPart}`;
     await shell.openExternal(url);
     return { ok: true };
   });

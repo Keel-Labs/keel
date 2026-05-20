@@ -11,27 +11,32 @@ export interface MeetingSynthesis {
   othersActionItems: string[];  // assigned to other people
 }
 
-const SYNTHESIS_SYSTEM_PROMPT = `You are a meeting analyst. Given a meeting transcript, extract structured information.
+const SYNTHESIS_SYSTEM_PROMPT = `You are a meeting analyst. Given a meeting transcript, extract structured information that appears in the transcript.
+
+Critical rules:
+- Only include content that is actually present in the transcript. Never invent details, numbers, names, levels, salaries, or constraints that weren't said.
+- If the transcript is empty, trivial, or has no substantive content, return empty arrays for every list and a brief honest summary like "Brief test recording — no substantive content."
+- Do not pattern-match on what a "typical" meeting looks like. A transcript of "hello hello hello" is a transcript of "hello hello hello", not a job interview.
+
 Respond ONLY with valid JSON — no markdown fences, no extra text.`;
 
 const SYNTHESIS_USER_TEMPLATE = (transcript: string) => `Meeting transcript:
 
 ${transcript}
 
-Extract the following and return as JSON:
+Return JSON with this shape:
 {
-  "title": "A short title for this meeting (5-10 words)",
-  "summary": "A substantive 3-5 sentence overview of what was discussed and why it mattered. Don't just restate the title — describe the actual content.",
-  "keyPoints": ["The main topics, facts, and context shared during the meeting that aren't decisions and aren't action items. Examples: 'Compensation: base salary $180-220k plus equity', 'Role is leveled as L5 senior IC', 'Team reports into VP of Product', 'Hiring timeline targets Q3 close'. Aim for 4-8 specific bullets that capture what was actually said — concrete details, numbers, names, constraints. Skip generic filler."],
-  "decisions": ["Concrete decisions or conclusions reached during the meeting (may be empty array)"],
-  "myActionItems": ["action items assigned to the person speaking/recording (the 'Speaker', 'I', 'me', or 'you' — first-person perspective)"],
-  "othersActionItems": ["Name: action item — tasks assigned to other named people"]
+  "title": "Short title (5–10 words) describing what was actually discussed",
+  "summary": "3–5 sentence overview of the actual content. If the transcript is empty or trivial, say so plainly.",
+  "keyPoints": ["Specific topics, facts, or context that were actually stated in the transcript. 4–8 bullets when the transcript supports it; empty array when it doesn't."],
+  "decisions": ["Concrete decisions reached, only if explicitly present"],
+  "myActionItems": ["Tasks the speaker/recorder committed to (first-person 'I', 'me', 'I'll')"],
+  "othersActionItems": ["Name: task — only for tasks explicitly assigned to other named people"]
 }
 
-For keyPoints: think of it as the notes a careful attendee would jot down — what was discussed, what was learned, what context was shared. Include specific details (numbers, names, dates, levels) when they appear in the transcript. Don't repeat content that's already in summary, decisions, or actionItems.
-For myActionItems: include anything the speaker committed to doing themselves.
-For othersActionItems: include tasks explicitly assigned to other named people.
-Use empty arrays when a category genuinely has nothing to capture.`;
+For keyPoints: include only concrete details that appear in the transcript — numbers, names, dates, constraints that were actually said. Do not fabricate.
+For action items and decisions: empty arrays are correct and expected when nothing was committed or decided.
+Empty arrays are always better than invented content.`;
 
 export async function synthesizeMeeting(
   transcript: string,

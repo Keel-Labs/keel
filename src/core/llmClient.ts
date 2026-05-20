@@ -151,6 +151,27 @@ export class LLMClient {
     }
   }
 
+  // Build the ordered list of providers to try. We start with the
+  // user-selected provider, then fall back to *other* providers the user has
+  // actually configured. This prevents two pathological cases that confused
+  // users badly in onboarding: (a) a bad Anthropic key would silently fall
+  // through to Ollama and hang for ~30s trying to connect, and (b) errors
+  // from the user's chosen provider were masked by the trailing
+  // "AI provider unavailable" message instead of the real reason.
+  private buildAttempts(): Provider[] {
+    const configured: Provider[] = [];
+    if (this.anthropic) configured.push('claude');
+    if (this.openai) configured.push('openai');
+    if (this.openrouter) configured.push('openrouter');
+    // Ollama has no API key — only attempt it if it's the user's explicit
+    // pick, since a connection probe to a non-running daemon hangs.
+    if (this.provider === 'ollama') configured.push('ollama');
+
+    const primary = configured.includes(this.provider) ? this.provider : configured[0];
+    if (!primary) return [];
+    return [primary, ...configured.filter((p) => p !== primary)];
+  }
+
   // For tests / dependency injection.
   _setAnthropicForTesting(client: Anthropic | null): void {
     this.anthropic = client;
@@ -161,12 +182,12 @@ export class LLMClient {
   }
 
   async chat(messages: Message[], systemPrompt: string): Promise<string> {
-    const attempts: Provider[] = [this.provider];
-    // Add fallbacks
-    for (const p of ['claude', 'openai', 'openrouter', 'ollama'] as Provider[]) {
-      if (!attempts.includes(p)) attempts.push(p);
+    const attempts = this.buildAttempts();
+    if (attempts.length === 0) {
+      throw new Error('No AI provider configured. Open Settings and add an API key, or pick Ollama.');
     }
 
+    let lastError: unknown;
     for (const provider of attempts) {
       try {
         switch (provider) {
@@ -175,11 +196,14 @@ export class LLMClient {
           case 'openrouter': return await this.chatOpenAI(this.openrouter, this.openrouterModel, messages, systemPrompt);
           case 'ollama': return await this.chatOllama(messages, systemPrompt);
         }
-      } catch {
+      } catch (err) {
+        lastError = err;
         continue;
       }
     }
-    throw new Error('AI provider unavailable. Check Settings to configure your AI engine.');
+    throw lastError instanceof Error
+      ? lastError
+      : new Error('AI provider unavailable. Check Settings to configure your AI engine.');
   }
 
   async chatStream(
@@ -188,11 +212,12 @@ export class LLMClient {
     onChunk: (chunk: string) => void,
     signal?: AbortSignal
   ): Promise<void> {
-    const attempts: Provider[] = [this.provider];
-    for (const p of ['claude', 'openai', 'openrouter', 'ollama'] as Provider[]) {
-      if (!attempts.includes(p)) attempts.push(p);
+    const attempts = this.buildAttempts();
+    if (attempts.length === 0) {
+      throw new Error('No AI provider configured. Open Settings and add an API key, or pick Ollama.');
     }
 
+    let lastError: unknown;
     for (const provider of attempts) {
       try {
         switch (provider) {
@@ -201,11 +226,14 @@ export class LLMClient {
           case 'openrouter': return await this.streamOpenAI(this.openrouter, this.openrouterModel, messages, systemPrompt, onChunk, signal);
           case 'ollama': return await this.streamOllama(messages, systemPrompt, onChunk, signal);
         }
-      } catch {
+      } catch (err) {
+        lastError = err;
         continue;
       }
     }
-    throw new Error('AI provider unavailable. Check Settings to configure your AI engine.');
+    throw lastError instanceof Error
+      ? lastError
+      : new Error('AI provider unavailable. Check Settings to configure your AI engine.');
   }
 
   /**
@@ -235,9 +263,9 @@ export class LLMClient {
       return buffer;
     }
 
-    const attempts: Provider[] = [this.provider];
-    for (const p of ['claude', 'openai', 'openrouter', 'ollama'] as Provider[]) {
-      if (!attempts.includes(p)) attempts.push(p);
+    const attempts = this.buildAttempts();
+    if (attempts.length === 0) {
+      throw new Error('No AI provider configured. Open Settings and add an API key, or pick Ollama.');
     }
 
     let lastError: unknown;

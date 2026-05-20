@@ -12,11 +12,24 @@ interface ReleasePayload {
 }
 
 async function fetchReleaseNotes(version: string): Promise<ReleasePayload | null> {
+  // Try the exact-version tag first. If the build is ahead of any published
+  // release (common during dev / pre-releases), fall back to the latest
+  // release so we still show something useful instead of a blank modal.
   try {
-    const res = await fetch(`https://api.github.com/repos/${REPO}/releases/tags/v${version}`);
-    if (!res.ok) return null;
-    const data = await res.json() as { name?: string; body?: string };
-    return { name: data.name ?? null, body: data.body ?? '' };
+    const exact = await fetch(`https://api.github.com/repos/${REPO}/releases/tags/v${version}`);
+    if (exact.ok) {
+      const data = await exact.json() as { name?: string; body?: string };
+      return { name: data.name ?? null, body: data.body ?? '' };
+    }
+
+    const latest = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`);
+    if (latest.ok) {
+      const data = await latest.json() as { name?: string; body?: string; tag_name?: string };
+      const tag = data.tag_name ? ` (${data.tag_name})` : '';
+      const header = `_You're on v${version}. Showing the most recent published release${tag}._\n\n`;
+      return { name: data.name ?? null, body: header + (data.body ?? '') };
+    }
+    return null;
   } catch {
     return null;
   }

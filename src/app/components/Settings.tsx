@@ -227,6 +227,7 @@ export default function Settings({ onBack, navigation, onSettingsChange }: Props
   const [openrouterModelError, setOpenrouterModelError] = useState<string | null>(null);
   const [ollamaError, setOllamaError] = useState<string | null>(null);
   const [ollamaLoading, setOllamaLoading] = useState(false);
+  const [testKeyState, setTestKeyState] = useState<Record<string, { status: 'idle' | 'testing' | 'ok' | 'error'; message?: string }>>({});
   const [ollamaManualEntry, setOllamaManualEntry] = useState(false);
   const [isCompactLayout, setIsCompactLayout] = useState(
     () => typeof window !== 'undefined' && window.innerWidth < 980
@@ -441,41 +442,89 @@ export default function Settings({ onBack, navigation, onSettingsChange }: Props
   const openaiModelOptions = openaiModelOptionIds
     .map((modelId) => ({ value: modelId, label: formatOpenAIModelLabel(modelId) }));
 
+  const runKeyTest = async (provider: 'claude' | 'openai' | 'openrouter', keyId: string, key: string) => {
+    setTestKeyState((s) => ({ ...s, [keyId]: { status: 'testing' } }));
+    try {
+      const result = await window.keel.testLlmKey(provider, key);
+      if (result.ok) {
+        setTestKeyState((s) => ({ ...s, [keyId]: { status: 'ok' } }));
+      } else {
+        setTestKeyState((s) => ({ ...s, [keyId]: { status: 'error', message: result.error } }));
+      }
+    } catch (err) {
+      setTestKeyState((s) => ({
+        ...s,
+        [keyId]: { status: 'error', message: err instanceof Error ? err.message : 'Key check failed.' },
+      }));
+    }
+  };
+
   const renderApiKeyInput = (
     label: string,
     value: string,
     field: keyof SettingsType,
     keyId: string
-  ) => (
-    <FieldRow label={label}>
-      <div style={{ position: 'relative' }}>
-        <input
-          type={showApiKey[keyId] ? 'text' : 'password'}
-          value={value}
-          onChange={(e) => update({ [field]: e.target.value } as Partial<SettingsType>)}
-          placeholder="sk-..."
-          style={{ ...inputStyle, paddingRight: 60 }}
-        />
-        <button
-          onClick={() => toggleKeyVisibility(keyId)}
-          style={{
-            position: 'absolute',
-            right: 10,
-            top: '50%',
-            transform: 'translateY(-50%)',
-            background: 'none',
-            border: 'none',
-            color: 'var(--text-tertiary)',
-            cursor: 'pointer',
-            fontSize: 12,
-            padding: '4px 6px',
-          }}
-        >
-          {showApiKey[keyId] ? 'Hide' : 'Show'}
-        </button>
-      </div>
-    </FieldRow>
-  );
+  ) => {
+    const test = testKeyState[keyId] || { status: 'idle' as const };
+    const provider = keyId as 'claude' | 'openai' | 'openrouter';
+    return (
+      <FieldRow label={label}>
+        <div style={{ position: 'relative' }}>
+          <input
+            type={showApiKey[keyId] ? 'text' : 'password'}
+            value={value}
+            onChange={(e) => {
+              update({ [field]: e.target.value } as Partial<SettingsType>);
+              // Any edit invalidates a prior test result.
+              if (test.status !== 'idle') {
+                setTestKeyState((s) => ({ ...s, [keyId]: { status: 'idle' } }));
+              }
+            }}
+            placeholder="sk-..."
+            style={{ ...inputStyle, paddingRight: 60 }}
+          />
+          <button
+            onClick={() => toggleKeyVisibility(keyId)}
+            style={{
+              position: 'absolute',
+              right: 10,
+              top: '50%',
+              transform: 'translateY(-50%)',
+              background: 'none',
+              border: 'none',
+              color: 'var(--text-tertiary)',
+              cursor: 'pointer',
+              fontSize: 12,
+              padding: '4px 6px',
+            }}
+          >
+            {showApiKey[keyId] ? 'Hide' : 'Show'}
+          </button>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8 }}>
+          <button
+            type="button"
+            onClick={() => runKeyTest(provider, keyId, value)}
+            disabled={!value || value.length < 5 || test.status === 'testing'}
+            style={{
+              padding: '6px 12px', borderRadius: 6, fontSize: 12, cursor: 'pointer',
+              background: 'var(--surface-muted)', color: 'var(--text-primary)',
+              border: '1px solid var(--panel-border)', fontFamily: 'inherit',
+              opacity: (!value || value.length < 5 || test.status === 'testing') ? 0.5 : 1,
+            }}
+          >
+            {test.status === 'testing' ? 'Testing…' : 'Test connection'}
+          </button>
+          {test.status === 'ok' && (
+            <span style={{ fontSize: 12, color: '#2f9e44' }}>✓ Key works.</span>
+          )}
+          {test.status === 'error' && (
+            <span style={{ fontSize: 12, color: '#c92a2a' }}>{test.message}</span>
+          )}
+        </div>
+      </FieldRow>
+    );
+  };
 
   const renderBaseUrlInput = (
     label: string,
