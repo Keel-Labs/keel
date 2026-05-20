@@ -41,6 +41,7 @@ interface CloudCapture {
   text: string;
   source: 'mobile' | 'share-sheet' | 'voice';
   device_id: string | null;
+  device_name: string | null;
   created_at: string;
 }
 
@@ -91,7 +92,12 @@ async function tick(deps: CloudDrainDeps): Promise<void> {
 }
 
 async function processOne(deps: CloudDrainDeps, row: CloudCapture): Promise<void> {
-  const deviceLabel = row.device_id ? `device ${row.device_id.slice(0, 6)}` : 'mobile';
+  // Prefer the human-readable device_name (e.g. "Medha's iPhone 17 Pro")
+  // sent by iOS; fall back to a hex slice of device_id, then to "mobile".
+  // On iOS 16+ without the user-assigned-device-name entitlement,
+  // device_name may just be "iPhone" — still more useful than hex.
+  const deviceLabel = row.device_name?.trim()
+    || (row.device_id ? `device ${row.device_id.slice(0, 6)}` : 'mobile');
   const result = await capture(row.text, deps.fileManager, deps.llmClient, deps.googleConfig, {
     routeTasksToIncoming: true,
     sourceLabel: deviceLabel,
