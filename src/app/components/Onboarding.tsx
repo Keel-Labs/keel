@@ -32,6 +32,8 @@ export default function Onboarding({ initialSettings, onComplete }: Props) {
   const [name, setName] = useState('');
   const [role, setRole] = useState('');
   const [showKey, setShowKey] = useState(false);
+  const [testKeyStatus, setTestKeyStatus] = useState<'idle' | 'testing' | 'ok' | 'error'>('idle');
+  const [testKeyError, setTestKeyError] = useState<string>('');
 
   // brain-path step state
   const defaultBrainPath = initialSettings.brainPath; // settings.ts already populates this with ~/Keel
@@ -221,6 +223,37 @@ export default function Onboarding({ initialSettings, onComplete }: Props) {
   const setApiKey = (value: string) => {
     if (!selectedProvider?.keyField) return;
     setSettings({ ...settings, [selectedProvider.keyField]: value });
+    // Any edit invalidates a prior test result.
+    setTestKeyStatus('idle');
+    setTestKeyError('');
+  };
+
+  const testApiKey = async () => {
+    const provider = settings.provider as 'claude' | 'openai' | 'openrouter' | 'ollama';
+    const key = getApiKey();
+    setTestKeyStatus('testing');
+    setTestKeyError('');
+    try {
+      const result = await window.keel.testLlmKey(provider, key);
+      if (result.ok) {
+        setTestKeyStatus('ok');
+        // Persist the working key so the test acts as both check and save.
+        await window.keel.saveSettings(settings);
+      } else {
+        setTestKeyStatus('error');
+        setTestKeyError(result.error || 'Key check failed.');
+      }
+    } catch (err) {
+      setTestKeyStatus('error');
+      setTestKeyError(err instanceof Error ? err.message : 'Key check failed.');
+    }
+  };
+
+  const skipApiKeyWithWarning = () => {
+    const ok = window.confirm(
+      "Without an API key, Keel can't talk to a model and chat won't work. You can add one later in Settings. Skip anyway?",
+    );
+    if (ok) next();
   };
 
   const containerStyle: React.CSSProperties = {
@@ -705,11 +738,17 @@ export default function Onboarding({ initialSettings, onComplete }: Props) {
           <>
             <h2 style={headingStyle}>Enter your API key</h2>
             <p style={subtextStyle}>
-              {settings.provider === 'claude' && 'Get your key from console.anthropic.com'}
-              {settings.provider === 'openai' && 'Get your key from platform.openai.com'}
-              {settings.provider === 'openrouter' && 'Get your key from openrouter.ai'}
+              {settings.provider === 'claude' && (
+                <>Get your key from <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)' }}>console.anthropic.com</a>. You'll also need to add billing credits before the key works.</>
+              )}
+              {settings.provider === 'openai' && (
+                <>Get your key from <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)' }}>platform.openai.com</a>. Note: a ChatGPT Plus subscription is separate from API access — you'll need to add billing credits at <a href="https://platform.openai.com/account/billing" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)' }}>platform.openai.com/account/billing</a>.</>
+              )}
+              {settings.provider === 'openrouter' && (
+                <>Get your key from <a href="https://openrouter.ai/keys" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)' }}>openrouter.ai/keys</a>. Most models require credits at <a href="https://openrouter.ai/credits" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)' }}>openrouter.ai/credits</a>.</>
+              )}
             </p>
-            <div style={{ position: 'relative', marginBottom: 24 }}>
+            <div style={{ position: 'relative', marginBottom: 12 }}>
               <input
                 type={showKey ? 'text' : 'password'}
                 value={getApiKey()}
@@ -728,20 +767,51 @@ export default function Onboarding({ initialSettings, onComplete }: Props) {
                 {showKey ? 'Hide' : 'Show'}
               </button>
             </div>
+
+            {/* Test-connection feedback */}
+            <div style={{ marginBottom: 20, minHeight: 24, textAlign: 'left', fontSize: 12, lineHeight: 1.5 }}>
+              {testKeyStatus === 'testing' && (
+                <span style={{ color: 'var(--text-muted)' }}>Checking key with provider…</span>
+              )}
+              {testKeyStatus === 'ok' && (
+                <span style={{ color: '#7dd87f' }}>✓ Key works. You're ready to continue.</span>
+              )}
+              {testKeyStatus === 'error' && (
+                <span style={{ color: '#ff8a8a' }}>{testKeyError}</span>
+              )}
+            </div>
+
             <div style={{ display: 'flex', justifyContent: 'center', gap: 12 }}>
               <button onClick={back} style={secondaryBtn}>Back</button>
-              <button onClick={next} style={{
-                ...primaryBtn,
-                opacity: getApiKey().length < 5 ? 0.5 : 1,
-              }}>
+              <button
+                onClick={testApiKey}
+                disabled={getApiKey().length < 5 || testKeyStatus === 'testing'}
+                style={{
+                  ...secondaryBtn,
+                  border: '1px solid var(--border-default)',
+                  opacity: (getApiKey().length < 5 || testKeyStatus === 'testing') ? 0.5 : 1,
+                }}
+              >
+                {testKeyStatus === 'testing' ? 'Testing…' : 'Test connection'}
+              </button>
+              <button
+                onClick={next}
+                disabled={testKeyStatus !== 'ok'}
+                style={{
+                  ...primaryBtn,
+                  opacity: testKeyStatus === 'ok' ? 1 : 0.5,
+                  cursor: testKeyStatus === 'ok' ? 'pointer' : 'not-allowed',
+                }}
+                title={testKeyStatus === 'ok' ? '' : 'Test the connection first.'}
+              >
                 Next
               </button>
             </div>
             <button
-              onClick={next}
+              onClick={skipApiKeyWithWarning}
               style={{ ...secondaryBtn, marginTop: 8, fontSize: 12 }}
             >
-              Skip for now
+              Skip for now (chat won't work until you add a key)
             </button>
           </>
         )}

@@ -129,6 +129,49 @@ export default function Message({ message, onOpenWikiPage }: Props) {
     );
   }
 
+  if (message.kind === 'error') {
+    const reportThis = () => {
+      window.keel?.reportBug?.({
+        title: `Chat error: ${message.content.slice(0, 80)}`,
+        error: message.content,
+      });
+    };
+    return (
+      <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 18, paddingRight: 88 }}>
+        <div style={{
+          background: 'rgba(255, 90, 90, 0.08)',
+          border: '1px solid rgba(255, 90, 90, 0.3)',
+          borderRadius: 12,
+          padding: '12px 16px',
+          maxWidth: 'min(680px, 100%)',
+          fontSize: 13,
+          lineHeight: 1.6,
+          color: 'var(--text-primary)',
+        }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+            <span aria-hidden="true" style={{ fontSize: 14, lineHeight: '20px' }}>⚠️</span>
+            <div style={{ flex: 1, whiteSpace: 'pre-wrap' }}>{message.content}</div>
+          </div>
+          <div style={{ marginTop: 10, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+            <button
+              type="button"
+              onClick={reportThis}
+              style={{
+                fontSize: 12, padding: '6px 12px', borderRadius: 6,
+                background: 'transparent', color: 'var(--text-muted)',
+                border: '1px solid var(--border-default)', cursor: 'pointer',
+                fontFamily: 'inherit',
+              }}
+              title="Opens a prefilled GitHub issue with your diagnostic info"
+            >
+              Report this issue
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 26, paddingRight: 88 }}>
       <div style={{ minWidth: 0, maxWidth: 'min(760px, 100%)' }}>

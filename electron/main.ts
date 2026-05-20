@@ -60,6 +60,7 @@ import { startInboxWatcher, stopInboxWatcher } from './inboxWatcher';
 import { synthesizeMeeting, formatMeetingNote, formatDailyLogEntry } from '../src/core/workflows/meetingTranscription';
 import { isWhisperAvailable, getWhisperBinary, downloadWhisperBinary, transcribeAudioBuffer } from './transcriptionService';
 import { initLogger, logger, buildDiagnostics } from './logger';
+import { describeLlmError } from '../src/core/llmErrors';
 import { autoUpdater } from 'electron-updater';
 import { isModelDownloaded, getAvailableModels, downloadModel } from './modelManager';
 import { autoCapture } from '../src/core/workflows/autoCapture';
@@ -1435,7 +1436,7 @@ function registerIpcHandlers() {
         }
         return;
       }
-      const message = error instanceof Error ? error.message : 'Unknown error';
+      const message = describeLlmError(error, settings.provider as any);
       if (!sender.isDestroyed()) {
         sender.send('keel:chat-stream-error', { requestId: streamRequestId, error: message });
       }
@@ -2736,7 +2737,7 @@ function registerIpcHandlers() {
         console.error('[openai-list-models] HTTP fallback failed:', fallbackErr);
         return {
           models: [],
-          error: fallbackErr instanceof Error ? fallbackErr.message : 'Could not fetch OpenAI models',
+          error: describeLlmError(fallbackErr, 'openai'),
         };
       }
     }
@@ -2763,7 +2764,7 @@ function registerIpcHandlers() {
       console.error('[openrouter-list-models] fetch failed:', err);
       return {
         models: [],
-        error: err instanceof Error ? err.message : 'Could not fetch OpenRouter models',
+        error: describeLlmError(err, 'openrouter'),
       };
     }
   });
@@ -2784,9 +2785,103 @@ function registerIpcHandlers() {
     } catch (err) {
       return {
         models: [],
-        error: err instanceof Error ? err.message : 'Could not connect to Ollama',
+        error: describeLlmError(err, 'ollama'),
       };
     }
+  });
+
+  ipcMain.handle('keel:test-llm-key', async (_event, provider: 'claude' | 'openai' | 'openrouter' | 'ollama', apiKey?: string) => {
+    // A small, cheap call against the provider to confirm the key works and
+    // the account has access. Called from onboarding before the user moves
+    // past the API-key step, so we catch "missing credits" / "bad key" up
+    // front instead of mid-chat.
+    try {
+      switch (provider) {
+        case 'claude': {
+          const key = apiKey || settings.anthropicApiKey;
+          if (!key) return { ok: false, error: 'Enter an API key first.' };
+          const response = await getElectronAwareFetch()('https://api.anthropic.com/v1/messages', {
+            method: 'POST',
+            headers: {
+              'x-api-key': key,
+              'anthropic-version': '2023-06-01',
+              'content-type': 'application/json',
+            },
+            body: JSON.stringify({
+              model: settings.claudeModel || 'claude-3-5-haiku-latest',
+              max_tokens: 1,
+              messages: [{ role: 'user', content: 'hi' }],
+            }),
+          });
+          if (response.ok) return { ok: true };
+          const body = await response.text();
+          const err: any = new Error(body.slice(0, 240) || `HTTP ${response.status}`);
+          err.status = response.status;
+          return { ok: false, error: describeLlmError(err, 'claude') };
+        }
+        case 'openai': {
+          const key = apiKey || settings.openaiApiKey;
+          if (!key) return { ok: false, error: 'Enter an API key first.' };
+          const response = await getElectronAwareFetch()('https://api.openai.com/v1/models', {
+            headers: { Authorization: `Bearer ${key}` },
+          });
+          if (response.ok) return { ok: true };
+          const body = await response.text();
+          const err: any = new Error(body.slice(0, 240) || `HTTP ${response.status}`);
+          err.status = response.status;
+          return { ok: false, error: describeLlmError(err, 'openai') };
+        }
+        case 'openrouter': {
+          const key = apiKey || settings.openrouterApiKey;
+          if (!key) return { ok: false, error: 'Enter an API key first.' };
+          const baseUrl = (settings.openrouterBaseUrl || 'https://openrouter.ai/api/v1').replace(/\/$/, '');
+          const response = await getElectronAwareFetch()(`${baseUrl}/auth/key`, {
+            headers: { Authorization: `Bearer ${key}` },
+          });
+          if (response.ok) return { ok: true };
+          const body = await response.text();
+          const err: any = new Error(body.slice(0, 240) || `HTTP ${response.status}`);
+          err.status = response.status;
+          return { ok: false, error: describeLlmError(err, 'openrouter') };
+        }
+        case 'ollama': {
+          const { Ollama } = await import('ollama');
+          const ollama = new Ollama();
+          await ollama.list();
+          return { ok: true };
+        }
+        default:
+          return { ok: false, error: 'Unknown provider.' };
+      }
+    } catch (err) {
+      return { ok: false, error: describeLlmError(err, provider) };
+    }
+  });
+
+  ipcMain.handle('keel:report-bug', async (_event, context?: { title?: string; error?: string }) => {
+    // Build a prefilled GitHub issue URL. Body includes buildDiagnostics()
+    // truncated to keep the URL under ~7KB (browsers/servers vary, but
+    // GitHub itself accepts ~8KB query strings reliably).
+    const { shell } = await import('electron');
+
+    const diagnostics = buildDiagnostics();
+    const errorBlock = context?.error
+      ? `\n### Error\n\n\`\`\`\n${context.error}\n\`\`\`\n`
+      : '';
+    const header = '<!-- Auto-generated from Keel desktop. Please describe what you were doing above this line. -->\n\n';
+    const fullBody = `${header}### What happened?\n\n(describe)\n${errorBlock}\n${diagnostics}\n`;
+
+    const MAX_BODY = 6500;
+    let body = fullBody;
+    if (body.length > MAX_BODY) {
+      const note = '\n\n_(Log tail truncated to fit URL — open Settings → Share feedback → Copy diagnostic info for the full version.)_\n';
+      body = body.slice(0, MAX_BODY - note.length) + note;
+    }
+
+    const title = context?.title || 'Bug report from desktop app';
+    const url = `https://github.com/Keel-Labs/keel/issues/new?title=${encodeURIComponent(title)}&body=${encodeURIComponent(body)}&labels=${encodeURIComponent('bug,from-app')}`;
+    await shell.openExternal(url);
+    return { ok: true };
   });
 
   // --- Cloud Migration ---
