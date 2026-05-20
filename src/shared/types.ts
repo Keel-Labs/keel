@@ -462,6 +462,8 @@ export type IpcChannels =
   | 'keel:openai-list-models'
   | 'keel:openrouter-list-models'
   | 'keel:ollama-list-models'
+  | 'keel:test-llm-key'
+  | 'keel:report-bug'
   | 'keel:list-tasks'
   | 'keel:toggle-task'
   | 'keel:move-task'
@@ -683,6 +685,8 @@ export interface KeelAPI {
   openrouterListModels: () => Promise<OpenRouterListResult>;
   // Ollama
   ollamaListModels: () => Promise<OllamaListResult>;
+  testLlmKey: (provider: 'claude' | 'openai' | 'openrouter' | 'ollama', apiKey?: string) => Promise<{ ok: true } | { ok: false; error: string }>;
+  reportBug: (context?: { title?: string; error?: string }) => Promise<{ ok: true }>;
   // Activity
   getRecentActivity: (limit?: number) => Promise<ActivityLogEntry[]>;
   fetchWeather: () => Promise<WeatherInfo | null>;

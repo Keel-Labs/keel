@@ -890,6 +890,20 @@ export default function Settings({ onBack, navigation, onSettingsChange }: Props
 
           <button
             type="button"
+            onClick={() => window.keel?.reportBug?.()}
+            style={{ ...linkButtonStyle, marginTop: 10 }}
+          >
+            <span>
+              <strong style={{ color: 'var(--text-primary)' }}>Report a bug on GitHub</strong>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
+                Opens a prefilled GitHub issue with your diagnostic info attached. Review before posting — it stays on your machine until you submit.
+              </div>
+            </span>
+            <span style={{ color: 'var(--text-tertiary)' }}>→</span>
+          </button>
+
+          <button
+            type="button"
             onClick={copyDiagnostics}
             style={{ ...linkButtonStyle, marginTop: 10 }}
           >

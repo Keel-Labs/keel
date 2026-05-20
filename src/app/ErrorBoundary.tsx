@@ -32,18 +32,32 @@ export class ErrorBoundary extends React.Component<{ children: React.ReactNode }
       marginTop: 20, padding: '10px 18px', borderRadius: 10, border: 'none',
       background: 'var(--accent)', color: 'white', fontSize: 14, fontWeight: 600, cursor: 'pointer',
     };
+    const secondaryBtn: React.CSSProperties = {
+      marginTop: 12, padding: '8px 14px', borderRadius: 10,
+      background: 'transparent', color: 'var(--text-muted)',
+      border: '1px solid var(--border-default)', fontSize: 13, cursor: 'pointer',
+      fontFamily: 'inherit',
+    };
+
+    const err = this.state.error;
+    const reportThis = () => {
+      window.keel?.reportBug?.({
+        title: `Renderer crash: ${err.message.slice(0, 80)}`,
+        error: `${err.message}\n\n${err.stack || ''}`,
+      });
+    };
 
     return (
       <div style={wrap}>
         <div style={{ fontSize: 18, fontWeight: 700 }}>Something went wrong.</div>
         <div style={muted}>
-          Keel hit an unexpected error and the window needs to be reloaded. If this keeps happening, open
-          Settings → Help &amp; Feedback → Copy diagnostic info, and paste it into a GitHub issue.
+          Keel hit an unexpected error and the window needs to be reloaded.
         </div>
         <div style={{ ...muted, fontFamily: 'monospace', fontSize: 12, opacity: 0.7 }}>
-          {this.state.error.message}
+          {err.message}
         </div>
         <button type="button" style={btn} onClick={() => window.location.reload()}>Reload</button>
+        <button type="button" style={secondaryBtn} onClick={reportThis}>Report this issue</button>
       </div>
     );
   }
