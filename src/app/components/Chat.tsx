@@ -1124,7 +1124,7 @@ export default function Chat({
 
         const finalMessages = [
           ...stream.baseMessages,
-          { role: 'assistant' as const, content: error, timestamp: Date.now() },
+          { role: 'assistant' as const, content: error, timestamp: Date.now(), kind: 'error' as const },
         ];
         sessionMessagesCacheRef.current.set(targetSessionId, finalMessages);
         sessionMetadataCacheRef.current.set(targetSessionId, stream.sessionMetadata);
