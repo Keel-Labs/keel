@@ -3378,7 +3378,16 @@ app.whenReady().then(async () => {
   // doesn't have us re-create it next launch. Populates daily-log/<date>.md
   // each night at 10pm so the mobile app's "Today's brief" surface has
   // content by next morning.
-  if (settings.defaultEodScheduled !== true) {
+  //
+  // We also check the DB directly for an existing job with the same name —
+  // settings.json and the SQLite DB live in different paths (the flag is in
+  // KEEL_CONFIG_DIR, jobs are at brainPath/.config/keel.db), and they can
+  // drift apart if a user resets settings while keeping their brain. Without
+  // this check, every reset would append another duplicate row.
+  const alreadySeeded =
+    settings.defaultEodScheduled === true
+    || listScheduledJobs(settings.brainPath).some((j) => j.name === 'End-of-day brief');
+  if (!alreadySeeded) {
     try {
       upsertScheduledJob(settings.brainPath, {
         name: 'End-of-day brief',
