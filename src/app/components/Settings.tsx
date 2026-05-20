@@ -108,7 +108,7 @@ const SECTION_META: Record<SettingsSectionId, { title: string; description: stri
   },
   'keel-cloud': {
     title: 'Keel Cloud',
-    description: 'Push reminders and fast capture queue across your devices. Opt-in.',
+    description: 'Default capture transport. Sign in to receive captures from your phone within seconds and to get push reminders. File-sync transport lives under Advanced.',
   },
   'help-feedback': {
     title: 'Help & Feedback',

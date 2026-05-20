@@ -1,6 +1,13 @@
 // Settings → Keel Cloud panel.
 //
-// Three states the user can be in:
+// As of v0.4, Cloud is the default transport for new installs — this
+// panel leads with the account card and tucks the "use my own file
+// sync instead" toggle inside a collapsed Advanced disclosure. The
+// underlying mode flag is `settings.cloudEnabled` (true = Cloud, false
+// = local file sync). Existing users who had `cloudEnabled: false`
+// persisted are not migrated; their saved value wins.
+//
+// Account states the user can be in:
 //   1. signed out      — explainer + email form
 //   2. waiting-link    — "Check your email" with cancel + spinner
 //   3. signed in       — email + sign-out + API base override
@@ -10,7 +17,7 @@
 // signed-in (or error/cancelled), and we react to those.
 
 import { useEffect, useRef, useState } from 'react';
-import type { CloudSignInStatusEvent } from '../../shared/types';
+import type { CloudSignInStatusEvent, Settings } from '../../shared/types';
 
 type Stage = 'signed-out' | 'waiting-link' | 'signed-in';
 
@@ -27,6 +34,15 @@ export default function KeelCloudPanel() {
   const [email, setEmail] = useState('');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ tone: 'info' | 'error'; text: string } | null>(null);
+
+  // Mirror of `settings.cloudEnabled` for the Advanced toggle. We keep
+  // a local copy so the disclosure feels snappy, then write through via
+  // `saveSettings` on flip. We DON'T fan this state out elsewhere —
+  // any consumer that cares (main process, capture loop) re-reads from
+  // settings.json after the save.
+  const [settings, setSettings] = useState<Settings | null>(null);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [transportBusy, setTransportBusy] = useState(false);
 
   // Keep the latest email handy for status-event handlers without
   // re-binding the subscription on every keystroke.
@@ -48,6 +64,16 @@ export default function KeelCloudPanel() {
       }
     };
     void refresh();
+    // Pull the full settings once so the Advanced toggle has something
+    // to render against. `getSettings` is cheap (reads a small JSON
+    // file in main) and we don't subscribe to changes — the panel is
+    // the only place this toggle is mutated.
+    void (async () => {
+      try {
+        const s = await window.keel.getSettings();
+        if (!cancelled) setSettings(s);
+      } catch { /* main not ready yet */ }
+    })();
     const offSignedOut = window.keel.onCloudSignedOut(() => {
       setStage('signed-out');
       setMessage({ tone: 'info', text: 'Your session expired. Sign in again to keep using Keel Cloud.' });
@@ -127,11 +153,30 @@ export default function KeelCloudPanel() {
   // handlers that want it.
   void emailRef;
 
+  const setUseFileSync = async (useFileSync: boolean) => {
+    if (!settings) return;
+    const next: Settings = { ...settings, cloudEnabled: !useFileSync };
+    setTransportBusy(true);
+    setSettings(next); // optimistic — flips the toggle immediately
+    try {
+      await window.keel.saveSettings(next);
+    } catch (err) {
+      // Roll back and surface
+      setSettings(settings);
+      setMessage({ tone: 'error', text: err instanceof Error ? err.message : 'Could not switch transport' });
+    } finally {
+      setTransportBusy(false);
+    }
+  };
+
+  const useFileSync = settings ? !settings.cloudEnabled : false;
+  const brainPath = settings?.brainPath ?? '';
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       <SectionCard
         title="Your account"
-        description="Keel Cloud is the optional paid tier. The free local app works without an account."
+        description="Captures send through Keel Cloud by default and arrive on your Mac in seconds. Sign in to connect this device to your account."
       >
         {stage === 'signed-out' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -201,6 +246,67 @@ export default function KeelCloudPanel() {
             {message.text}
           </div>
         )}
+      </SectionCard>
+
+      <SectionCard
+        title="Workspace folder"
+        description="Your Mac reads and writes Keel files here. Captures from this device land in your account regardless; the workspace folder is what the desktop app itself watches and serves to the Read tab."
+      >
+        {brainPath ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <code style={{
+              fontSize: 13,
+              padding: '6px 10px',
+              borderRadius: 6,
+              background: 'var(--surface-muted)',
+              color: 'var(--text-primary)',
+              wordBreak: 'break-all',
+            }}>{brainPath}</code>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+              Change in <strong>Personal Settings → Workspace</strong>.
+            </div>
+          </div>
+        ) : (
+          <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+            Workspace not set yet. Pick a folder in Personal Settings.
+          </div>
+        )}
+      </SectionCard>
+
+      <SectionCard title="Advanced">
+        <details
+          open={advancedOpen}
+          onToggle={(e) => setAdvancedOpen((e.target as HTMLDetailsElement).open)}
+          style={{ fontSize: 14 }}
+        >
+          <summary style={{
+            cursor: 'pointer',
+            fontWeight: 500,
+            color: 'var(--text-primary)',
+            padding: '4px 0',
+          }}>
+            Capture transport
+          </summary>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 12 }}>
+            <label style={{ display: 'flex', gap: 12, alignItems: 'flex-start', cursor: settings ? 'pointer' : 'default' }}>
+              <input
+                type="checkbox"
+                checked={useFileSync}
+                disabled={!settings || transportBusy}
+                onChange={(e) => void setUseFileSync(e.target.checked)}
+                style={{ marginTop: 3 }}
+              />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>
+                  Use my own file sync instead of Keel Cloud for captures
+                </span>
+                <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>
+                  Captures from your phone land in your workspace folder via iCloud / Dropbox / etc. — your Mac picks them up locally and no bytes touch Keel's server. Reminders and push won't be available.
+                </span>
+              </div>
+            </label>
+          </div>
+        </details>
       </SectionCard>
 
       {/* The "API endpoint" override that used to live here was useful

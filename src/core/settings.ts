@@ -50,7 +50,13 @@ export function getDefaultSettings(): Settings {
     timezone: '',
     mobileInboxEnabled: true,
     defaultEodScheduled: false,
-    cloudEnabled: false,
+    // Default for NEW installs (no settings.json yet) is Cloud.
+    // Existing users have `cloudEnabled` already persisted in their
+    // settings.json from a prior save, so flipping this default does
+    // not silently migrate anyone — `normalizeSettings` preserves their
+    // explicit value. Local stays available behind the Advanced
+    // disclosure in the Keel Cloud settings panel.
+    cloudEnabled: true,
     cloudUserEmail: '',
     cloudApiBase: 'https://api.keel-labs.org',
   };
