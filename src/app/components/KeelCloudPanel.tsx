@@ -89,7 +89,10 @@ export default function KeelCloudPanel() {
           break;
         case 'signed-in':
           setStage('signed-in');
-          setMessage({ tone: 'info', text: `Signed in as ${payload.email}.` });
+          // The signed-in card already shows "Signed in as <email>"
+          // prominently — a status pill underneath repeating the same
+          // line is noise. Clear any prior message instead.
+          setMessage(null);
           void refresh();
           break;
         case 'cancelled':
