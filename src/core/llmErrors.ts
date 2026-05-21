@@ -19,9 +19,27 @@ function extractShape(err: unknown): ErrorShape {
       typeof e.status === 'number' ? (e.status as number)
       : typeof e.statusCode === 'number' ? (e.statusCode as number)
       : undefined;
-    const message =
-      typeof e.message === 'string' ? (e.message as string)
-      : String(err);
+
+    // Provider SDKs wrap their server-side error inside nested .error objects.
+    // OpenAI: err.error.message ; Anthropic: err.error.error.message.
+    // Pull those out so keyword detection sees the real reason, not just a
+    // generic "Connection error" / "fetch failed" outer string.
+    const parts: string[] = [];
+    if (typeof e.message === 'string') parts.push(e.message);
+    const inner1 = e.error as Record<string, unknown> | undefined;
+    if (inner1 && typeof inner1 === 'object') {
+      if (typeof inner1.message === 'string') parts.push(inner1.message);
+      const inner2 = inner1.error as Record<string, unknown> | undefined;
+      if (inner2 && typeof inner2 === 'object' && typeof inner2.message === 'string') {
+        parts.push(inner2.message);
+      }
+    }
+    const cause = e.cause as Record<string, unknown> | undefined;
+    if (cause && typeof cause === 'object' && typeof cause.message === 'string') {
+      parts.push(cause.message);
+    }
+    const message = parts.length > 0 ? parts.join(' | ') : String(err);
+
     const code = typeof e.code === 'string' ? (e.code as string) : undefined;
     const name = typeof e.name === 'string' ? (e.name as string) : undefined;
     return { status, message, code, name };
@@ -53,10 +71,41 @@ export function describeLlmError(err: unknown, provider?: LlmProvider): string {
   const label = providerLabel(provider);
   const billing = billingUrl(provider);
 
+  // Account/quota checks run BEFORE the network check. SDKs sometimes wrap
+  // server-returned errors in an outer "fetch failed" / "Connection error"
+  // string, so we need to inspect the inner message (which extractShape
+  // already concatenated) to avoid misclassifying a credit error as a
+  // network blip.
+  const isCredit =
+    status === 402
+    || /insufficient[_\s-]?quota|exceeded your current quota|credit balance|low balance|out of (credits|funds)|buy credits|top[\s-]?up|billing|payment required|no credits|credit[s]?\b/i.test(message);
+
+  const isAuth =
+    status === 401
+    || /invalid[_\s-]api[_\s-]key|incorrect api key|unauthor|authentication.*fail/i.test(message);
+
+  if (isCredit) {
+    const where = billing ? ` Add credits at ${billing}.` : '';
+    return `Your ${label} account is out of credits.${where}`;
+  }
+
+  if (isAuth) {
+    return `${label} rejected your API key. Open Settings and double-check the key, or generate a new one.`;
+  }
+
+  if (status === 403 || /forbid|permission/i.test(message)) {
+    return `${label} refused the request (403). The key may not have access to this model, or your account may be restricted.`;
+  }
+
+  if (status === 429 || /rate[_\s-]?limit|too many requests/i.test(message)) {
+    return `${label} rate-limited the request. Wait a moment and try again, or switch models in Settings.`;
+  }
+
   // Network-level failures — these are what surface as "Fetch failed" in the
-  // browser/undici default error message.
+  // browser/undici default error message. Checked AFTER credit/auth so a
+  // wrapped server error isn't lost to a generic network message.
   const isNetwork =
-    /fetch failed|ENOTFOUND|ECONNREFUSED|ECONNRESET|ETIMEDOUT|EAI_AGAIN|network|socket hang up/i.test(message)
+    /fetch failed|ENOTFOUND|ECONNREFUSED|ECONNRESET|ETIMEDOUT|EAI_AGAIN|network|socket hang up|connection error/i.test(message)
     || name === 'FetchError'
     || code === 'ENOTFOUND' || code === 'ECONNREFUSED' || code === 'ECONNRESET'
     || code === 'ETIMEDOUT' || code === 'EAI_AGAIN';
@@ -72,28 +121,6 @@ export function describeLlmError(err: unknown, provider?: LlmProvider): string {
   // Certificate trust issues — common on locked-down corporate networks.
   if (/certificate|self-signed|ERR_CERT|issuer/i.test(message)) {
     return `Network certificate validation failed while contacting ${label}. If you're on a corporate network, install your organization's root certificate, or switch to Ollama for offline use.`;
-  }
-
-  // Auth & quota — try HTTP status first, then fall back to message keywords
-  // (some SDKs unwrap the status and only expose a string).
-  if (status === 401 || /invalid[_\s-]api[_\s-]key|incorrect api key|unauthor/i.test(message)) {
-    return `${label} rejected your API key. Open Settings and double-check the key, or generate a new one.`;
-  }
-
-  if (status === 403 || /forbid|permission/i.test(message)) {
-    return `${label} refused the request (403). The key may not have access to this model, or your account may be restricted.`;
-  }
-
-  if (
-    status === 402
-    || /insufficient[_\s-]?quota|exceeded your current quota|credit[s]?\b|billing|payment required|no credits/i.test(message)
-  ) {
-    const where = billing ? ` Add credits at ${billing}.` : '';
-    return `Your ${label} account is out of credits.${where}`;
-  }
-
-  if (status === 429 || /rate[_\s-]?limit|too many requests/i.test(message)) {
-    return `${label} rate-limited the request. Wait a moment and try again, or switch models in Settings.`;
   }
 
   if (status === 404 || /model.*(not found|does not exist|unknown)/i.test(message)) {
