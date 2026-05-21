@@ -3225,7 +3225,8 @@ function maybeStartCloudDrain(): void {
       }
     },
     onRouted: (event) => {
-      // Pipe through the same toast/badge UI the file-sync watcher uses.
+      // 1. In-app toast — pipe through the same UI the file-sync
+      //    watcher uses. Visible only when a Keel window is foregrounded.
       for (const win of BrowserWindow.getAllWindows()) {
         if (!win.isDestroyed()) {
           win.webContents.send('keel:mobile-capture-routed', {
@@ -3234,6 +3235,31 @@ function maybeStartCloudDrain(): void {
             device: event.device,
             routedTo: event.routedTo,
           });
+        }
+      }
+
+      // 2. Native macOS notification — only when the user can't already
+      //    see the toast. Mirrors the file-sync watcher's behaviour so
+      //    cloud-drained captures don't silently disappear when the Mac
+      //    is off-focus. Without this, users with the desktop in the
+      //    background see no signal that a capture arrived.
+      const aKeelWindowIsFocused = BrowserWindow.getFocusedWindow() !== null;
+      if (Notification.isSupported() && !aKeelWindowIsFocused) {
+        const title = `Captured from ${event.device}`;
+        const body = event.routedTo || 'Filed to inbox.';
+        try {
+          const notif = new Notification({ title, body, silent: false });
+          notif.on('click', () => {
+            const win = BrowserWindow.getAllWindows()[0];
+            if (win) {
+              if (win.isMinimized()) win.restore();
+              win.focus();
+              win.webContents.send('keel:open-view', { view: 'inbox' });
+            }
+          });
+          notif.show();
+        } catch (err) {
+          logger.error('[cloud] notification failed:', err);
         }
       }
     },
