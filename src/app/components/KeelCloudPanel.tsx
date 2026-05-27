@@ -172,6 +172,19 @@ export default function KeelCloudPanel() {
     }
   };
 
+  const setReminderPushEnabled = async (enabled: boolean) => {
+    if (!settings) return;
+    const previous = settings;
+    const next: Settings = { ...settings, reminderPushEnabled: enabled };
+    setSettings(next); // optimistic
+    try {
+      await window.keel.saveSettings(next);
+    } catch (err) {
+      setSettings(previous);
+      setMessage({ tone: 'error', text: err instanceof Error ? err.message : 'Could not update setting' });
+    }
+  };
+
   const useFileSync = settings ? !settings.cloudEnabled : false;
   const brainPath = settings?.brainPath ?? '';
 
@@ -232,6 +245,24 @@ export default function KeelCloudPanel() {
             <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
               Captures from your phone arrive within 30 seconds. Reminders fire as push notifications even when this Mac is asleep.
             </div>
+            {settings && (
+              <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', cursor: 'pointer', marginTop: 6 }}>
+                <input
+                  type="checkbox"
+                  checked={settings.reminderPushEnabled}
+                  onChange={(e) => void setReminderPushEnabled(e.target.checked)}
+                  style={{ marginTop: 3 }}
+                />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <span style={{ color: 'var(--text-primary)', fontSize: 14 }}>
+                    Also send reminders to my phone
+                  </span>
+                  <span style={{ color: 'var(--text-secondary)', fontSize: 12 }}>
+                    Push notification fires in parallel with the Mac banner. Turn off to keep reminders Mac-only.
+                  </span>
+                </div>
+              </label>
+            )}
             <div>
               <button onClick={signOut} disabled={busy} style={buttonSecondary}>
                 {busy ? 'Signing out…' : 'Sign out'}

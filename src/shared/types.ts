@@ -106,6 +106,18 @@ export interface Settings {
    * overridable to `http://localhost:8080` (or staging) for dev.
    */
   cloudApiBase: string;
+  /**
+   * When true (and Cloud is enabled + signed in), locally-fired
+   * reminders are mirrored to the cloud so a push notification fans
+   * out to the user's phone in parallel with the desktop banner.
+   * The local reminder always fires — this flag only controls the
+   * cloud mirror call.
+   *
+   * Default true for Cloud users; the local-mode user never sees this
+   * setting fire either way because the mirror is gated on
+   * `cloudEnabled` first.
+   */
+  reminderPushEnabled: boolean;
 }
 
 /**
