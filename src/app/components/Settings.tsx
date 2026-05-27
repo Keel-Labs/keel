@@ -13,6 +13,13 @@ import { applyTheme } from '../theme';
 import { BUILT_IN_PERSONALITIES } from '../../core/personalities';
 import { BetaBadge } from './BetaBadge';
 import KeelCloudPanel from './KeelCloudPanel';
+import { GoogleProviderSwitchModal } from './GoogleProviderSwitchModal';
+import {
+  canConnectGoogle,
+  canSwitchProvider,
+  isGoogleCompatible,
+  type Provider as PolicyProvider,
+} from '../../core/googlePolicy';
 
 const isElectron = typeof window !== 'undefined' && !!(window as any).keelMigrate;
 
@@ -215,6 +222,12 @@ export default function Settings({ onBack, navigation, onSettingsChange }: Props
   const [googleConfigured, setGoogleConfigured] = useState(false);
   const [googleSyncing, setGoogleSyncing] = useState(false);
   const [googleMessage, setGoogleMessage] = useState('');
+  // Limited Use gate — shown when user clicks Connect Google while
+  // on a non-allowlisted provider (today: OpenRouter).
+  const [showGoogleProviderSwitch, setShowGoogleProviderSwitch] = useState(false);
+  // Symmetric guard — shown when user tries to switch to a
+  // non-allowlisted provider while Google is connected.
+  const [pendingIncompatibleProvider, setPendingIncompatibleProvider] = useState<PolicyProvider | null>(null);
   const [xStatus, setXStatus] = useState<XStatus | null>(null);
   const [xMessage, setXMessage] = useState('');
   const [xBusy, setXBusy] = useState(false);
@@ -1128,6 +1141,12 @@ export default function Settings({ onBack, navigation, onSettingsChange }: Props
                 value={settings.provider}
                 onChange={(e) => {
                   const val = e.target.value as SettingsType['provider'];
+                  // Symmetric Limited Use guard — see src/core/googlePolicy.ts.
+                  const gate = canSwitchProvider(val, googleConnected);
+                  if (!gate.ok) {
+                    setPendingIncompatibleProvider(val);
+                    return; // don't apply until user confirms in modal
+                  }
                   update({ provider: val });
                   if (val === 'ollama') fetchOllamaModels();
                 }}
@@ -1137,6 +1156,17 @@ export default function Settings({ onBack, navigation, onSettingsChange }: Props
                   <option key={p.value} value={p.value}>{p.label}</option>
                 ))}
               </select>
+              {/* Helper row — only shown when the chosen provider can't be combined with Google. */}
+              {!isGoogleCompatible(settings.provider as PolicyProvider) && (
+                <div style={{
+                  marginTop: 8, padding: '8px 10px', borderRadius: 6,
+                  background: 'rgba(245, 158, 11, 0.08)',
+                  border: '1px solid rgba(245, 158, 11, 0.2)',
+                  color: 'var(--text-muted)', fontSize: 12, lineHeight: 1.5,
+                }}>
+                  {providerLabel(settings.provider)} can't be used with Google Calendar or Docs. Google's API policy doesn't allow data to flow to providers whose terms permit training. Switch to Claude, OpenAI, or Ollama if you want to connect Google.
+                </div>
+              )}
             </FieldRow>
 
             {settings.provider !== 'ollama' && (
@@ -1334,6 +1364,14 @@ export default function Settings({ onBack, navigation, onSettingsChange }: Props
                         <button
                           onClick={async () => {
                             setGoogleMessage('');
+                            // Limited Use policy gate — see src/core/googlePolicy.ts.
+                            // Open the switch-provider modal instead of OAuth if
+                            // the active provider isn't on the allowlist.
+                            const gate = canConnectGoogle(settings.provider);
+                            if (!gate.ok) {
+                              setShowGoogleProviderSwitch(true);
+                              return;
+                            }
                             try {
                               await window.keel.googleConnect();
                               setGoogleConnected(true);
@@ -1498,6 +1536,40 @@ export default function Settings({ onBack, navigation, onSettingsChange }: Props
 
   return (
     <div style={{ flex: 1, height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+      {showGoogleProviderSwitch && settings && (
+        <GoogleProviderSwitchModal
+          settings={settings}
+          onCancel={() => setShowGoogleProviderSwitch(false)}
+          onSwitchAndConnect={async (next) => {
+            const nextSettings = { ...settings, provider: next };
+            setSettings(nextSettings);
+            latestSettingsRef.current = nextSettings;
+            await persistSettings(nextSettings);
+            setShowGoogleProviderSwitch(false);
+            try {
+              await window.keel.googleConnect();
+              setGoogleConnected(true);
+              setGoogleMessage('Connected successfully.');
+            } catch (err) {
+              setGoogleMessage(err instanceof Error ? err.message : 'Connection failed');
+            }
+          }}
+        />
+      )}
+      {pendingIncompatibleProvider && settings && (
+        <GoogleProviderSwitchModal
+          settings={settings}
+          mode="disconnect-google"
+          targetProvider={pendingIncompatibleProvider}
+          onCancel={() => setPendingIncompatibleProvider(null)}
+          onSwitchAndConnect={async (target) => {
+            try { await window.keel.googleDisconnect(); } catch { /* ignore */ }
+            setGoogleConnected(false);
+            update({ provider: target });
+            setPendingIncompatibleProvider(null);
+          }}
+        />
+      )}
       <div style={{
         padding: '16px 24px',
         borderBottom: '1px solid var(--border-default)',
