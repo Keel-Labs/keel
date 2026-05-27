@@ -13,6 +13,7 @@ import KnowledgeBrowser from './components/KnowledgeBrowser';
 import Dashboard from './components/Dashboard';
 import ChatsIndex from './components/ChatsIndex';
 import MeetingRecorder from './components/MeetingRecorder';
+import { GoogleConflictResolveModal } from './components/GoogleConflictResolveModal';
 import type { Settings as SettingsType } from '../shared/types';
 import { applyTheme } from './theme';
 import {
@@ -84,6 +85,10 @@ export default function App() {
   const [wikiCommand, setWikiCommand] = useState<WikiCommand | null>(null);
   const [showOnboarding, setShowOnboarding] = useState<boolean | null>(null);
   const [initialSettings, setInitialSettings] = useState<SettingsType | null>(null);
+  // Set by the launch-time Limited Use check when a pre-policy install
+  // has both Google connected and a non-compatible LLM provider.
+  // Renders a blocking modal forcing the user to choose which to keep.
+  const [forceResolveGoogleConflict, setForceResolveGoogleConflict] = useState(false);
   const [settingsNavigation, setSettingsNavigation] = useState<SettingsNavigationState>({});
   const [autoSidebarCollapsed, setAutoSidebarCollapsed] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
@@ -169,8 +174,23 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    window.keel.getSettings().then((settings) => {
+    window.keel.getSettings().then(async (settings) => {
       applyTheme(settings.theme);
+      // Limited Use grandfather check — if a pre-policy install has
+      // OpenRouter selected AND Google connected, force the user to
+      // pick which to keep before the app proceeds. With ~1 known
+      // install at the time we shipped this, doing the clean version
+      // (force-resolve) is cheaper than maintaining a grandfathered
+      // path. See src/core/googlePolicy.ts.
+      try {
+        const { isGoogleCompatible } = await import('../core/googlePolicy');
+        if (!isGoogleCompatible(settings.provider)) {
+          const g = await window.keel.googleStatus().catch(() => ({ connected: false }));
+          if (g.connected) {
+            setForceResolveGoogleConflict(true);
+          }
+        }
+      } catch { /* policy module unavailable — proceed */ }
       setInitialSettings(settings);
       const forceOnboarding = import.meta.env.DEV
         ? consumeForceOnboardingFlag(window.localStorage)
@@ -530,6 +550,15 @@ export default function App() {
 
   return (
     <div className="desktop-shell">
+      {forceResolveGoogleConflict && initialSettings && (
+        <GoogleConflictResolveModal
+          settings={initialSettings}
+          onResolved={(next) => {
+            setInitialSettings(next);
+            setForceResolveGoogleConflict(false);
+          }}
+        />
+      )}
       <MobileCaptureToast onOpenInbox={() => handleDesktopNavigation('inbox')} />
       <DesktopTopBar
         activeMode={desktopMode}

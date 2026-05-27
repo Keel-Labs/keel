@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import type { ScanFolderResult, Settings } from '../../shared/types';
 import keelLogoUrl from '../assets/keel-logo-transparent.png';
 import { BetaBadge } from './BetaBadge';
+import { isGoogleCompatible } from '../../core/googlePolicy';
 
 const PROVIDERS = [
   { value: 'claude' as const, label: 'Claude', description: 'Anthropic — best reasoning & writing', tag: 'API key', keyField: 'anthropicApiKey' as const, signupUrl: 'https://console.anthropic.com/' },
@@ -692,7 +693,7 @@ export default function Onboarding({ initialSettings, onComplete }: Props) {
                       style={{ accentColor: 'var(--accent)', marginTop: 3 }}
                     />
                     <div style={{ flex: 1 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2, flexWrap: 'wrap' }}>
                         <span style={{ fontSize: 'var(--text-base)', fontWeight: 500, color: 'var(--text-primary)' }}>{p.label}</span>
                         <span style={{
                           fontSize: 10, fontWeight: 600, letterSpacing: '0.04em',
@@ -703,6 +704,19 @@ export default function Onboarding({ initialSettings, onComplete }: Props) {
                         }}>
                           {p.tag}
                         </span>
+                        {/* Limited Use compatibility hint — see src/core/googlePolicy.ts */}
+                        {!isGoogleCompatible(p.value) && (
+                          <span title="Google's API policy doesn't allow data to flow to this provider. You can still use it, but you won't be able to connect Google Calendar or Docs."
+                            style={{
+                              fontSize: 10, fontWeight: 600, letterSpacing: '0.04em',
+                              textTransform: 'uppercase', padding: '2px 6px', borderRadius: 4,
+                              background: 'rgba(245, 158, 11, 0.12)',
+                              color: '#fbbf24',
+                              border: '1px solid rgba(245, 158, 11, 0.22)',
+                            }}>
+                            No Google
+                          </span>
+                        )}
                       </div>
                       <div style={{ fontSize: 12, color: 'var(--text-subtle)', lineHeight: 1.5 }}>
                         {p.description}
