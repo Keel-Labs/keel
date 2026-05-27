@@ -2483,7 +2483,10 @@ function registerIpcHandlers() {
     // Mirror to Keel Cloud so the cron worker can fire a push even
     // when this Mac is asleep. Failures are logged but don't undo
     // the local insert — local-only reminders remain a valid fallback.
-    if (settings.cloudEnabled && cloudTokenStore.hasValidSession()) {
+    // `reminderPushEnabled` lets the user opt out without dropping
+    // Cloud entirely (capture sync stays on; only the phone push is
+    // suppressed).
+    if (settings.cloudEnabled && settings.reminderPushEnabled && cloudTokenStore.hasValidSession()) {
       void mirrorReminder({
         baseUrl: settings.cloudApiBase,
         message,

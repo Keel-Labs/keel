@@ -26,6 +26,7 @@ function makeSettings(overrides: Partial<Settings> = {}): Settings {
     cloudEnabled: false,
     cloudUserEmail: '',
     cloudApiBase: 'https://api.keel-labs.org',
+    reminderPushEnabled: true,
     ...overrides,
   };
 }

@@ -59,6 +59,7 @@ export function getDefaultSettings(): Settings {
     cloudEnabled: true,
     cloudUserEmail: '',
     cloudApiBase: 'https://api.keel-labs.org',
+    reminderPushEnabled: true,
   };
 }
 
