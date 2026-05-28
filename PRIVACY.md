@@ -2,7 +2,7 @@
 
 **Canonical URL:** https://keel-labs.org/privacy — that is the authoritative version. This file is mirrored in the repository for convenience; if the two ever diverge, the hosted version wins.
 
-**Last Updated:** April 2026
+**Last Updated:** May 2026
 
 ## Overview
 
@@ -79,6 +79,18 @@ If you connect your Google account:
 - **Google Docs:** Keel can read docs you share and export Keel's outputs to Google Docs. This uses OAuth 2.0; you can revoke access anytime in your Google account settings.
 
 **No permanent sync:** Keel reads Google services on-demand. Events and docs are fetched fresh each time and not stored in Keel's database.
+
+#### Google API Limited Use Compliance
+
+Keel's use and transfer of information received from Google APIs to any other app will adhere to the [Google API Services User Data Policy](https://developers.google.com/terms/api-services-user-data-policy), including the [Limited Use](https://developers.google.com/terms/api-services-user-data-policy#additional_requirements_for_specific_api_scopes) requirements.
+
+In particular, data obtained from Google Calendar or Google Docs is never used:
+- To train, develop, or improve generalized AI/ML models.
+- For advertising or to build user profiles for advertising.
+- By humans, except for security purposes, to comply with applicable law, or with your explicit consent for support you've requested.
+- For purposes unrelated to providing or improving the user-facing features of Keel.
+
+**Architectural enforcement.** Keel lets you choose which LLM provider processes your chat (Claude, OpenAI, OpenRouter, or local Ollama). To honor the Limited Use restriction, Keel **only allows a Google account to be connected when the active LLM provider is on an allowlist of providers whose API terms disclaim training on submitted data** (Anthropic's Claude API, OpenAI's API, and local Ollama). OpenRouter is not on the allowlist because its terms reserve broader rights, so Keel will refuse to connect Google while OpenRouter is the active provider, and will refuse to switch to OpenRouter while Google is connected. This invariant is enforced in code (`src/core/googlePolicy.ts`) and covered by tests.
 
 ### To Keel
 
