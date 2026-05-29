@@ -515,7 +515,7 @@ export default function Onboarding({ initialSettings, onComplete }: Props) {
               marginBottom: 24,
             }}>
               <p style={{ fontSize: 13, color: 'var(--text-tertiary)', lineHeight: 1.6, margin: 0 }}>
-                Keel ships as a desktop app. The desktop app runs without any cloud account. Your API key, your folder, your data. (If you want an iPhone companion for capturing on the go, that's a separate opt-in we'll mention later.)
+                Keel ships as a desktop app. No cloud account required. Your API key, your folder, your data.
               </p>
             </section>
 

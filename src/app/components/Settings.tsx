@@ -123,11 +123,17 @@ const SECTION_META: Record<SettingsSectionId, { title: string; description: stri
   },
 };
 
+// NOTE: Keel Cloud nav entry intentionally omitted. Cloud is paused as
+// of 2026-05-29 (see memory/cloud_pause_decision_2026_05_29.md). The
+// underlying section + render + render-case in this file are preserved
+// so the code path is intact for an eventual unpause — only the visible
+// sidebar entry is hidden. Existing signed-in test users keep working
+// because the section ID still resolves; they just have to deep-link to
+// it manually.
 const NAV_ITEMS: Array<{ id: SettingsSectionId; label: string }> = [
   { id: 'general-personal', label: 'Personal Settings' },
   { id: 'ai-setup', label: 'Model' },
   { id: 'integrations', label: 'Integrations' },
-  { id: 'keel-cloud', label: 'Keel Cloud' },
   { id: 'general-scheduled-jobs', label: 'Scheduled Jobs' },
   { id: 'general-personality', label: 'Personality' },
   { id: 'help-feedback', label: 'Help & Feedback' },
@@ -988,7 +994,7 @@ export default function Settings({ onBack, navigation, onSettingsChange }: Props
             <div style={sectionHeading}>FAQ</div>
             <div style={featureItem}>
               <strong style={{ color: 'var(--text-primary)' }}>Where is my data stored?</strong>
-              <div>In the brain folder you chose during setup (default <code>~/Keel</code>). Plain markdown files plus a small SQLite db at <code>.config/keel.db</code>. If you opt in to Keel Cloud (Settings → Keel Cloud), captures from your iPhone transit a small server buffer for up to 24 hours before your Mac pulls them — chat history, workspace files, and notes never go to that server. See the <a href="https://keel-labs.org/privacy" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)' }}>privacy policy</a> for the full breakdown.</div>
+              <div>In the brain folder you chose during setup (default <code>~/Keel</code>). Plain markdown files plus a small SQLite db at <code>.config/keel.db</code>.</div>
             </div>
             <div style={featureItem}>
               <strong style={{ color: 'var(--text-primary)' }}>Can I switch AI providers?</strong>
