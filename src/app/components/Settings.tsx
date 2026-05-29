@@ -994,7 +994,7 @@ export default function Settings({ onBack, navigation, onSettingsChange }: Props
             <div style={sectionHeading}>FAQ</div>
             <div style={featureItem}>
               <strong style={{ color: 'var(--text-primary)' }}>Where is my data stored?</strong>
-              <div>In the brain folder you chose during setup (default <code>~/Keel</code>). Plain markdown files plus a small SQLite db at <code>.config/keel.db</code>.</div>
+              <div>In the brain folder you chose during setup (default <code>~/Keel</code>). Plain markdown files plus a small SQLite db at <code>.config/keel.db</code>. If you opt in to Keel Cloud (Settings → Keel Cloud), captures from your iPhone transit a small server buffer for up to 24 hours before your Mac pulls them — chat history, workspace files, and notes never go to that server. See the <a href="https://keel-labs.org/privacy" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)' }}>privacy policy</a> for the full breakdown.</div>
             </div>
             <div style={featureItem}>
               <strong style={{ color: 'var(--text-primary)' }}>Can I switch AI providers?</strong>

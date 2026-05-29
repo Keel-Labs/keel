@@ -123,8 +123,8 @@ Keel is a working beta and stable enough for daily use on macOS. Windows support
 - SQLite full-text search; optional LanceDB vector search
 
 **What doesn't work yet**
-- No mobile app
-- No cloud sync — your workspace lives on one machine at a time
+- iPhone companion app is in TestFlight, not yet on the App Store. It captures thoughts on the go and forwards them to your Mac via Keel Cloud (an optional, opt-in service; the desktop app works fully without it). No Android app.
+- No multi-Mac sync — your workspace lives on one machine at a time. (Keel Cloud is a phone→Mac capture pipe, not a workspace sync.)
 - No team or sharing features
 - Some integrations (X bookmark sync) require API access you'll need to provision yourself
 
