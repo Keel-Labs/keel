@@ -4473,3 +4473,13 @@ body.is-windows .desktop-topbar__trailing {
   color: var(--text-disabled);
   margin: 10px 0 0;
 }
+
+/* Archived items render quietly — they're retired, not current. */
+.about-me__card--archive {
+  opacity: 0.62;
+}
+
+.about-me__card--archive .about-me__card-title {
+  color: var(--text-muted);
+  font-weight: 500;
+}

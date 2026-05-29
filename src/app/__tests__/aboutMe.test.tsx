@@ -94,4 +94,15 @@ describe('AboutMe', () => {
     await mount();
     expect(container.textContent ?? '').toContain('Let Keel learn who you are');
   });
+
+  it('renders an Archive section with the de-emphasized modifier', async () => {
+    setKeel(async () => `## Goals\n- [now] Ship\n\n## Archive\n- Old goal — archived 2026-05-24 (done)`);
+    await mount();
+    const archiveCard = Array.from(container.querySelectorAll('.about-me__card')).find((c) =>
+      /Archive/.test(c.querySelector('.about-me__card-title')?.textContent ?? ''),
+    );
+    expect(archiveCard).toBeTruthy();
+    expect(archiveCard!.className).toContain('about-me__card--archive');
+    expect(archiveCard!.textContent).toContain('Old goal');
+  });
 });

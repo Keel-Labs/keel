@@ -73,6 +73,7 @@ import { dailyBrief } from '../src/core/workflows/dailyBrief';
 import { eod } from '../src/core/workflows/eod';
 import { seedModelFromInterview } from '../src/core/workflows/interviewSeed';
 import { backfillModel } from '../src/core/workflows/backfill';
+import { consolidateModel, dueForConsolidation } from '../src/core/workflows/consolidate';
 import { extractAndSaveMemory } from '../src/core/workflows/memoryExtract';
 import { extractFileSource, ingestWikiSource } from '../src/core/workflows/wikiIngest';
 import { createWikiBase } from '../src/core/workflows/wikiBase';
@@ -3155,6 +3156,41 @@ async function runScheduledJob(job: ScheduledJobRow): Promise<void> {
   }
 }
 
+const CONSOLIDATION_MARKER = '.keel/.last-consolidation';
+let consolidationInFlight = false;
+
+// Weekly model-of-you consolidation. Runs at most once per day, on the
+// configured day of week (default Sunday), with a >10-day catch-up. Best-effort
+// and silent — a background tidy, no notification.
+async function checkWeeklyConsolidation(): Promise<void> {
+  try {
+    if (consolidationInFlight) return;
+    if (!(await fileManager.fileExists('.keel/model-of-me.md'))) return;
+
+    const todayKey = getTodayKey();
+    const dow = new Date(`${todayKey}T00:00:00Z`).getUTCDay();
+    const configuredDay =
+      typeof settings.modelConsolidationDay === 'number' ? settings.modelConsolidationDay : 0;
+
+    let lastRun: string | null = null;
+    try {
+      lastRun = (await fileManager.readFile(CONSOLIDATION_MARKER)).trim() || null;
+    } catch { /* never run */ }
+
+    if (!dueForConsolidation(lastRun, todayKey, dow, configuredDay)) return;
+
+    // Claim today up front so repeated 30s ticks don't re-trigger.
+    consolidationInFlight = true;
+    await fileManager.writeFile(CONSOLIDATION_MARKER, todayKey);
+    consolidateModel(fileManager, llmClient, { userName: settings.userName || undefined })
+      .catch((err) => logger.error('[consolidate] failed:', err))
+      .finally(() => { consolidationInFlight = false; });
+  } catch (err) {
+    consolidationInFlight = false;
+    logger.error('[consolidate] scheduler check failed:', err);
+  }
+}
+
 function checkScheduledJobs(): void {
   try {
     const jobs = listScheduledJobs(settings.brainPath);
@@ -3293,6 +3329,9 @@ function startScheduler(): void {
 
     // Check custom scheduled jobs
     checkScheduledJobs();
+
+    // Weekly model-of-you consolidation (background tidy)
+    void checkWeeklyConsolidation();
   }, 30_000);
 }
 
