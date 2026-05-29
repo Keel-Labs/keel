@@ -24,6 +24,8 @@ export interface ToolDefinition {
 export interface ToolAvailability {
   googleConnected: boolean;
   xConnected: boolean;
+  /** True when <workspace>/.keel/model-of-me.md exists (Pro / seeded). Gates correct_model_of_you. */
+  modelOfYouSeeded?: boolean;
 }
 
 export const ALL_TOOLS: readonly ToolDefinition[] = [
@@ -255,6 +257,46 @@ export const ALL_TOOLS: readonly ToolDefinition[] = [
       additionalProperties: false,
     },
   },
+  // --- Model-of-you (About Me) ---
+  {
+    name: 'correct_model_of_you',
+    description:
+      "Update the user's \"model of you\" (their About Me) when they correct, update, or add a fact ABOUT THEMSELVES — e.g. \"you said I'm avoiding the Q3 plan but I finished it\", \"actually my role is X\", \"add Y to my goals\". The current model is in your context under .keel/model-of-me.md. Provide the target section and its COMPLETE new body (merge the section's existing lines that you can see with the user's correction — do not drop unrelated lines). Only call when the user is correcting facts about themselves, NOT for general chat or task management.",
+    inputSchema: {
+      type: 'object',
+      properties: {
+        // Section names are the locked model-of-you schema (src/core/modelOfYou.ts MODEL_SECTIONS).
+        section: {
+          type: 'string',
+          enum: [
+            'Goals',
+            'Active projects',
+            'People',
+            'Habits and routines',
+            'Commitments',
+            'Writing voice',
+            'Working style',
+            'Recurring themes',
+            'Things avoided',
+            'Narrative',
+          ],
+          description: 'Which section of the About Me to update.',
+        },
+        lines: {
+          type: 'array',
+          items: { type: 'string' },
+          description:
+            "The COMPLETE new body for the section. For structured sections, an array of markdown bullet lines (each starting with \"- \"); for Narrative, the prose lines. Merge the section's current lines (visible in your context) with the user's correction — keep unrelated lines intact.",
+        },
+        confirmation: {
+          type: 'string',
+          description: 'A short, friendly one-line confirmation of what you changed, to relay to the user.',
+        },
+      },
+      required: ['section', 'lines'],
+      additionalProperties: false,
+    },
+  },
   // --- X ---
   {
     name: 'publish_x_post',
@@ -285,6 +327,9 @@ export function getToolsForContext(availability: ToolAvailability): ToolDefiniti
     }
     if (tool.name === 'publish_x_post') {
       return availability.xConnected;
+    }
+    if (tool.name === 'correct_model_of_you') {
+      return availability.modelOfYouSeeded === true;
     }
     return true;
   });

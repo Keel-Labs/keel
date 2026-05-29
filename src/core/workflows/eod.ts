@@ -2,6 +2,7 @@ import { FileManager } from '../fileManager';
 import { LLMClient } from '../llmClient';
 import { logActivity } from '../db';
 import type { Message } from '../../shared/types';
+import { updateModelFromEod } from './modelUpdate';
 
 export async function eod(
   fileManager: FileManager,
@@ -93,6 +94,13 @@ Use markdown. Keep the whole thing under 15 lines.`
   }
 
   logActivity(brainPath, 'eod', `Generated for ${today}`);
+
+  // Update the model-of-you from today (best-effort; no-op if not seeded/Pro).
+  await updateModelFromEod(fileManager, llmClient, {
+    eodSummary: summary,
+    recentChat: chatHistory,
+    userName: options?.userName,
+  });
 
   // Write concise team update if team brain is configured
   if (options?.teamFileManager && options?.userName) {

@@ -5,6 +5,7 @@ import { logActivity, searchChunksFts, type ChunkRow } from './db';
 import { rerank, type RankableChunk } from './reranker';
 import { getPersonality } from './personalities';
 import { buildProjectCatalog } from './projectCatalog';
+import { loadModelOfYou, MODEL_OF_YOU_PATH } from './modelOfYou';
 
 const MAX_CONTEXT_CHARS_V1 = 80_000;
 const MAX_CONTEXT_CHARS_V2 = 60_000;
@@ -165,6 +166,15 @@ export class ContextAssembler {
       // pulse.md doesn't exist yet
     }
 
+    // 1c. Model-of-you: Keel's accumulated understanding of who the user is.
+    // Pro-gated at the surface level (entitlement check lands in Sprint 3); the
+    // file simply won't exist for non-Pro users, so loadModelOfYou returns null.
+    const modelV1 = await loadModelOfYou(this.fileManager);
+    if (modelV1) {
+      onStep?.('Loading what I know about you...');
+      addSection(MODEL_OF_YOU_PATH, modelV1);
+    }
+
     // 2. All project context files
     try {
       const projectFiles = await this.fileManager.listFiles('projects/*/context.md');
@@ -317,6 +327,14 @@ export class ContextAssembler {
       addSection('pulse.md', pulseContent);
     } catch {
       // pulse.md doesn't exist yet
+    }
+
+    // 1c. Model-of-you (always included, like keel.md — it is identity context,
+    // not retrieval material). Absent for non-Pro users → loadModelOfYou null.
+    const modelV2 = await loadModelOfYou(this.fileManager);
+    if (modelV2) {
+      onStep?.('Loading what I know about you...');
+      addSection(MODEL_OF_YOU_PATH, modelV2);
     }
 
     // 2. Today's and yesterday's daily logs

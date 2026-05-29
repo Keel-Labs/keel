@@ -10,6 +10,7 @@ import PlaceholderPane from './components/PlaceholderPane';
 import Inbox from './components/Inbox';
 import MobileCaptureToast from './components/MobileCaptureToast';
 import KnowledgeBrowser from './components/KnowledgeBrowser';
+import AboutMe from './components/AboutMe';
 import Dashboard from './components/Dashboard';
 import ChatsIndex from './components/ChatsIndex';
 import MeetingRecorder from './components/MeetingRecorder';
@@ -529,6 +530,8 @@ export default function App() {
         return <Inbox />;
       case 'knowledge':
         return <KnowledgeBrowser showBack={false} />;
+      case 'about-me':
+        return <AboutMe />;
       case 'meetings':
         return <MeetingRecorder onOpenSettings={(section) => openSettings(section ? { section: section as any } : {})} />;
       case 'settings':
