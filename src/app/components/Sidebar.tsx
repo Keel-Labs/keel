@@ -8,7 +8,7 @@ interface Session {
   updatedAt: number;
 }
 
-export type DesktopView = 'dashboard' | 'chat' | 'search' | 'chats' | 'wiki' | 'inbox' | 'knowledge' | 'meetings' | 'settings';
+export type DesktopView = 'dashboard' | 'chat' | 'search' | 'chats' | 'wiki' | 'inbox' | 'knowledge' | 'meetings' | 'about-me' | 'settings';
 // Note: 'dashboard' is routed via the top mode-switcher, not the sidebar nav
 export type WikiNavId = 'home' | 'synthesis';
 
@@ -158,6 +158,7 @@ const PRIMARY_ITEMS: Array<{
   { id: 'inbox', label: 'Tasks', icon: <InboxIcon /> },
   { id: 'meetings', label: 'Meetings', icon: <MicIcon /> },
   { id: 'knowledge', label: 'My Brain', icon: <FolderIcon /> },
+  { id: 'about-me', label: 'About Me', icon: <SparkleIcon /> },
 ];
 
 const WIKI_ITEMS: Array<{ id: WikiNavId; label: string; icon: React.ReactNode }> = [

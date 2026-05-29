@@ -4154,3 +4154,322 @@ body.is-windows .desktop-topbar__trailing {
     padding: 18px;
   }
 }
+
+/* ── About Me (model-of-you) ───────────────────────────────────── */
+.about-me {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--bg-base);
+}
+
+.about-me__loading {
+  padding: 48px 32px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+.about-me__header {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 28px 32px 18px;
+  border-bottom: 1px solid var(--panel-border);
+}
+
+.about-me__header-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: var(--radius-lg);
+  background: var(--accent-bg);
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.about-me__title {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.about-me__subtitle {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: 4px 0 0;
+  max-width: 540px;
+  line-height: 1.5;
+}
+
+.about-me__scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 22px 32px 32px;
+}
+
+.about-me__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+
+.about-me__card {
+  border-radius: 18px;
+  border: 1px solid var(--panel-border);
+  background: var(--surface-panel);
+  padding: 18px 20px;
+}
+
+.about-me__card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.about-me__card-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.about-me__lock-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+
+.about-me__list {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.about-me__list li {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  line-height: 1.55;
+}
+
+.about-me__prose {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  line-height: 1.65;
+  margin: 0 0 10px;
+}
+
+.about-me__prose:last-child {
+  margin-bottom: 0;
+}
+
+.about-me__empty {
+  font-size: var(--text-sm);
+  color: var(--text-disabled);
+  font-style: italic;
+  line-height: 1.55;
+  margin: 0;
+}
+
+.about-me__footnote {
+  margin: 22px 0 0;
+  font-size: 12px;
+  color: var(--text-disabled);
+  line-height: 1.6;
+}
+
+.about-me__footnote code {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 11px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 1px 5px;
+}
+
+/* Free-tier upsell teaser */
+.about-me__lock {
+  margin: auto;
+  max-width: 460px;
+  padding: 48px 32px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.about-me__lock-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--accent-bg);
+  color: var(--accent);
+  margin-bottom: 4px;
+}
+
+.about-me__lock-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.about-me__lock-text {
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin: 0;
+}
+
+.about-me__lock-subtext {
+  font-size: 13px;
+  font-style: italic;
+  color: var(--text-muted);
+  margin: 4px 0 0;
+}
+
+/* ── About Me: interview + CTA ─────────────────────────────────── */
+.about-me__lock-cta {
+  margin-top: 18px;
+  padding: 10px 22px;
+  border-radius: var(--radius-lg);
+  border: none;
+  background: var(--accent);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.about-me__lock-cta:hover {
+  background: var(--accent-hover);
+}
+
+.interview {
+  max-width: 620px;
+  margin: 0 auto;
+}
+
+.interview__q {
+  margin-bottom: 22px;
+}
+
+.interview__label {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 9px;
+  line-height: 1.45;
+}
+
+.interview__num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--accent-bg);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.interview__input {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  padding: 11px 13px;
+  border-radius: var(--radius-base);
+  border: 1px solid var(--panel-border);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-size: var(--text-sm);
+  font-family: inherit;
+  line-height: 1.5;
+}
+
+.interview__input:focus {
+  outline: none;
+  border-color: var(--accent-border);
+}
+
+.interview__input::placeholder {
+  color: var(--text-disabled);
+}
+
+.interview__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.interview__btn {
+  padding: 9px 18px;
+  border-radius: var(--radius-base);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+.interview__btn--primary {
+  background: var(--accent);
+  color: #fff;
+}
+
+.interview__btn--primary:hover {
+  background: var(--accent-hover);
+}
+
+.interview__btn--primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.interview__btn--ghost {
+  background: transparent;
+  color: var(--text-secondary);
+  border-color: var(--panel-border);
+}
+
+.interview__btn--ghost:hover {
+  background: var(--bg-surface-hover);
+}
+
+.interview__error {
+  color: var(--accent);
+  font-size: 13px;
+  margin: 4px 0 12px;
+}
+
+.interview__hint {
+  text-align: right;
+  font-size: 12px;
+  color: var(--text-disabled);
+  margin: 10px 0 0;
+}

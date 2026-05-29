@@ -12,6 +12,12 @@ import {
 import { capture as captureWorkflow } from '../src/core/workflows/capture';
 import { appendTask } from '../src/core/tasks';
 import {
+  loadModelOfYou,
+  writeSection,
+  MODEL_SECTIONS,
+  type ModelSection,
+} from '../src/core/modelOfYou';
+import {
   createReminder as dbCreateReminder,
   logActivity,
 } from '../src/core/db';
@@ -246,6 +252,33 @@ export function makeToolExecutor(ctx: ToolExecutorContext) {
           });
           logActivity(ctx.brainPath, 'google-export-sheet', result.spreadsheetUrl);
           return ok(id, `Created Google Sheet: ${result.spreadsheetUrl}`);
+        }
+
+        case 'correct_model_of_you': {
+          const section = asString((input as any).section).trim();
+          const rawLines = (input as any).lines;
+          if (!section) return fail(id, 'section is required.');
+          if (!Array.isArray(rawLines) || rawLines.length === 0) {
+            return fail(id, 'lines must be a non-empty array of strings (the complete new section body).');
+          }
+          const heading = MODEL_SECTIONS.find((s) => s.toLowerCase() === section.toLowerCase());
+          if (!heading) {
+            return fail(id, `Unknown section "${section}". Valid sections: ${MODEL_SECTIONS.join(', ')}.`);
+          }
+          if (!(await loadModelOfYou(ctx.fileManager))) {
+            return fail(id, 'There is no About Me / model-of-you file yet to correct.');
+          }
+          const body = rawLines.map(asString).join('\n');
+          const applied = await writeSection(ctx.fileManager, heading as ModelSection, body);
+          if (!applied) {
+            return fail(
+              id,
+              `The "${heading}" section is locked (the user added <!-- locked -->); I left it unchanged. Tell the user to remove the lock marker to edit it.`,
+            );
+          }
+          logActivity(ctx.brainPath, 'model-correction', `Updated "${heading}" via chat correction`);
+          const confirmation = asString((input as any).confirmation).trim();
+          return ok(id, confirmation || `Updated the "${heading}" section of your About Me.`);
         }
 
         case 'publish_x_post': {

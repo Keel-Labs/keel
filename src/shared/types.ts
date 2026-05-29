@@ -596,6 +596,15 @@ export interface MobileCaptureRoutedEvent {
   routedTo: string;      // human one-liner like "Saved to Fitness"
 }
 
+// The five onboarding-interview answers that seed model-of-you (About Me).
+export interface ModelInterviewAnswers {
+  workingOn: string;
+  people: string;
+  recurringTheme: string;
+  avoided: string;
+  voice: string;
+}
+
 export interface KeelAPI {
   cancelStream: (requestId: string) => Promise<void>;
   chat: (request: ChatRequest) => Promise<string>;
@@ -612,6 +621,7 @@ export interface KeelAPI {
   capture: (input: string) => Promise<string>;
   dailyBrief: () => Promise<string>;
   eod: (chatHistory: Message[]) => Promise<string>;
+  seedModelOfYou: (answers: ModelInterviewAnswers) => Promise<{ seededSections: string[] }>;
   exportPdf: (markdownContent: string, title?: string) => Promise<string>;
   resetProfile: () => Promise<void>;
   saveChat: (sessionId: string, session: StoredChatSession) => Promise<void>;

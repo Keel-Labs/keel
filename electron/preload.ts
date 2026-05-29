@@ -56,6 +56,8 @@ const api: KeelAPI = {
 
   eod: (chatHistory) => ipcRenderer.invoke('keel:eod', chatHistory),
 
+  seedModelOfYou: (answers) => ipcRenderer.invoke('keel:seed-model-of-you', answers),
+
   exportPdf: (markdownContent, title) => ipcRenderer.invoke('keel:export-pdf', markdownContent, title),
 
   resetProfile: () => ipcRenderer.invoke('keel:reset-profile'),

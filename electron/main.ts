@@ -71,6 +71,8 @@ import { isModelDownloaded, getAvailableModels, downloadModel } from './modelMan
 import { autoCapture } from '../src/core/workflows/autoCapture';
 import { dailyBrief } from '../src/core/workflows/dailyBrief';
 import { eod } from '../src/core/workflows/eod';
+import { seedModelFromInterview } from '../src/core/workflows/interviewSeed';
+import { backfillModel } from '../src/core/workflows/backfill';
 import { extractAndSaveMemory } from '../src/core/workflows/memoryExtract';
 import { extractFileSource, ingestWikiSource } from '../src/core/workflows/wikiIngest';
 import { createWikiBase } from '../src/core/workflows/wikiBase';
@@ -1309,6 +1311,7 @@ function registerIpcHandlers() {
     const toolsForChat = getToolsForContext({
       googleConnected: googleAvailable(settings.brainPath),
       xConnected: xAvailable(settings.brainPath),
+      modelOfYouSeeded: await fileManager.fileExists('.keel/model-of-me.md'),
     });
     systemPrompt += '\n' + toolsSystemAddendum(toolsForChat);
 
@@ -1721,6 +1724,17 @@ function registerIpcHandlers() {
     const today = new Date().toISOString().split('T')[0];
     setSelfWriting();
     fileManager.writeFile('pulse.md', `# Pulse\nLast updated: ${today} (EOD)\n\n## Active Focus\n- See tomorrow's priorities in EOD summary\n\n## Recent Activity\n- EOD completed ${today}\n`).catch(() => {});
+    return result;
+  });
+
+  ipcMain.handle('keel:seed-model-of-you', async (_event, answers) => {
+    const result = await seedModelFromInterview(fileManager, answers);
+    // Backfill the rest from workspace history in the background (design #7):
+    // interview answers are already in place, so a backfill failure leaves no
+    // half-state. Don't block the UI on it.
+    backfillModel(fileManager, llmClient, { userName: settings.userName || undefined }).catch((err) => {
+      console.error('[seed-model-of-you] background backfill failed:', err);
+    });
     return result;
   });
 
