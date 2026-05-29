@@ -187,7 +187,12 @@ export default function AboutMe() {
       <div className="about-me__scroll">
         <div className="about-me__grid">
           {sections.map((section) => (
-            <section className="about-me__card" key={section.heading}>
+            <section
+              className={
+                section.heading === 'Archive' ? 'about-me__card about-me__card--archive' : 'about-me__card'
+              }
+              key={section.heading}
+            >
               <div className="about-me__card-head">
                 <h2 className="about-me__card-title">{section.heading}</h2>
                 {section.locked && (

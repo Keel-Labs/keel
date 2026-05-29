@@ -118,6 +118,11 @@ export interface Settings {
    * `cloudEnabled` first.
    */
   reminderPushEnabled: boolean;
+  /**
+   * Day of week (0=Sunday … 6=Saturday) for the weekly model-of-you
+   * consolidation pass. Optional; defaults to Sunday (0). No UI yet.
+   */
+  modelConsolidationDay?: number;
 }
 
 /**

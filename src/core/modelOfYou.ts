@@ -27,6 +27,13 @@ export const STRUCTURED_SECTIONS = MODEL_SECTIONS.filter(
   (s): s is Exclude<ModelSection, 'Narrative'> => s !== 'Narrative',
 );
 
+// Archive is written only by weekly consolidation (retired/stale items), never
+// by EOD or backfill, so it is NOT in MODEL_SECTIONS (not templated, not a
+// proposal target) — it appears in the file lazily the first time something is
+// retired. writeSection accepts it via WritableSection.
+export const ARCHIVE_SECTION = 'Archive';
+export type WritableSection = ModelSection | typeof ARCHIVE_SECTION;
+
 const PREAMBLE = `<!-- Keel model-of-you. Edit freely; Keel respects your changes.
      Add <!-- locked --> after any section heading to prevent Keel from touching it. -->`;
 
@@ -100,7 +107,7 @@ export function isSectionLocked(body: string): boolean {
  */
 export async function writeSection(
   fm: FileManager,
-  heading: ModelSection,
+  heading: WritableSection,
   newBody: string,
 ): Promise<boolean> {
   const raw = (await loadModelOfYou(fm)) ?? MODEL_OF_YOU_TEMPLATE;
