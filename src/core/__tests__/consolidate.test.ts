@@ -1,5 +1,10 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as fs from 'fs/promises';
+
+// logActivity opens a real SQLite DB in the temp workspace; on Windows the open
+// handle blocks fs.rm cleanup (EBUSY). The workflow only needs it as a no-op.
+vi.mock('../db', () => ({ logActivity: () => {} }));
+
 import * as os from 'os';
 import * as path from 'path';
 import { FileManager } from '../fileManager';
