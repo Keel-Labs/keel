@@ -123,11 +123,17 @@ const SECTION_META: Record<SettingsSectionId, { title: string; description: stri
   },
 };
 
+// NOTE: Keel Cloud nav entry intentionally omitted. Cloud is paused as
+// of 2026-05-29 (see memory/cloud_pause_decision_2026_05_29.md). The
+// underlying section + render + render-case in this file are preserved
+// so the code path is intact for an eventual unpause — only the visible
+// sidebar entry is hidden. Existing signed-in test users keep working
+// because the section ID still resolves; they just have to deep-link to
+// it manually.
 const NAV_ITEMS: Array<{ id: SettingsSectionId; label: string }> = [
   { id: 'general-personal', label: 'Personal Settings' },
   { id: 'ai-setup', label: 'Model' },
   { id: 'integrations', label: 'Integrations' },
-  { id: 'keel-cloud', label: 'Keel Cloud' },
   { id: 'general-scheduled-jobs', label: 'Scheduled Jobs' },
   { id: 'general-personality', label: 'Personality' },
   { id: 'help-feedback', label: 'Help & Feedback' },
