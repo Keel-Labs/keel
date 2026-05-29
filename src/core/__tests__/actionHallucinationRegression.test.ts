@@ -297,6 +297,7 @@ describe('Issue #62 regression — fabricated action claims', () => {
       // this is to force that conversation in code review.
       expect(allNames).toEqual([
         'capture_note',
+        'correct_model_of_you',
         'create_calendar_event',
         'create_knowledge_base',
         'create_local_spreadsheet',
