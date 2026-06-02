@@ -68,6 +68,7 @@ import { initLogger, logger, buildDiagnostics } from './logger';
 import { describeLlmError } from '../src/core/llmErrors';
 import { autoUpdater } from 'electron-updater';
 import { isModelDownloaded, getAvailableModels, downloadModel } from './modelManager';
+import * as entitlements from '../src/core/pro/entitlements';
 import { autoCapture } from '../src/core/workflows/autoCapture';
 import { dailyBrief } from '../src/core/workflows/dailyBrief';
 import { eod } from '../src/core/workflows/eod';
@@ -2615,6 +2616,67 @@ function registerIpcHandlers() {
       maybeStartCloudDrain();
     }
     return { apiBase: settings.cloudApiBase };
+  });
+
+  // --- Keel Pro ---
+
+  ipcMain.handle('keel:pro-status', async () => {
+    return entitlements.getProStatus();
+  });
+
+  ipcMain.handle('keel:pro-activate', async (_event, licenseKey: string) => {
+    const instanceId = require('os').hostname(); // Use machine hostname as instance ID
+    const result = await entitlements.activateProLicense(licenseKey, instanceId);
+
+    if (result.ok && result.subscription) {
+      // Broadcast Pro status change to all windows
+      mainWindow?.webContents.send('keel:pro-status-changed', {
+        isPro: true,
+        subscription: result.subscription,
+      });
+      // Update settings with Pro status
+      settings.proLicenseKey = licenseKey;
+      settings.proStatus = 'active';
+      saveSettingsToFile(settings);
+    }
+
+    return result;
+  });
+
+  ipcMain.handle('keel:pro-validate', async () => {
+    if (!settings.proLicenseKey) {
+      return { ok: false, error: 'No Pro license key found' };
+    }
+    const instanceId = require('os').hostname();
+    const result = await entitlements.validateProLicense(settings.proLicenseKey, instanceId);
+
+    if (result.ok) {
+      // Broadcast Pro status change
+      mainWindow?.webContents.send('keel:pro-status-changed', {
+        isPro: true,
+        reason: 'active',
+      });
+    }
+
+    return result;
+  });
+
+  ipcMain.handle('keel:pro-cancel', async () => {
+    const result = await entitlements.cancelProLicense();
+
+    if (result.ok) {
+      // Broadcast Pro status change
+      mainWindow?.webContents.send('keel:pro-status-changed', {
+        isPro: false,
+        reason: 'cancelled',
+      });
+      // Clear Pro status from settings
+      settings.proLicenseKey = undefined;
+      settings.proStatus = 'free';
+      saveSettingsToFile(settings);
+    }
+
+    return result;
   });
 
   ipcMain.handle('keel:delete-reminder', async (_event, id: number) => {

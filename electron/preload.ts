@@ -188,6 +188,18 @@ const api: KeelAPI = {
     return () => ipcRenderer.off('keel:cloud-signin-status', handler);
   },
 
+  // Keel Pro
+  proStatus: () => ipcRenderer.invoke('keel:pro-status'),
+  proActivate: (licenseKey: string) => ipcRenderer.invoke('keel:pro-activate', licenseKey),
+  proValidate: () => ipcRenderer.invoke('keel:pro-validate'),
+  proCancel: () => ipcRenderer.invoke('keel:pro-cancel'),
+  onProStatusChanged: (callback: (status: import('../src/shared/types').ProStatus) => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, status: import('../src/shared/types').ProStatus) =>
+      callback(status);
+    ipcRenderer.on('keel:pro-status-changed', handler);
+    return () => ipcRenderer.off('keel:pro-status-changed', handler);
+  },
+
   googleConnect: () => ipcRenderer.invoke('keel:google-connect'),
 
   googleDisconnect: () => ipcRenderer.invoke('keel:google-disconnect'),
