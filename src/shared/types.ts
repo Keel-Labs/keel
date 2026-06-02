@@ -123,6 +123,19 @@ export interface Settings {
    * consolidation pass. Optional; defaults to Sunday (0). No UI yet.
    */
   modelConsolidationDay?: number;
+
+  // Keel Pro — opt-in paid tier (model-of-you + KB + thinking partner).
+  /**
+   * User's Pro license key (if activated). When set, the desktop periodically
+   * validates it against LemonSqueezy. Session truth lives in the local
+   * entitlement.json cache file.
+   */
+  proLicenseKey?: string;
+  /**
+   * Last-known Pro status ('free' | 'active' | 'expired'). Display-only;
+   * the authoritative check is entitlementStore.isActive().
+   */
+  proStatus?: 'free' | 'active' | 'expired';
 }
 
 /**
@@ -137,6 +150,21 @@ export type CloudSignInStatusEvent =
   | { status: 'signed-in'; email: string }
   | { status: 'cancelled' }
   | { status: 'error'; error: string };
+
+/**
+ * Pro tier entitlement data from LemonSqueezy.
+ * Cached locally for offline-grace (7-day) support.
+ */
+export interface EntitlementData {
+  license_key: string;      // Unique license key from LS
+  instance_id: string;      // Instance ID (Mac hostname or UUID)
+  expires_at: number;       // Unix timestamp when the subscription expires
+  cached_at: number;        // Unix timestamp when this was cached locally
+  status: 'active' | 'inactive' | 'expired';  // Entitlement status
+  email: string;            // Customer email from LS
+}
+
+export type ProStatus = { isPro: boolean; reason?: string; subscription?: { tier: 'pro'; expiresAt?: number; email?: string } };
 
 export interface EmbeddedChunk {
   id: string;
@@ -696,6 +724,12 @@ export interface KeelAPI {
   cloudSetApiBase: (apiBase: string) => Promise<{ apiBase: string }>;
   onCloudSignedOut: (callback: () => void) => () => void;
   onCloudSignInStatus: (callback: (payload: CloudSignInStatusEvent) => void) => () => void;
+  // Keel Pro (opt-in paid tier)
+  proStatus: () => Promise<ProStatus>;
+  proActivate: (licenseKey: string) => Promise<{ ok: boolean; error?: string; subscription?: { email: string; expiresAt: number } }>;
+  proValidate: () => Promise<{ ok: boolean; error?: string }>;
+  proCancel: () => Promise<{ ok: boolean; error?: string }>;
+  onProStatusChanged: (callback: (status: ProStatus) => void) => () => void;
   // Google Integration
   googleConnect: () => Promise<void>;
   googleDisconnect: () => Promise<void>;

@@ -86,24 +86,21 @@ On a clean Windows machine, install `dist-packages\Keel-<version>-win-x64.exe`, 
 
 Upload the artifacts from the machines that built them. If macOS and Windows artifacts are produced on different machines, run `gh release upload` separately on each machine against the same tag.
 
-From macOS:
+From macOS, use the publish helper — it asserts every artifact electron-updater needs (`latest-mac.yml`, the dmg + zip, and both blockmaps) is present before uploading, and verifies they all land on the release:
 
 ```sh
-gh release upload v<version> \
-  dist-packages/Keel-<version>-mac.dmg \
-  dist-packages/latest-mac.yml \
-  --clobber
+scripts/publish-mac-release.sh v<version>
 ```
+
+If the helper refuses to run, fix the missing artifact (usually re-run `npm run dist:mac`) rather than uploading by hand — a release missing `latest-mac.yml` will 404 every auto-update check on installed clients.
 
 From Windows PowerShell:
 
 ```powershell
-gh release upload v<version> `
-  dist-packages/Keel-<version>-win-x64.exe \
-  dist-packages/Keel-<version>-win-x64.zip \
-  dist-packages/latest.yml \
-  --clobber
+scripts\publish-win-release.ps1 v<version>
 ```
+
+Same shape as the macOS helper: asserts `latest.yml`, the `.exe`, `.zip`, and both `.blockmap` files are present, checks the manifest's version + referenced files line up, uploads, and verifies every asset landed on the release.
 
 If `gh` is not installed on the Windows build machine:
 
