@@ -1707,6 +1707,14 @@ function registerIpcHandlers() {
   });
 
   ipcMain.handle('keel:daily-brief', async () => {
+    // Gate on Pro entitlement
+    const proStatus = await entitlements.getProStatus();
+    if (!proStatus.isPro) {
+      return {
+        error: 'Daily briefings are a Keel Pro feature. Upgrade at keel-labs.org/pro to unlock.',
+      };
+    }
+
     const result = await dailyBrief(fileManager, llmClient, {
       teamFileManager: teamFileManager || undefined,
     });
@@ -3422,6 +3430,15 @@ app.whenReady().then(async () => {
   createTray();
   registerShortcuts();
   registerIpcHandlers();
+
+  // Refresh Pro entitlement on app launch (if user has a cached key)
+  if (settings.proLicenseKey) {
+    const instanceId = require('os').hostname();
+    entitlements.validateProLicense(settings.proLicenseKey, instanceId).catch((err) => {
+      console.error('[pro] Entitlement validation failed on launch:', err);
+      // Don't block app startup on network error; local cache still works
+    });
+  }
 
   if (app.isPackaged) {
     setupAutoUpdater();
