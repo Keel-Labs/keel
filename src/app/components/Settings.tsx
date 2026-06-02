@@ -12,6 +12,7 @@ import type {
 import { applyTheme } from '../theme';
 import { BUILT_IN_PERSONALITIES } from '../../core/personalities';
 import { BetaBadge } from './BetaBadge';
+import KeelProPanel from './KeelProPanel';
 import KeelCloudPanel from './KeelCloudPanel';
 import { GoogleProviderSwitchModal } from './GoogleProviderSwitchModal';
 import {
@@ -79,6 +80,7 @@ export type SettingsSectionId =
   | 'general-scheduled-jobs'
   | 'ai-setup'
   | 'integrations'
+  | 'keel-pro'
   | 'keel-cloud'
   | 'help-feedback';
 
@@ -88,6 +90,7 @@ const SETTINGS_SECTION_IDS: SettingsSectionId[] = [
   'general-scheduled-jobs',
   'ai-setup',
   'integrations',
+  'keel-pro',
   'keel-cloud',
   'help-feedback',
 ];
@@ -112,6 +115,10 @@ const SECTION_META: Record<SettingsSectionId, { title: string; description: stri
   'integrations': {
     title: 'Integrations',
     description: 'Connect external services to sync data and extend what Keel can do.',
+  },
+  'keel-pro': {
+    title: 'Keel Pro',
+    description: 'Activate Pro to unlock daily briefings and personalized AI learning. $15/month.',
   },
   'keel-cloud': {
     title: 'Keel Cloud',
@@ -1528,6 +1535,9 @@ export default function Settings({ onBack, navigation, onSettingsChange }: Props
             </SectionCard>
           </>
         );
+
+      case 'keel-pro':
+        return <KeelProPanel />;
 
       case 'keel-cloud':
         return <KeelCloudPanel />;

@@ -159,11 +159,11 @@ export default function AboutMe() {
           </div>
           <h2 className="about-me__lock-title">Let Keel learn who you are</h2>
           <p className="about-me__lock-text">
-            With Keel Pro, this page becomes your second brain's understanding of you — your
-            goals, the people in your work, your voice, the things you keep circling back to.
-            It fills in as you use Keel, and every chat gets more you-aware.
+            With Keel Pro: daily briefings on your work, plus an AI that learns your goals,
+            the people in your life, your voice, and the things you keep circling back to.
+            Every morning it briefs you. Every chat gets more you-aware.
           </p>
-          <p className="about-me__lock-subtext">The longer you use Keel, the better it knows you.</p>
+          <p className="about-me__lock-subtext">Daily briefs + personalized AI = $15/month</p>
           <button className="about-me__lock-cta" onClick={() => setInterviewing(true)}>
             Get started
           </button>
