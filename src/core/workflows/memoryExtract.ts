@@ -1,6 +1,6 @@
 import { FileManager, KEEL_MD_TEMPLATE } from '../fileManager';
 import { LLMClient } from '../llmClient';
-import { logActivity, insertIncomingTask } from '../db';
+import { logActivity } from '../db';
 import type { Message } from '../../shared/types';
 
 const EXTRACT_PROMPT = `You are a memory extraction system. Analyze the conversation and extract ONLY facts the user explicitly stated.
@@ -16,8 +16,9 @@ Categories to extract:
 - Projects: names (and only details the user explicitly provided)
 - People: names and roles (only if stated)
 - Priorities: only if explicitly listed
-- Tasks/To-Dos: specific action items, things the user needs to do, wants to work on, or is tracking. Include which project they belong to if mentioned.
 - Completed Tasks: tasks the user explicitly says are done, finished, or completed. Match by the task description.
+
+Do NOT extract new to-dos / action items here — creating tasks is handled separately by the create_task tool during the conversation. Only capture COMPLETED tasks (so they can be checked off).
 
 If there IS new info, respond with JSON:
 {
@@ -26,11 +27,9 @@ If there IS new info, respond with JSON:
   "projects": [{ "name": "...", "status": "", "summary": "", "deadline": "" }],
   "people": [{ "name": "...", "role": "", "notes": "" }],
   "priorities": ["..."],
-  "tasks": [{ "task": "...", "project": "..." }],
   "completedTasks": ["task description that was marked done"]
 }
 
-For tasks: "task" is the to-do description, "project" is the project name it belongs to (empty string if not associated with a project).
 For completedTasks: list the task descriptions the user said are done. Use the exact or closest matching description.
 
 Only include fields with new info. Use empty strings for unknown fields — NEVER guess.
@@ -78,7 +77,6 @@ interface MemoryUpdate {
   people?: Array<{ name: string; role?: string; notes?: string }>;
   priorities?: string[];
   conventions?: string[];
-  tasks?: Array<{ task: string; project?: string }>;
   completedTasks?: string[];
 }
 
@@ -214,74 +212,10 @@ export async function extractAndSaveMemory(
       console.log('[memory-extract] Successfully updated keel.md');
     }
 
-    // Save tasks to project task files
-    if (update.tasks && update.tasks.length > 0) {
-      // Collect all existing tasks across all files to prevent duplicates
-      const allExistingTasks = new Set<string>();
-      try {
-        const existingTaskFiles = await fileManager.listFiles('projects/*/tasks.md');
-        for (const f of existingTaskFiles) {
-          try {
-            const c = await fileManager.readFile(f);
-            for (const line of c.split('\n')) {
-              const trimmed = line.trim();
-              if (trimmed.startsWith('- [ ]') || trimmed.startsWith('- [x]')) {
-                allExistingTasks.add(trimmed.replace(/^- \[.\]\s*/, '').toLowerCase());
-              }
-            }
-          } catch { /* skip */ }
-        }
-      } catch { /* no project tasks */ }
-      try {
-        const generalContent = await fileManager.readFile('tasks.md');
-        for (const line of generalContent.split('\n')) {
-          const trimmed = line.trim();
-          if (trimmed.startsWith('- [ ]') || trimmed.startsWith('- [x]')) {
-            allExistingTasks.add(trimmed.replace(/^- \[.\]\s*/, '').toLowerCase());
-          }
-        }
-      } catch { /* no general tasks */ }
-
-      const tasksByProject = new Map<string, string[]>();
-      for (const t of update.tasks) {
-        // Skip if task already exists anywhere
-        if (allExistingTasks.has(t.task.toLowerCase())) continue;
-        const projectKey = t.project?.trim() || '';
-        if (!tasksByProject.has(projectKey)) {
-          tasksByProject.set(projectKey, []);
-        }
-        tasksByProject.get(projectKey)!.push(t.task);
-      }
-
-      // Insert new tasks into incoming_tasks table for triage
-      const brainPath = fileManager.getBrainPath();
-      let incomingCount = 0;
-      for (const [projectName, tasks] of tasksByProject) {
-        if (projectName) {
-          const slug = projectName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-          const tasksPath = `projects/${slug}/tasks.md`;
-          const contextPath = `projects/${slug}/context.md`;
-
-          // Ensure project context file exists
-          if (!(await fileManager.fileExists(contextPath))) {
-            await fileManager.writeFile(contextPath, `# ${projectName}\n\nProject context and notes.\n`);
-            console.log(`[memory-extract] Created project context: ${contextPath}`);
-          }
-
-          for (const task of tasks) {
-            insertIncomingTask(brainPath, task, slug, tasksPath);
-            incomingCount++;
-          }
-        } else {
-          for (const task of tasks) {
-            insertIncomingTask(brainPath, task, null, 'tasks.md');
-            incomingCount++;
-          }
-        }
-      }
-
-      logActivity(brainPath, 'memory-update', `Queued ${incomingCount} task(s) for triage`);
-    }
+    // New to-dos are NOT created here — the create_task tool owns task creation
+    // during the conversation. Extracting them here too produced duplicates
+    // (one copy in the project's open tasks via the tool, a reworded copy in the
+    // incoming-triage queue here). We only mark COMPLETED tasks below.
 
     // Mark completed tasks
     if (update.completedTasks && update.completedTasks.length > 0) {
@@ -330,7 +264,6 @@ export async function extractAndSaveMemory(
     // Build summary of what was saved. Group by verb so we don't repeat
     // "Noted X, Noted Y" — instead: "Noted 2 projects, 1 contact".
     const noted: string[] = [];
-    const saved: string[] = [];
     const updated: string[] = [];
     const completed: string[] = [];
     const plural = (n: number, singular: string, pluralForm?: string) =>
@@ -340,13 +273,11 @@ export async function extractAndSaveMemory(
     if (update.priorities && update.priorities.length > 0) updated.push('priorities');
     if (update.projects && update.projects.length > 0) noted.push(plural(update.projects.length, 'project'));
     if (update.people && update.people.length > 0) noted.push(plural(update.people.length, 'contact'));
-    if (update.tasks && update.tasks.length > 0) saved.push(plural(update.tasks.length, 'task'));
     if (update.completedTasks && update.completedTasks.length > 0) completed.push(plural(update.completedTasks.length, 'task'));
 
     const summaryParts: string[] = [];
     if (updated.length > 0) summaryParts.push(`Updated ${updated.join(' and ')}`);
     if (noted.length > 0) summaryParts.push(`Noted ${noted.join(', ')}`);
-    if (saved.length > 0) summaryParts.push(`Saved ${saved.join(', ')}`);
     if (completed.length > 0) summaryParts.push(`Completed ${completed.join(', ')}`);
 
     if (summaryParts.length > 0) {
