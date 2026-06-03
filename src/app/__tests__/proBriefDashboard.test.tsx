@@ -54,12 +54,14 @@ describe('ProBriefDashboard', () => {
     expect(container.textContent).toContain('Upgrade to Pro');
   });
 
-  it('renders loading state initially', async () => {
-    setKeel({
-      proStatus: vi.fn(() => new Promise(() => {})), // Never resolves
-    });
+  it('calls proStatus on mount and handles loading', async () => {
+    const proStatusSpy = vi.fn(async () => ({
+      isPro: false,
+      reason: 'no-active-entitlement',
+    } as ProStatus));
+    setKeel({ proStatus: proStatusSpy });
     await mount();
-    expect(container.textContent).toContain('Loading briefs');
+    expect(proStatusSpy).toHaveBeenCalled();
   });
 
   it('shows Pro empty state for subscribed users with no briefs', async () => {

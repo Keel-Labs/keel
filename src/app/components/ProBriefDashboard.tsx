@@ -192,7 +192,7 @@ export default function ProBriefDashboard() {
                 <div
                   className="markdown-content"
                   dangerouslySetInnerHTML={{
-                    __html: DOMPurify.sanitize(marked.parse(brief.content)),
+                    __html: DOMPurify.sanitize(marked.parse(brief.content) as string),
                   }}
                 />
               </div>
