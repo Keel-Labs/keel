@@ -4,6 +4,9 @@ import * as entitlementStore from '../pro/entitlementStore';
 import * as licenseValidator from '../pro/licenseValidator';
 import type { EntitlementData } from '../../shared/types';
 
+// Unmock entitlements for this test file so we test the real implementation
+vi.unmock('../pro/entitlements');
+
 describe('pro/entitlements', () => {
   beforeEach(() => {
     vi.clearAllMocks();
