@@ -84,18 +84,20 @@ describe('AboutMe', () => {
   it('shows the Pro upsell teaser when no model file exists', async () => {
     setKeel(async () => {
       throw new Error('ENOENT');
-    });
+    }, false);
     await mount();
     const text = container.textContent ?? '';
-    expect(text).toContain('Keel Pro');
+    expect(text).toContain('About Me');
     expect(text).toContain('Every chat gets more relevant');
+    expect(text).toContain('Get Keel Pro');
     expect(container.querySelector('.about-me__card')).toBeNull();
   });
 
   it('treats an empty file as no model (teaser)', async () => {
-    setKeel(async () => '   \n');
+    setKeel(async () => '   \n', false);
     await mount();
-    expect(container.textContent ?? '').toContain('Keel Pro');
+    expect(container.textContent ?? '').toContain('About Me');
+    expect(container.textContent ?? '').toContain('Get Keel Pro');
   });
 
   it('renders an Archive section with the de-emphasized modifier', async () => {

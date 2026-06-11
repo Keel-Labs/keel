@@ -4373,6 +4373,15 @@ body.is-windows .desktop-topbar__trailing {
   margin-top: 1px;
 }
 
+.about-me__lock-pro-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin: 16px 0 6px;
+}
+
 .about-me__lock-already {
   font-size: 12px;
   color: var(--text-muted);
