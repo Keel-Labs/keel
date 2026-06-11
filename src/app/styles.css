@@ -4388,6 +4388,25 @@ body.is-windows .desktop-topbar__trailing {
   margin: 4px 0 0;
 }
 
+.about-me__retake-btn {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 5px 10px;
+  border-radius: 6px;
+  font-family: inherit;
+  white-space: nowrap;
+  align-self: flex-start;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.about-me__retake-btn:hover {
+  color: var(--text-primary);
+  border-color: var(--text-secondary);
+}
+
 .about-me__lock-link {
   background: none;
   border: none;
