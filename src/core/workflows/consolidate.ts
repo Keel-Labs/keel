@@ -8,6 +8,7 @@ import {
   ARCHIVE_SECTION,
 } from '../modelOfYou';
 import { applyModelUpdate, sanitizeModelJson, type ModelUpdatePayload } from './modelUpdate';
+import * as entitlements from '../pro/entitlements';
 
 // How far back "recent activity" reaches when judging whether an item is stale.
 const FRESHNESS_WINDOW_DAYS = 60;
@@ -99,6 +100,10 @@ export async function consolidateModel(
   opts?: { userName?: string },
 ): Promise<ConsolidateResult | undefined> {
   try {
+    // Defensive gating: verify Pro entitlement before consolidating model
+    const proStatus = await entitlements.getProStatus();
+    if (!proStatus.isPro) return; // not Pro — don't consolidate
+
     const current = await loadModelOfYou(fileManager);
     if (!current) return; // not seeded — nothing to consolidate
 

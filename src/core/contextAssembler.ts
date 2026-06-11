@@ -6,6 +6,7 @@ import { rerank, type RankableChunk } from './reranker';
 import { getPersonality } from './personalities';
 import { buildProjectCatalog } from './projectCatalog';
 import { loadModelOfYou, MODEL_OF_YOU_PATH } from './modelOfYou';
+import * as entitlements from './pro/entitlements';
 
 const MAX_CONTEXT_CHARS_V1 = 80_000;
 const MAX_CONTEXT_CHARS_V2 = 60_000;
@@ -167,9 +168,17 @@ export class ContextAssembler {
     }
 
     // 1c. Model-of-you: Keel's accumulated understanding of who the user is.
-    // Pro-gated at the surface level (entitlement check lands in Sprint 3); the
-    // file simply won't exist for non-Pro users, so loadModelOfYou returns null.
-    const modelV1 = await loadModelOfYou(this.fileManager);
+    // Defensive gating: check Pro entitlement before including in context.
+    // Even if file exists, only include if user has active Pro subscription.
+    let modelV1: string | null = null;
+    try {
+      const proStatus = await entitlements.getProStatus();
+      if (proStatus.isPro) {
+        modelV1 = await loadModelOfYou(this.fileManager);
+      }
+    } catch {
+      // If entitlement check fails, don't include model (defensive)
+    }
     if (modelV1) {
       onStep?.('Loading what I know about you...');
       addSection(MODEL_OF_YOU_PATH, modelV1);
@@ -330,8 +339,16 @@ export class ContextAssembler {
     }
 
     // 1c. Model-of-you (always included, like keel.md — it is identity context,
-    // not retrieval material). Absent for non-Pro users → loadModelOfYou null.
-    const modelV2 = await loadModelOfYou(this.fileManager);
+    // not retrieval material). Defensive gating: check Pro entitlement before including.
+    let modelV2: string | null = null;
+    try {
+      const proStatus = await entitlements.getProStatus();
+      if (proStatus.isPro) {
+        modelV2 = await loadModelOfYou(this.fileManager);
+      }
+    } catch {
+      // If entitlement check fails, don't include model (defensive)
+    }
     if (modelV2) {
       onStep?.('Loading what I know about you...');
       addSection(MODEL_OF_YOU_PATH, modelV2);

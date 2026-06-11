@@ -8,6 +8,7 @@ import {
   STRUCTURED_SECTIONS,
 } from '../modelOfYou';
 import { applyModelUpdate, sanitizeModelJson, type ModelUpdatePayload } from './modelUpdate';
+import * as entitlements from '../pro/entitlements';
 
 // ~50k tokens of source material (decision #7 in the design). Budgeted in chars
 // (~4 chars/token) with headroom for the prompt and the model file itself.
@@ -92,6 +93,10 @@ export async function backfillModel(
     skippedLocked: [],
   };
   try {
+    // Defensive gating: verify Pro entitlement before backfilling model
+    const proStatus = await entitlements.getProStatus();
+    if (!proStatus.isPro) return empty; // not Pro — don't backfill
+
     const budget = opts?.maxSourceChars ?? DEFAULT_MAX_SOURCE_CHARS;
     const today = formatDate(new Date());
     const cutoff = new Date(Date.now() - DAILY_LOG_WINDOW_DAYS * 86_400_000);

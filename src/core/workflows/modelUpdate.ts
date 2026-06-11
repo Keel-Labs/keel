@@ -10,6 +10,7 @@ import {
   STRUCTURED_SECTIONS,
   type ModelSection,
 } from '../modelOfYou';
+import * as entitlements from '../pro/entitlements';
 
 function sanitizeJsonResponse(raw: string): string {
   let text = raw.trim();
@@ -127,8 +128,12 @@ export async function updateModelFromEod(
   opts: { eodSummary: string; recentChat?: Message[]; userName?: string },
 ): Promise<ModelUpdateResult | undefined> {
   try {
+    // Defensive gating: verify Pro entitlement before updating model
+    const proStatus = await entitlements.getProStatus();
+    if (!proStatus.isPro) return; // not Pro — don't update model
+
     const current = await loadModelOfYou(fileManager);
-    if (!current) return; // not seeded / non-Pro — nothing to maintain
+    if (!current) return; // not seeded — nothing to maintain
 
     const today = formatDate(new Date());
 
