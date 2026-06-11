@@ -97,7 +97,11 @@ function emphasizeInline(text: string): React.ReactNode {
   );
 }
 
-export default function AboutMe() {
+interface AboutMeProps {
+  onOpenSettings?: (section?: string) => void;
+}
+
+export default function AboutMe({ onOpenSettings }: AboutMeProps = {}) {
   const [content, setContent] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [interviewing, setInterviewing] = useState(false);
@@ -200,7 +204,12 @@ export default function AboutMe() {
               >
                 Get Keel Pro
               </button>
-              <p className="about-me__lock-already">Already have a license? Activate it in Settings → Keel Pro.</p>
+              <p className="about-me__lock-already">
+                Already have a license? Activate it in{' '}
+                <button className="about-me__lock-link" onClick={() => onOpenSettings?.('keel-pro')}>
+                  Settings → Keel Pro
+                </button>.
+              </p>
             </>
           )}
           {isPro && (
