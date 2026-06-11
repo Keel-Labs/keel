@@ -531,7 +531,7 @@ export default function App() {
       case 'knowledge':
         return <KnowledgeBrowser showBack={false} />;
       case 'about-me':
-        return <AboutMe />;
+        return <AboutMe onOpenSettings={(section) => openSettings(section ? { section: section as any } : {})} />;
       case 'meetings':
         return <MeetingRecorder onOpenSettings={(section) => openSettings(section ? { section: section as any } : {})} />;
       case 'settings':
