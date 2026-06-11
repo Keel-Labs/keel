@@ -231,10 +231,13 @@ export default function AboutMe({ onOpenSettings }: AboutMeProps = {}) {
     <div className="about-me">
       <div className="about-me__header">
         <div className="about-me__header-icon"><SparkleIcon /></div>
-        <div>
+        <div style={{ flex: 1 }}>
           <h1 className="about-me__title">About Me</h1>
           <p className="about-me__subtitle">What Keel has learned about you. The longer you use Keel, the better it knows you.</p>
         </div>
+        <button className="about-me__retake-btn" onClick={() => setInterviewing(true)} title="Update your model with a fresh interview">
+          Update via interview
+        </button>
       </div>
 
       <div className="about-me__scroll">
