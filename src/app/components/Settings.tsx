@@ -118,7 +118,7 @@ const SECTION_META: Record<SettingsSectionId, { title: string; description: stri
   },
   'keel-pro': {
     title: 'Keel Pro',
-    description: 'Activate Pro to unlock daily briefings and personalized AI learning. $15/month.',
+    description: 'Activate Pro to unlock daily briefings and personalized AI learning. $9.99/month.',
   },
   'keel-cloud': {
     title: 'Keel Cloud',
@@ -143,6 +143,7 @@ const NAV_ITEMS: Array<{ id: SettingsSectionId; label: string }> = [
   { id: 'integrations', label: 'Integrations' },
   { id: 'general-scheduled-jobs', label: 'Scheduled Jobs' },
   { id: 'general-personality', label: 'Personality' },
+  { id: 'keel-pro', label: 'Keel Pro' },
   { id: 'help-feedback', label: 'Help & Feedback' },
 ];
 

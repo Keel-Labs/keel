@@ -20,6 +20,46 @@ interface State {
   error: string | null;
 }
 
+const inputStyle: React.CSSProperties = {
+  padding: '8px 12px',
+  border: '1px solid var(--border-subtle)',
+  borderRadius: 6,
+  background: 'var(--bg-tertiary)',
+  color: 'var(--text-primary)',
+  fontSize: 14,
+};
+
+const buttonPrimary: React.CSSProperties = {
+  padding: '8px 16px',
+  background: 'var(--accent)',
+  color: 'white',
+  border: 'none',
+  borderRadius: 6,
+  cursor: 'pointer',
+  fontSize: 14,
+  fontWeight: 500,
+};
+
+const buttonSecondary: React.CSSProperties = {
+  padding: '8px 16px',
+  background: 'var(--bg-secondary)',
+  color: 'var(--text-primary)',
+  border: '1px solid var(--border-subtle)',
+  borderRadius: 6,
+  cursor: 'pointer',
+  fontSize: 14,
+  fontWeight: 500,
+};
+
+const errorStyle: React.CSSProperties = {
+  padding: '10px 12px',
+  background: 'rgba(220, 38, 38, 0.1)',
+  color: '#dc2626',
+  borderRadius: 4,
+  fontSize: 13,
+  marginTop: 8,
+};
+
 export default function KeelProPanel() {
   const [state, setState] = useState<State>({
     isLoading: true,
@@ -71,7 +111,6 @@ export default function KeelProPanel() {
       const result = await window.keel.proActivate(state.licenseKey.trim());
 
       if (result.ok) {
-        // Status will be updated via onProStatusChanged
         setState((prev) => ({
           ...prev,
           licenseKey: '',
@@ -101,7 +140,6 @@ export default function KeelProPanel() {
       const result = await window.keel.proCancel();
 
       if (result.ok) {
-        // Status will be updated via onProStatusChanged
         setState((prev) => ({
           ...prev,
           activating: false,
@@ -124,48 +162,38 @@ export default function KeelProPanel() {
   };
 
   if (state.isLoading) {
-    return <div className="settings-section__loading">Loading Pro status...</div>;
+    return <div style={{ padding: 16, color: 'var(--text-secondary)' }}>Loading Pro status...</div>;
   }
 
   const { status } = state;
   const isPro = status?.isPro ?? false;
 
   return (
-    <div className="keel-pro-panel">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       {/* Free state */}
-      {!isPro && (
-        <div className="pro-state free">
-          <div className="pro-header">
-            <h3>Keel Pro</h3>
-            <p className="pro-tagline">Daily briefings + AI that learns who you are</p>
-          </div>
-
-          <div className="pro-content">
-            <p className="pro-description">
-              Upgrade to Pro for daily morning briefings on your priorities, plus an AI that learns your working style.
-            </p>
-
-            {status?.reason === 'no-active-entitlement' && (
-              <button
-                className="button button--primary button--large"
-                onClick={() => window.open('https://keel-labs.org/pro', '_blank')}
-              >
-                Upgrade to Pro
-              </button>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Activation state (no key cached) */}
       {!isPro && status?.reason === 'no-active-entitlement' && (
-        <div className="pro-state activation">
-          <div className="pro-activation">
-            <label htmlFor="license-key" className="pro-label">
-              License Key
-            </label>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div>
+            <h3 style={{ margin: '0 0 8px 0', fontSize: 18 }}>Keel Pro</h3>
+            <p style={{ margin: 0, fontSize: 14, color: 'var(--text-secondary)' }}>
+              Daily briefings + AI that learns who you are
+            </p>
+          </div>
+
+          <p style={{ margin: 0, fontSize: 14, lineHeight: 1.6 }}>
+            Upgrade to Pro for daily morning briefings on your priorities, plus an AI that learns your working style.
+          </p>
+
+          <button
+            onClick={() => window.open('https://keel-labs.org/pro', '_blank')}
+            style={buttonPrimary}
+          >
+            Upgrade to Pro
+          </button>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 8 }}>
+            <label style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Already have a license key?</label>
             <input
-              id="license-key"
               type="text"
               placeholder="KEEL-XXXX-XXXX-XXXX-XXXX-XXXX"
               value={state.licenseKey}
@@ -173,15 +201,18 @@ export default function KeelProPanel() {
                 setState((prev) => ({ ...prev, licenseKey: e.target.value, error: null }))
               }
               disabled={state.activating}
-              className="input input--text"
+              style={inputStyle}
             />
 
-            {state.error && <div className="error-message">{state.error}</div>}
+            {state.error && <div style={errorStyle}>{state.error}</div>}
 
             <button
-              className="button button--primary"
               onClick={handleActivate}
               disabled={state.activating || !state.licenseKey.trim()}
+              style={{
+                ...buttonSecondary,
+                opacity: state.activating || !state.licenseKey.trim() ? 0.5 : 1,
+              }}
             >
               {state.activating ? 'Verifying...' : 'Verify & Activate'}
             </button>
@@ -191,34 +222,53 @@ export default function KeelProPanel() {
 
       {/* Pro active state */}
       {isPro && status?.subscription && (
-        <div className="pro-state active">
-          <div className="pro-header">
-            <h3>Keel Pro</h3>
-            <span className="pro-badge">Active</span>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <h3 style={{ margin: 0, fontSize: 18 }}>Keel Pro</h3>
+            <span style={{
+              background: 'var(--accent)',
+              color: 'white',
+              padding: '2px 8px',
+              borderRadius: 4,
+              fontSize: 12,
+              fontWeight: 500,
+            }}>
+              Active
+            </span>
           </div>
 
-          <div className="pro-details">
-            <div className="pro-detail">
-              <label>Email</label>
-              <p>{status.subscription.email || 'Unknown'}</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div>
+              <label style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Email</label>
+              <p style={{ margin: '4px 0 0 0', fontSize: 14 }}>{status.subscription.email || 'Unknown'}</p>
             </div>
 
             {status.subscription.expiresAt && (
-              <div className="pro-detail">
-                <label>Expires</label>
-                <p>{new Date(status.subscription.expiresAt).toLocaleDateString()}</p>
+              <div>
+                <label style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Expires</label>
+                <p style={{ margin: '4px 0 0 0', fontSize: 14 }}>
+                  {new Date(status.subscription.expiresAt).toLocaleDateString()}
+                </p>
               </div>
             )}
 
-            <div className="pro-actions">
-              <a href="https://lemonsqueezy.com/my-purchases" target="_blank" rel="noopener noreferrer" className="button button--secondary">
+            <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
+              <a
+                href="https://lemonsqueezy.com/my-purchases"
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ ...buttonSecondary, textDecoration: 'none' }}
+              >
                 Manage Subscription
               </a>
 
               <button
-                className="button button--tertiary"
                 onClick={handleCancel}
                 disabled={state.activating}
+                style={{
+                  ...buttonSecondary,
+                  opacity: state.activating ? 0.5 : 1,
+                }}
               >
                 {state.activating ? 'Cancelling...' : 'Sign Out'}
               </button>
@@ -229,8 +279,15 @@ export default function KeelProPanel() {
 
       {/* Offline-grace warning */}
       {isPro && status?.reason === 'offline-grace' && (
-        <div className="pro-warning">
-          <p>⚠️ Couldn't verify your Pro status — connect to the internet to maintain Pro features.</p>
+        <div style={{
+          padding: 12,
+          background: 'rgba(245, 158, 11, 0.1)',
+          border: '1px solid rgba(245, 158, 11, 0.3)',
+          borderRadius: 6,
+          fontSize: 14,
+          color: '#d97706',
+        }}>
+          ⚠️ Couldn't verify your Pro status — connect to the internet to maintain Pro features.
         </div>
       )}
     </div>

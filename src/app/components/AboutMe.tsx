@@ -163,7 +163,7 @@ export default function AboutMe() {
             the people in your life, your voice, and the things you keep circling back to.
             Every morning it briefs you. Every chat gets more you-aware.
           </p>
-          <p className="about-me__lock-subtext">Daily briefs + personalized AI = $15/month</p>
+          <p className="about-me__lock-subtext">Daily briefs + personalized AI = $9.99/month</p>
           <button className="about-me__lock-cta" onClick={() => setInterviewing(true)}>
             Get started
           </button>
