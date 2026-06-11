@@ -44,3 +44,4 @@ ios/
 build/icon_1024.png
 build/icon_master.png
 build/k-crop.png
+.env.local

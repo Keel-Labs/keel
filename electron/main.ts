@@ -1707,14 +1707,6 @@ function registerIpcHandlers() {
   });
 
   ipcMain.handle('keel:daily-brief', async () => {
-    // Gate on Pro entitlement
-    const proStatus = await entitlements.getProStatus();
-    if (!proStatus.isPro) {
-      return {
-        error: 'Daily briefings are a Keel Pro feature. Upgrade at keel-labs.org/pro to unlock.',
-      };
-    }
-
     const result = await dailyBrief(fileManager, llmClient, {
       teamFileManager: teamFileManager || undefined,
     });

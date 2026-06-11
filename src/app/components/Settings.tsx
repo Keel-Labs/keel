@@ -118,7 +118,7 @@ const SECTION_META: Record<SettingsSectionId, { title: string; description: stri
   },
   'keel-pro': {
     title: 'Keel Pro',
-    description: 'Activate Pro to unlock daily briefings and personalized AI learning. $9.99/month.',
+    description: 'Personalized AI that learns who you are + access to Claude. $15/month.',
   },
   'keel-cloud': {
     title: 'Keel Cloud',
