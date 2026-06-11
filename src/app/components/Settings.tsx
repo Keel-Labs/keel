@@ -118,7 +118,7 @@ const SECTION_META: Record<SettingsSectionId, { title: string; description: stri
   },
   'keel-pro': {
     title: 'Keel Pro',
-    description: 'Personalized AI that learns who you are + access to Claude. $15/month.',
+    description: 'Personalized AI that learns who you are + bring your own API key (Claude, OpenAI, etc).',
   },
   'keel-cloud': {
     title: 'Keel Cloud',

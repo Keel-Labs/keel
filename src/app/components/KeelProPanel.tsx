@@ -176,12 +176,12 @@ export default function KeelProPanel() {
           <div>
             <h3 style={{ margin: '0 0 8px 0', fontSize: 18 }}>Keel Pro</h3>
             <p style={{ margin: 0, fontSize: 14, color: 'var(--text-secondary)' }}>
-              AI that learns who you are + Claude access
+              AI that learns who you are + bring your own API key
             </p>
           </div>
 
           <p style={{ margin: 0, fontSize: 14, lineHeight: 1.6 }}>
-            Unlock personalized AI learning and access to Claude for deeper reasoning and writing. $15/month.
+            Unlock personalized AI learning. Use any model you want — Claude, OpenAI, or your own. You provide the API key and control the cost.
           </p>
 
           <button

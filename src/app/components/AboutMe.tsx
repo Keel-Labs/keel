@@ -160,10 +160,10 @@ export default function AboutMe() {
           <h2 className="about-me__lock-title">Let Keel learn who you are</h2>
           <p className="about-me__lock-text">
             With Keel Pro: Keel learns your goals, the people in your work, your voice, and the
-            things you keep circling back to. Every chat gets more you-aware. Plus, unlock access
-            to Claude for deeper reasoning and writing.
+            things you keep circling back to. Every chat gets more you-aware. Use any AI model you
+            want—Claude, OpenAI, or others. You control which model and the cost.
           </p>
-          <p className="about-me__lock-subtext">Personalized AI + Claude access = $15/month</p>
+          <p className="about-me__lock-subtext">Personalized AI + your choice of models</p>
           <button className="about-me__lock-cta" onClick={() => setInterviewing(true)}>
             Get started
           </button>
