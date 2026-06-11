@@ -140,6 +140,15 @@ export default function KeelProPanel() {
       const result = await window.keel.proCancel();
 
       if (result.ok) {
+        // Revert to Ollama/Mistral — Pro providers (Claude, OpenAI, OpenRouter)
+        // require an active license, so switch back to the free local model.
+        try {
+          const s = await window.keel.getSettings();
+          if (s.provider !== 'ollama') {
+            await window.keel.saveSettings({ ...s, provider: 'ollama', ollamaModel: s.ollamaModel || 'mistral' });
+          }
+        } catch { /* best-effort */ }
+
         setState((prev) => ({
           ...prev,
           activating: false,
@@ -170,28 +179,17 @@ export default function KeelProPanel() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-      {/* Free state */}
-      {!isPro && status?.reason === 'no-active-entitlement' && (
+      {/* Free state — show whenever not Pro, regardless of the specific reason */}
+      {!isPro && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div>
-            <h3 style={{ margin: '0 0 8px 0', fontSize: 18 }}>Keel Pro</h3>
-            <p style={{ margin: 0, fontSize: 14, color: 'var(--text-secondary)' }}>
-              AI that learns who you are + bring your own API key
-            </p>
-          </div>
-
-          <p style={{ margin: 0, fontSize: 14, lineHeight: 1.6 }}>
-            Unlock personalized AI learning. Use any model you want — Claude, OpenAI, or your own. You provide the API key and control the cost.
-          </p>
-
           <button
             onClick={() => window.open('https://keel-pro.lemonsqueezy.com/checkout/buy/1c224dc6-5e38-4d05-a068-e8a751a9eefb', '_blank')}
             style={buttonPrimary}
           >
-            Upgrade to Pro
+            Get Keel Pro
           </button>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 8 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <label style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Already have a license key?</label>
             <input
               type="text"
@@ -252,16 +250,11 @@ export default function KeelProPanel() {
               </div>
             )}
 
-            <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
-              <a
-                href="https://lemonsqueezy.com/my-purchases"
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{ ...buttonSecondary, textDecoration: 'none' }}
-              >
-                Manage Subscription
-              </a>
+            <div style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.5, marginTop: 4 }}>
+              Your license key and receipt were sent to your purchase email. Keep them safe — you'll need the key to reactivate on a new machine.
+            </div>
 
+            <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
               <button
                 onClick={handleCancel}
                 disabled={state.activating}
@@ -270,7 +263,7 @@ export default function KeelProPanel() {
                   opacity: state.activating ? 0.5 : 1,
                 }}
               >
-                {state.activating ? 'Cancelling...' : 'Sign Out'}
+                {state.activating ? 'Signing out...' : 'Sign Out'}
               </button>
             </div>
           </div>

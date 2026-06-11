@@ -68,10 +68,10 @@ function formatOpenAIModelLabel(modelId: string): string {
 }
 
 const PROVIDERS = [
-  { value: 'claude', label: 'Claude', description: 'Anthropic reasoning and writing.' },
-  { value: 'openai', label: 'OpenAI', description: 'General-purpose GPT models.' },
-  { value: 'openrouter', label: 'OpenRouter', description: 'Any OpenAI-compatible endpoint.' },
-  { value: 'ollama', label: 'Ollama', description: 'Local models running on your machine.' },
+  { value: 'ollama', label: 'Local AI (via Ollama)', description: 'Free, private, offline. No API key required.', isPro: false },
+  { value: 'claude', label: 'Claude', description: 'Anthropic — best reasoning & writing.', isPro: true },
+  { value: 'openai', label: 'OpenAI', description: 'GPT models — strong all-rounder.', isPro: true },
+  { value: 'openrouter', label: 'OpenRouter', description: 'One key, hundreds of models.', isPro: true },
 ] as const;
 
 export type SettingsSectionId =
@@ -258,6 +258,7 @@ export default function Settings({ onBack, navigation, onSettingsChange }: Props
   const [ollamaPullProgress, setOllamaPullProgress] = useState<number | undefined>(undefined);
   const [ollamaPullStatus, setOllamaPullStatus] = useState<string>('');
   const [ollamaPulling, setOllamaPulling] = useState(false);
+  const [isPro, setIsPro] = useState(false);
   const [isCompactLayout, setIsCompactLayout] = useState(
     () => typeof window !== 'undefined' && window.innerWidth < 980
   );
@@ -349,6 +350,10 @@ export default function Settings({ onBack, navigation, onSettingsChange }: Props
     window.keel.getUpdateState?.().then(setUpdateState).catch(() => {});
     const unsub = window.keel.onUpdateState?.(setUpdateState);
 
+    // Fetch and subscribe to Pro status so the Model section can gate Pro providers.
+    window.keel.proStatus?.().then((s) => setIsPro(s?.isPro ?? false)).catch(() => {});
+    const unsubPro = window.keel.onProStatusChanged?.((s) => setIsPro(s?.isPro ?? false));
+
     // Subscribe to background Ollama pull progress events.
     const unsubPull = window.keel.onOllamaPullProgress?.((payload) => {
       if (payload.status === 'ready' || payload.status === 'error') {
@@ -366,6 +371,7 @@ export default function Settings({ onBack, navigation, onSettingsChange }: Props
     return () => {
       unsub?.();
       unsubPull?.();
+      unsubPro?.();
     };
   }, [fetchOllamaModels, fetchOpenAIModels, fetchOpenRouterModels, refreshXStatus]);
 
@@ -1278,9 +1284,43 @@ export default function Settings({ onBack, navigation, onSettingsChange }: Props
                   {providerLabel(settings.provider)} can't be used with Google Calendar or Docs. Google's API policy doesn't allow data to flow to providers whose terms permit training. Switch to Claude, OpenAI, or Ollama if you want to connect Google.
                 </div>
               )}
+
+              {/* Pro gate — shown when a non-Pro user has a Pro-only provider selected. */}
+              {!isPro && settings.provider !== 'ollama' && (
+                <div style={{
+                  marginTop: 8, padding: '10px 12px', borderRadius: 6,
+                  background: 'rgba(207, 122, 92, 0.1)',
+                  border: '1px solid rgba(207, 122, 92, 0.3)',
+                  color: 'var(--text-muted)', fontSize: 12, lineHeight: 1.6,
+                }}>
+                  <strong style={{ color: '#CF7A5C' }}>Keel Pro required.</strong>{' '}
+                  Claude, OpenAI, and OpenRouter require a Keel Pro license.{' '}
+                  <button
+                    onClick={() => window.open('https://keel-pro.lemonsqueezy.com/checkout/buy/1c224dc6-5e38-4d05-a068-e8a751a9eefb', '_blank')}
+                    style={{ background: 'none', border: 'none', color: '#CF7A5C', cursor: 'pointer', fontSize: 12, padding: 0, fontFamily: 'inherit', textDecoration: 'underline' }}
+                  >
+                    Get Keel Pro
+                  </button>
+                  {' '}or{' '}
+                  <button
+                    onClick={() => update({ provider: 'ollama', ollamaModel: 'mistral' })}
+                    style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 12, padding: 0, fontFamily: 'inherit', textDecoration: 'underline' }}
+                  >
+                    use Local Mistral for free
+                  </button>
+                  . If you already have a key, activate it in{' '}
+                  <button
+                    onClick={() => setSelectedSection('keel-pro')}
+                    style={{ background: 'none', border: 'none', color: '#CF7A5C', cursor: 'pointer', fontSize: 12, padding: 0, fontFamily: 'inherit', textDecoration: 'underline' }}
+                  >
+                    Keel Pro settings
+                  </button>
+                  .
+                </div>
+              )}
             </FieldRow>
 
-            {settings.provider !== 'ollama' && (
+            {settings.provider !== 'ollama' && isPro && (
               <FieldRow label="API Key">
                 <div style={{ position: 'relative' }}>
                   <input
@@ -1313,7 +1353,7 @@ export default function Settings({ onBack, navigation, onSettingsChange }: Props
               </FieldRow>
             )}
 
-            {settings.provider === 'claude' && (
+            {settings.provider === 'claude' && isPro && (
               <FieldRow label="Model">
                 <select
                   value={settings.claudeModel}
@@ -1327,7 +1367,7 @@ export default function Settings({ onBack, navigation, onSettingsChange }: Props
               </FieldRow>
             )}
 
-            {settings.provider === 'openai' && (
+            {settings.provider === 'openai' && isPro && (
               <FieldRow label="Model">
                 <select
                   value={settings.openaiModel}
@@ -1341,7 +1381,7 @@ export default function Settings({ onBack, navigation, onSettingsChange }: Props
               </FieldRow>
             )}
 
-            {settings.provider === 'openrouter' && (() => {
+            {settings.provider === 'openrouter' && isPro && (() => {
               const hasLiveList = openrouterModels.length > 0;
               const selectOptionIds = Array.from(new Set([
                 ...openrouterModels.map((m) => m.id),

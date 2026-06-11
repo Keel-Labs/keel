@@ -768,6 +768,7 @@ export default function Chat({
   const streamCleanupRef = useRef<Array<() => void>>([]);
   const actionButtonRef = useRef<HTMLButtonElement>(null);
   const [availableProviders, setAvailableProviders] = useState<Set<string>>(new Set());
+  const [isPro, setIsPro] = useState(false);
   const [openrouterModelName, setOpenrouterModelName] = useState<string>('');
   const [openrouterModels, setOpenrouterModels] = useState<OpenRouterModelInfo[]>([]);
   const openaiModelOptionIds = Array.from(new Set([
@@ -846,6 +847,13 @@ export default function Chat({
     window.addEventListener('focus', handleFocus);
     return () => window.removeEventListener('focus', handleFocus);
   }, [syncProviderSettings]);
+
+  // Track Pro status so the model picker can gate Pro-only providers.
+  useEffect(() => {
+    window.keel.proStatus?.().then((s) => setIsPro(s?.isPro ?? false)).catch(() => {});
+    const unsub = window.keel.onProStatusChanged?.((s) => setIsPro(s?.isPro ?? false));
+    return () => unsub?.();
+  }, []);
 
   useEffect(() => {
     if (settingsSyncSignal === undefined) return;
@@ -2233,7 +2241,7 @@ export default function Chat({
 	                {availableProviders.has('claude') && (
 	                  <>
 	                    <div style={{ fontSize: 10, color: 'var(--text-disabled)', padding: '6px 14px 2px', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600 }}>Claude</div>
-	                    {CLAUDE_MODELS.map((m) => {
+	                    {isPro ? CLAUDE_MODELS.map((m) => {
 	                      const active = currentProvider === 'claude' && currentModel === m.value;
 	                      return (
 	                        <button key={`claude-${m.value}`} onClick={() => handleModelChange('claude', m.value)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '7px 14px', border: 'none', cursor: 'pointer', background: active ? 'var(--accent-bg)' : 'transparent', color: active ? 'var(--accent-link)' : 'var(--text-secondary)', fontSize: 12, transition: 'background 0.1s' }}
@@ -2241,27 +2249,39 @@ export default function Chat({
 	                          onMouseLeave={(e) => { if (!active) e.currentTarget.style.background = 'transparent'; }}
 	                        >{m.label}</button>
 	                      );
-                    })}
+                    }) : (
+	                      <div style={{ padding: '6px 14px 8px', fontSize: 11, color: 'var(--text-disabled)' }}>
+	                        Requires <span style={{ color: '#CF7A5C', fontWeight: 600 }}>Keel Pro</span> — activate in Settings
+	                      </div>
+	                    )}
                   </>
                 )}
                 {availableProviders.has('openai') && (
                   <>
 	                    {availableProviders.has('claude') && <div style={{ height: 1, background: 'var(--panel-border)', margin: '4px 0' }} />}
 	                    <div style={{ fontSize: 10, color: 'var(--text-disabled)', padding: '6px 14px 2px', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600 }}>OpenAI</div>
-	                    {openaiModelsLoading && openaiModelOptions.length === 0 && (
-	                      <div style={{ padding: '8px 14px', color: 'var(--text-muted)', fontSize: 12 }}>
-	                        Loading live OpenAI models...
+	                    {isPro ? (
+	                      <>
+	                        {openaiModelsLoading && openaiModelOptions.length === 0 && (
+	                          <div style={{ padding: '8px 14px', color: 'var(--text-muted)', fontSize: 12 }}>
+	                            Loading live OpenAI models...
+	                          </div>
+	                        )}
+	                        {openaiModelOptions.map((m) => {
+	                          const active = currentProvider === 'openai' && currentModel === m.value;
+	                          return (
+	                            <button key={`openai-${m.value}`} onClick={() => handleModelChange('openai', m.value)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '7px 14px', border: 'none', cursor: 'pointer', background: active ? 'var(--accent-bg)' : 'transparent', color: active ? 'var(--accent-link)' : 'var(--text-secondary)', fontSize: 12, transition: 'background 0.1s' }}
+	                              onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = 'var(--surface-muted)'; }}
+	                              onMouseLeave={(e) => { if (!active) e.currentTarget.style.background = 'transparent'; }}
+	                            >{m.label}</button>
+	                          );
+	                        })}
+	                      </>
+	                    ) : (
+	                      <div style={{ padding: '6px 14px 8px', fontSize: 11, color: 'var(--text-disabled)' }}>
+	                        Requires <span style={{ color: '#CF7A5C', fontWeight: 600 }}>Keel Pro</span> — activate in Settings
 	                      </div>
 	                    )}
-	                    {openaiModelOptions.map((m) => {
-	                      const active = currentProvider === 'openai' && currentModel === m.value;
-	                      return (
-	                        <button key={`openai-${m.value}`} onClick={() => handleModelChange('openai', m.value)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '7px 14px', border: 'none', cursor: 'pointer', background: active ? 'var(--accent-bg)' : 'transparent', color: active ? 'var(--accent-link)' : 'var(--text-secondary)', fontSize: 12, transition: 'background 0.1s' }}
-	                          onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = 'var(--surface-muted)'; }}
-	                          onMouseLeave={(e) => { if (!active) e.currentTarget.style.background = 'transparent'; }}
-	                        >{m.label}</button>
-                      );
-                    })}
                   </>
                 )}
                 {availableProviders.has('ollama') && ollamaModels.length > 0 && (
@@ -2283,7 +2303,11 @@ export default function Chat({
                   <>
 	                    {(availableProviders.has('claude') || availableProviders.has('openai') || availableProviders.has('ollama')) && <div style={{ height: 1, background: 'var(--panel-border)', margin: '4px 0' }} />}
 	                    <div style={{ fontSize: 10, color: 'var(--text-disabled)', padding: '6px 14px 2px', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600 }}>OpenRouter</div>
-	                    {openrouterModels.length > 0 ? (
+	                    {!isPro ? (
+	                      <div style={{ padding: '6px 14px 8px', fontSize: 11, color: 'var(--text-disabled)' }}>
+	                        Requires <span style={{ color: '#CF7A5C', fontWeight: 600 }}>Keel Pro</span> — activate in Settings
+	                      </div>
+	                    ) : openrouterModels.length > 0 ? (
 	                      openrouterModels.map((m) => {
 	                        const active = currentProvider === 'openrouter' && currentModel === m.id;
 	                        return (

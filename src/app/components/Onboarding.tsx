@@ -5,7 +5,7 @@ import { BetaBadge } from './BetaBadge';
 import { isGoogleCompatible } from '../../core/googlePolicy';
 
 const PROVIDERS = [
-  { value: 'ollama' as const, label: 'Local Mistral (via Ollama)', description: 'Mistral 7B — free, private, offline. Downloads automatically on first launch.', tag: 'Free · No key · Default', keyField: null, signupUrl: 'https://ollama.com/download', isPro: false },
+  { value: 'ollama' as const, label: 'Local Mistral (via Ollama)', description: 'Mistral 7B — free, private, offline. Install the Ollama app once; the model (~4 GB) downloads automatically after that.', tag: 'Free · No key · Default', keyField: null, signupUrl: 'https://ollama.com/download', isPro: false },
   { value: 'claude' as const, label: 'Claude', description: 'Anthropic — best reasoning & writing', tag: 'Keel Pro', keyField: 'anthropicApiKey' as const, signupUrl: 'https://console.anthropic.com/', isPro: true },
   { value: 'openai' as const, label: 'OpenAI', description: 'GPT models — strong all-rounder', tag: 'Keel Pro', keyField: 'openaiApiKey' as const, signupUrl: 'https://platform.openai.com/api-keys', isPro: true },
   { value: 'openrouter' as const, label: 'OpenRouter', description: 'One key, hundreds of models', tag: 'Keel Pro', keyField: 'openrouterApiKey' as const, signupUrl: 'https://openrouter.ai/keys', isPro: true },
@@ -16,10 +16,10 @@ interface Props {
   onComplete: (settings: Settings) => void;
 }
 
-type Step = 'welcome' | 'about' | 'brain-path' | 'provider' | 'pro-gate' | 'api-key' | 'profile' | 'your-work' | 'done';
+type Step = 'welcome' | 'about' | 'brain-path' | 'provider' | 'ollama-setup' | 'pro-gate' | 'api-key' | 'profile' | 'your-work' | 'done';
 
 // 'about' is a side-step reachable only from 'welcome' via Learn more — not part of the linear flow.
-const STEPS: Step[] = ['welcome', 'brain-path', 'provider', 'pro-gate', 'api-key', 'profile', 'your-work', 'done'];
+const STEPS: Step[] = ['welcome', 'brain-path', 'provider', 'ollama-setup', 'pro-gate', 'api-key', 'profile', 'your-work', 'done'];
 
 interface ProjectDraft {
   name: string;
@@ -46,6 +46,12 @@ export default function Onboarding({ initialSettings, onComplete }: Props) {
   const [proLicenseInput, setProLicenseInput] = useState('');
   const [proActivating, setProActivating] = useState(false);
   const [proActivateError, setProActivateError] = useState('');
+
+  // Ollama setup step state
+  const [ollamaRunning, setOllamaRunning] = useState(false);
+  const [ollamaSetupPulling, setOllamaSetupPulling] = useState(false);
+  const [ollamaSetupProgress, setOllamaSetupProgress] = useState<number | undefined>(undefined);
+  const [ollamaSetupStatus, setOllamaSetupStatus] = useState<string>('');
 
   // brain-path step state
   const defaultBrainPath = initialSettings.brainPath; // settings.ts already populates this with ~/Keel
@@ -735,7 +741,7 @@ export default function Onboarding({ initialSettings, onComplete }: Props) {
               <button
                 onClick={() => {
                   if (!needsApiKey) {
-                    setStep('profile'); // Ollama — skip pro-gate and api-key
+                    setStep('ollama-setup'); // Ollama — check it's installed before profile
                   } else {
                     setStep('pro-gate'); // Pro provider — must activate license first
                   }
@@ -748,12 +754,31 @@ export default function Onboarding({ initialSettings, onComplete }: Props) {
           </>
         )}
 
+        {/* Ollama Setup — blocks until Ollama is installed and running */}
+        {step === 'ollama-setup' && (
+          <OllamaSetupStep
+            ollamaRunning={ollamaRunning}
+            setOllamaRunning={setOllamaRunning}
+            pulling={ollamaSetupPulling}
+            setPulling={setOllamaSetupPulling}
+            progress={ollamaSetupProgress}
+            setProgress={setOllamaSetupProgress}
+            status={ollamaSetupStatus}
+            setStatus={setOllamaSetupStatus}
+            onBack={() => setStep('provider')}
+            onNext={() => setStep('profile')}
+          />
+        )}
+
         {/* Pro Gate — license activation required before entering API key */}
         {step === 'pro-gate' && (
           <>
             <h2 style={headingStyle}>Activate Keel Pro</h2>
             <p style={subtextStyle}>
-              Using {selectedProvider?.label} requires a Keel Pro license. Enter your license key below, or subscribe to get one.
+              Using {selectedProvider?.label} requires a Keel Pro license. Enter your license key below, or{' '}
+              <a href="https://keel-pro.lemonsqueezy.com/checkout/buy/1c224dc6-5e38-4d05-a068-e8a751a9eefb" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)' }}>
+                get Keel Pro
+              </a>.
             </p>
 
             <div style={{ textAlign: 'left', marginBottom: 24 }}>
@@ -778,7 +803,16 @@ export default function Onboarding({ initialSettings, onComplete }: Props) {
             </div>
 
             <div style={{ marginBottom: 24, padding: '12px 14px', borderRadius: 'var(--radius-lg)', background: 'var(--bg-surface)', border: '1px solid var(--border-default)', fontSize: 12, color: 'var(--text-subtle)', lineHeight: 1.5, textAlign: 'left' }}>
-              Don't have a license yet? Subscribe to Keel Pro, then come back and paste your key above. Or{' '}
+              Don't have a license yet?{' '}
+              <a
+                href="https://keel-pro.lemonsqueezy.com/checkout/buy/1c224dc6-5e38-4d05-a068-e8a751a9eefb"
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ color: 'var(--accent)' }}
+              >
+                Get Keel Pro
+              </a>
+              , then come back and paste your key above. Or{' '}
               <button
                 onClick={() => setStep('provider')}
                 style={{ background: 'none', border: 'none', color: 'var(--accent)', fontSize: 'inherit', cursor: 'pointer', padding: 0, fontFamily: 'inherit' }}
@@ -1197,5 +1231,187 @@ export default function Onboarding({ initialSettings, onComplete }: Props) {
         )}
       </div>
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// OllamaSetupStep — checks Ollama is installed + running before proceeding.
+// Polls every 2s; shows download link if not running; shows pull progress if
+// Mistral is downloading; "Continue" only enabled when Ollama is up.
+// ---------------------------------------------------------------------------
+
+interface OllamaSetupStepProps {
+  ollamaRunning: boolean;
+  setOllamaRunning: (v: boolean) => void;
+  pulling: boolean;
+  setPulling: (v: boolean) => void;
+  progress: number | undefined;
+  setProgress: (v: number | undefined) => void;
+  status: string;
+  setStatus: (v: string) => void;
+  onBack: () => void;
+  onNext: () => void;
+}
+
+function OllamaSetupStep({
+  ollamaRunning, setOllamaRunning,
+  pulling, setPulling,
+  progress, setProgress,
+  status, setStatus,
+  onBack, onNext,
+}: OllamaSetupStepProps) {
+  const heading: React.CSSProperties = { fontSize: 26, fontWeight: 700, margin: '0 0 10px', color: 'var(--text-primary)' };
+  const subtext: React.CSSProperties = { fontSize: 15, color: 'var(--text-secondary)', margin: '0 0 28px', lineHeight: 1.55 };
+  const primary: React.CSSProperties = { padding: '12px 28px', borderRadius: 10, background: 'var(--accent)', color: '#fff', border: 'none', fontSize: 15, fontWeight: 600, cursor: 'pointer' };
+  const secondary: React.CSSProperties = { padding: '12px 24px', borderRadius: 10, background: 'transparent', color: 'var(--text-secondary)', border: '1px solid var(--border-subtle)', fontSize: 15, cursor: 'pointer' };
+
+  // Poll Ollama every 2s to detect when it starts running.
+  useEffect(() => {
+    let cancelled = false;
+
+    const check = async () => {
+      if (cancelled) return;
+      try {
+        const result = await window.keel.ollamaListModels?.();
+        if (cancelled) return;
+        if (!result?.error) {
+          setOllamaRunning(true);
+          // Check if mistral is already there or being pulled.
+          const hasMistral = result?.models?.some((m: { name: string }) => m.name.startsWith('mistral'));
+          if (!hasMistral) {
+            // Check if a pull is already in progress.
+            const pullStatus = await window.keel.ollamaModelStatus?.('mistral');
+            if (pullStatus?.pulling) {
+              setPulling(true);
+              setProgress(pullStatus.progress);
+              setStatus(pullStatus.status || 'Downloading...');
+            } else if (!pullStatus?.ready) {
+              // Kick off the pull automatically.
+              setPulling(true);
+              setProgress(0);
+              setStatus('Starting download...');
+              window.keel.ollamaPullModel?.('mistral').catch(() => {});
+            }
+          }
+        } else {
+          setOllamaRunning(false);
+        }
+      } catch {
+        if (!cancelled) setOllamaRunning(false);
+      }
+    };
+
+    void check();
+    const interval = setInterval(check, 2000);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, [setOllamaRunning, setPulling, setProgress, setStatus]);
+
+  // Subscribe to pull progress events.
+  useEffect(() => {
+    const unsub = window.keel.onOllamaPullProgress?.((payload) => {
+      if (!payload.modelName.startsWith('mistral')) return;
+      if (payload.status === 'ready') {
+        setPulling(false);
+        setProgress(100);
+        setStatus('Ready');
+      } else if (payload.status === 'error') {
+        setPulling(false);
+        setStatus('Download failed — try again');
+      } else {
+        setPulling(true);
+        setStatus(payload.status);
+        if (payload.progress != null) setProgress(payload.progress);
+      }
+    });
+    return () => unsub?.();
+  }, [setPulling, setProgress, setStatus]);
+
+  const mistralReady = progress === 100 || status === 'Ready';
+  const canContinue = ollamaRunning && (mistralReady || pulling === false);
+
+  return (
+    <>
+      <h2 style={heading}>Set up Local AI</h2>
+      <p style={subtext}>
+        Keel uses <strong>Ollama</strong> to run Mistral 7B on your machine — free, private, and offline.
+        Install the Ollama app once, then come back. Keel will download Mistral automatically.
+      </p>
+
+      {/* Step 1 — Install Ollama */}
+      <div style={{
+        padding: '16px 20px', borderRadius: 12,
+        background: ollamaRunning ? 'rgba(76,175,80,0.08)' : 'var(--surface-panel)',
+        border: `1px solid ${ollamaRunning ? 'rgba(76,175,80,0.25)' : 'var(--border-subtle)'}`,
+        marginBottom: 12,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+          <div>
+            <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--text-primary)', marginBottom: 2 }}>
+              {ollamaRunning ? '✓ Ollama is running' : 'Step 1: Install Ollama'}
+            </div>
+            {!ollamaRunning && (
+              <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+                Free app. Download, install, and leave it running — Keel will detect it automatically.
+              </div>
+            )}
+          </div>
+          {!ollamaRunning && (
+            <button
+              onClick={() => window.keel.openPath?.('https://ollama.com/download')}
+              style={{ ...primary, padding: '8px 16px', fontSize: 13, whiteSpace: 'nowrap' as const }}
+            >
+              Download Ollama
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Step 2 — Mistral download (only shown once Ollama is running) */}
+      {ollamaRunning && (
+        <div style={{
+          padding: '16px 20px', borderRadius: 12,
+          background: mistralReady ? 'rgba(76,175,80,0.08)' : 'var(--surface-panel)',
+          border: `1px solid ${mistralReady ? 'rgba(76,175,80,0.25)' : 'var(--border-subtle)'}`,
+          marginBottom: 12,
+        }}>
+          <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--text-primary)', marginBottom: 4 }}>
+            {mistralReady ? '✓ Mistral 7B is ready' : pulling ? 'Downloading Mistral 7B...' : 'Step 2: Download Mistral 7B'}
+          </div>
+          {!mistralReady && (
+            <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: pulling ? 10 : 0 }}>
+              {pulling ? status : 'About 4 GB. Downloads once, runs forever.'}
+            </div>
+          )}
+          {pulling && progress != null && (
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--text-secondary)', marginBottom: 4 }}>
+                <span>{status}</span>
+                <span>{progress}%</span>
+              </div>
+              <div style={{ height: 6, borderRadius: 3, background: 'var(--border-subtle)', overflow: 'hidden' }}>
+                <div style={{ height: '100%', width: `${progress}%`, background: 'var(--accent)', borderRadius: 3, transition: 'width 0.3s ease' }} />
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {!ollamaRunning && (
+        <p style={{ fontSize: 13, color: 'var(--text-secondary)', textAlign: 'center' as const, margin: '8px 0 0' }}>
+          Waiting for Ollama to start... Keel will detect it automatically.
+        </p>
+      )}
+
+      <div style={{ display: 'flex', justifyContent: 'center', gap: 12, marginTop: 24 }}>
+        <button onClick={onBack} style={secondary}>Back</button>
+        <button
+          onClick={onNext}
+          disabled={!ollamaRunning}
+          style={{ ...primary, opacity: ollamaRunning ? 1 : 0.4, cursor: ollamaRunning ? 'pointer' : 'not-allowed' }}
+        >
+          {mistralReady ? 'Continue' : pulling ? 'Continue (downloading in background)' : 'Continue'}
+        </button>
+      </div>
+    </>
   );
 }
