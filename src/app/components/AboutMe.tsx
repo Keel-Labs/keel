@@ -180,16 +180,19 @@ export default function AboutMe() {
           <div className="about-me__lock-badge">
             <LockIcon size={22} />
           </div>
-          <h2 className="about-me__lock-title">Let Keel learn who you are</h2>
-          <p className="about-me__lock-text">
-            With Keel Pro: Keel learns your goals, the people in your work, your voice, and the
-            things you keep circling back to. Every chat gets more you-aware. Use any AI model you
-            want—Claude, OpenAI, or others. You control which model and the cost.
-          </p>
-          <p className="about-me__lock-subtext">Personalized AI + your choice of models</p>
+          <h2 className="about-me__lock-title">Keel Pro</h2>
+          <p className="about-me__lock-subtext">A personal AI that gets sharper the more you use it.</p>
+          <ul className="about-me__lock-features">
+            <li><span className="about-me__lock-check">✓</span> Learns your goals, context, and working style over time</li>
+            <li><span className="about-me__lock-check">✓</span> Every chat gets more relevant as your model grows</li>
+            <li><span className="about-me__lock-check">✓</span> Builds a private "About Me" page from your conversations</li>
+            <li><span className="about-me__lock-check">✓</span> Bring your own API key — Claude, OpenAI, or OpenRouter</li>
+            <li><span className="about-me__lock-check">✓</span> Your data stays local, in plain markdown you own</li>
+          </ul>
           <button className="about-me__lock-cta" onClick={() => setInterviewing(true)}>
-            Get started
+            Get Keel Pro
           </button>
+          <p className="about-me__lock-already">Already have a license? Activate it in Settings → Keel Pro.</p>
         </div>
       </div>
     );
