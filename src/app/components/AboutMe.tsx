@@ -1,10 +1,10 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import ModelInterview from './ModelInterview';
+import type { ProStatus } from '../../shared/types';
 
 // About Me renders the model-of-you file (<workspace>/.keel/model-of-me.md).
-// Pro-gated: until the Sprint 3 entitlement system lands, the gating signal is
-// simply whether the file exists — a seeded file means Pro/seeded, its absence
-// shows the upsell teaser.
+// Pro-gated: check both Pro entitlement AND file existence before showing model.
+// Free users see upsell teaser even if file exists (defensive gating).
 const MODEL_PATH = '.keel/model-of-me.md';
 const LOCK_MARKER = '<!-- locked -->';
 
@@ -101,25 +101,48 @@ export default function AboutMe() {
   const [content, setContent] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [interviewing, setInterviewing] = useState(false);
+  const [proStatus, setProStatus] = useState<ProStatus | null>(null);
 
   const load = useCallback(() => {
     setLoading(true);
-    return window.keel
-      .readFile(MODEL_PATH)
-      .then((text) => setContent(text.trim().length > 0 ? text : null))
-      .catch(() => setContent(null))
+    return Promise.all([
+      window.keel.proStatus(),
+      window.keel.readFile(MODEL_PATH),
+    ])
+      .then(([pro, text]) => {
+        // Only show model if Pro is active AND file has content
+        if (pro.isPro && text.trim().length > 0) {
+          setContent(text);
+        } else {
+          setContent(null);
+        }
+        setProStatus(pro);
+      })
+      .catch(() => {
+        setContent(null);
+      })
       .finally(() => setLoading(false));
   }, []);
 
   useEffect(() => {
     let cancelled = false;
-    window.keel
-      .readFile(MODEL_PATH)
-      .then((text) => {
-        if (!cancelled) setContent(text.trim().length > 0 ? text : null);
+    Promise.all([
+      window.keel.proStatus(),
+      window.keel.readFile(MODEL_PATH),
+    ])
+      .then(([pro, text]) => {
+        if (cancelled) return;
+        // Only show model if Pro is active AND file has content
+        if (pro.isPro && text.trim().length > 0) {
+          setContent(text);
+        } else {
+          setContent(null);
+        }
+        setProStatus(pro);
       })
       .catch(() => {
-        if (!cancelled) setContent(null);
+        if (cancelled) return;
+        setContent(null);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
