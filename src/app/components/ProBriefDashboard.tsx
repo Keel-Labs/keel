@@ -148,7 +148,7 @@ export default function ProBriefDashboard() {
           </ul>
           <button
             className="button button--primary button--large"
-            onClick={() => window.open('https://keel-labs.org/pro', '_blank')}
+            onClick={() => window.open('https://keel-pro.lemonsqueezy.com/checkout/buy/1c224dc6-5e38-4d05-a068-e8a751a9eefb', '_blank')}
           >
             Upgrade to Pro
           </button>

@@ -5,10 +5,10 @@ import { BetaBadge } from './BetaBadge';
 import { isGoogleCompatible } from '../../core/googlePolicy';
 
 const PROVIDERS = [
-  { value: 'claude' as const, label: 'Claude', description: 'Anthropic — best reasoning & writing', tag: 'API key', keyField: 'anthropicApiKey' as const, signupUrl: 'https://console.anthropic.com/' },
-  { value: 'openai' as const, label: 'OpenAI', description: 'GPT models — strong all-rounder', tag: 'API key', keyField: 'openaiApiKey' as const, signupUrl: 'https://platform.openai.com/api-keys' },
-  { value: 'openrouter' as const, label: 'OpenRouter', description: 'One key, hundreds of models', tag: 'API key', keyField: 'openrouterApiKey' as const, signupUrl: 'https://openrouter.ai/keys' },
-  { value: 'ollama' as const, label: 'Ollama', description: 'Local models — free, private, offline. Runs on your machine.', tag: 'Free · No key', keyField: null, signupUrl: 'https://ollama.com/download' },
+  { value: 'ollama' as const, label: 'Local Mistral (via Ollama)', description: 'Mistral 7B — free, private, offline. Downloads automatically on first launch.', tag: 'Free · No key · Default', keyField: null, signupUrl: 'https://ollama.com/download', isPro: false },
+  { value: 'claude' as const, label: 'Claude', description: 'Anthropic — best reasoning & writing', tag: 'Keel Pro', keyField: 'anthropicApiKey' as const, signupUrl: 'https://console.anthropic.com/', isPro: true },
+  { value: 'openai' as const, label: 'OpenAI', description: 'GPT models — strong all-rounder', tag: 'Keel Pro', keyField: 'openaiApiKey' as const, signupUrl: 'https://platform.openai.com/api-keys', isPro: true },
+  { value: 'openrouter' as const, label: 'OpenRouter', description: 'One key, hundreds of models', tag: 'Keel Pro', keyField: 'openrouterApiKey' as const, signupUrl: 'https://openrouter.ai/keys', isPro: true },
 ];
 
 interface Props {
@@ -16,10 +16,10 @@ interface Props {
   onComplete: (settings: Settings) => void;
 }
 
-type Step = 'welcome' | 'about' | 'brain-path' | 'provider' | 'api-key' | 'profile' | 'your-work' | 'done';
+type Step = 'welcome' | 'about' | 'brain-path' | 'provider' | 'pro-gate' | 'api-key' | 'profile' | 'your-work' | 'done';
 
 // 'about' is a side-step reachable only from 'welcome' via Learn more — not part of the linear flow.
-const STEPS: Step[] = ['welcome', 'brain-path', 'provider', 'api-key', 'profile', 'your-work', 'done'];
+const STEPS: Step[] = ['welcome', 'brain-path', 'provider', 'pro-gate', 'api-key', 'profile', 'your-work', 'done'];
 
 interface ProjectDraft {
   name: string;
@@ -29,12 +29,23 @@ interface ProjectDraft {
 
 export default function Onboarding({ initialSettings, onComplete }: Props) {
   const [step, setStep] = useState<Step>('welcome');
-  const [settings, setSettings] = useState<Settings>({ ...initialSettings });
+  // Onboarding always starts with Ollama/Mistral as the free default.
+  // Users who want a Pro provider select it on the provider step.
+  const [settings, setSettings] = useState<Settings>({
+    ...initialSettings,
+    provider: 'ollama',
+    ollamaModel: 'mistral',
+  });
   const [name, setName] = useState('');
   const [role, setRole] = useState('');
   const [showKey, setShowKey] = useState(false);
   const [testKeyStatus, setTestKeyStatus] = useState<'idle' | 'testing' | 'ok' | 'error'>('idle');
   const [testKeyError, setTestKeyError] = useState<string>('');
+
+  // Pro gate step state
+  const [proLicenseInput, setProLicenseInput] = useState('');
+  const [proActivating, setProActivating] = useState(false);
+  const [proActivateError, setProActivateError] = useState('');
 
   // brain-path step state
   const defaultBrainPath = initialSettings.brainPath; // settings.ts already populates this with ~/Keel
@@ -656,19 +667,8 @@ export default function Onboarding({ initialSettings, onComplete }: Props) {
           <>
             <h2 style={headingStyle}>Choose your AI model</h2>
             <p style={subtextStyle}>
-              Keel needs an AI model to think with. Bring an API key from a provider below, or use Ollama to run models free on your machine. You can switch anytime.
+              Local Mistral is free — no API key, no account. Mistral 7B downloads automatically after setup. Claude, OpenAI, and OpenRouter require Keel Pro + your own API key.
             </p>
-
-            {/* No-key helper callout */}
-            <div style={{
-              textAlign: 'left', padding: '10px 12px', marginBottom: 14,
-              background: 'var(--accent-bg)', border: '1px solid var(--accent-border)',
-              borderRadius: 'var(--radius-lg)',
-              fontSize: 12, color: 'var(--text-subtle)', lineHeight: 1.5,
-            }}>
-              <strong style={{ color: 'var(--text-primary)' }}>No API key?</strong>{' '}
-              Pick <strong style={{ color: 'var(--text-primary)' }}>Ollama</strong> — it's free, runs locally, and no signup is needed. You'll just install the Ollama app once.
-            </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 24, textAlign: 'left' }}>
               {PROVIDERS.map((p) => {
@@ -695,37 +695,35 @@ export default function Onboarding({ initialSettings, onComplete }: Props) {
                     <div style={{ flex: 1 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2, flexWrap: 'wrap' }}>
                         <span style={{ fontSize: 'var(--text-base)', fontWeight: 500, color: 'var(--text-primary)' }}>{p.label}</span>
+                        {/* Free / Pro tier badge */}
                         <span style={{
                           fontSize: 10, fontWeight: 600, letterSpacing: '0.04em',
                           textTransform: 'uppercase', padding: '2px 6px', borderRadius: 4,
-                          background: isOllama ? 'rgba(76,175,80,0.15)' : 'rgba(255,255,255,0.06)',
-                          color: isOllama ? '#7dd87f' : 'var(--text-tertiary)',
-                          border: `1px solid ${isOllama ? 'rgba(76,175,80,0.3)' : 'var(--border-default)'}`,
+                          background: isOllama
+                            ? 'rgba(76,175,80,0.15)'
+                            : 'rgba(207,122,92,0.15)',
+                          color: isOllama ? '#7dd87f' : '#CF7A5C',
+                          border: `1px solid ${isOllama ? 'rgba(76,175,80,0.3)' : 'rgba(207,122,92,0.3)'}`,
                         }}>
                           {p.tag}
                         </span>
-                        {/* Limited Use compatibility hint — see src/core/googlePolicy.ts */}
-                        {!isGoogleCompatible(p.value) && (
-                          <span title="Google's API policy doesn't allow data to flow to this provider. You can still use it, but you won't be able to connect Google Calendar or Docs."
-                            style={{
-                              fontSize: 10, fontWeight: 600, letterSpacing: '0.04em',
-                              textTransform: 'uppercase', padding: '2px 6px', borderRadius: 4,
-                              background: 'rgba(245, 158, 11, 0.12)',
-                              color: '#fbbf24',
-                              border: '1px solid rgba(245, 158, 11, 0.22)',
-                            }}>
-                            No Google
-                          </span>
-                        )}
+                        {/* Google Limited Use badge intentionally omitted from onboarding — shown in Settings instead */}
                       </div>
                       <div style={{ fontSize: 12, color: 'var(--text-subtle)', lineHeight: 1.5 }}>
-                        {p.description}
-                        {' '}
-                        <a href={p.signupUrl} target="_blank" rel="noopener noreferrer"
-                          onClick={(e) => e.stopPropagation()}
-                          style={{ color: 'var(--accent)' }}>
-                          {isOllama ? 'Download Ollama' : 'Get a key'}
-                        </a>
+                        {isOllama ? (
+                          <>
+                            {p.description}{' '}
+                            <a href={p.signupUrl} target="_blank" rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              style={{ color: 'var(--accent)' }}>
+                              Get Ollama
+                            </a>
+                          </>
+                        ) : (
+                          <>
+                            {p.description} — requires Keel Pro + your own API key.
+                          </>
+                        )}
                       </div>
                     </div>
                   </label>
@@ -736,12 +734,83 @@ export default function Onboarding({ initialSettings, onComplete }: Props) {
               <button onClick={back} style={secondaryBtn}>Back</button>
               <button
                 onClick={() => {
-                  if (needsApiKey) next();
-                  else setStep('profile'); // Skip API key step for Ollama
+                  if (!needsApiKey) {
+                    setStep('profile'); // Ollama — skip pro-gate and api-key
+                  } else {
+                    setStep('pro-gate'); // Pro provider — must activate license first
+                  }
                 }}
                 style={primaryBtn}
               >
                 Next
+              </button>
+            </div>
+          </>
+        )}
+
+        {/* Pro Gate — license activation required before entering API key */}
+        {step === 'pro-gate' && (
+          <>
+            <h2 style={headingStyle}>Activate Keel Pro</h2>
+            <p style={subtextStyle}>
+              Using {selectedProvider?.label} requires a Keel Pro license. Enter your license key below, or subscribe to get one.
+            </p>
+
+            <div style={{ textAlign: 'left', marginBottom: 24 }}>
+              <label style={{ display: 'block', fontSize: 12, color: 'var(--text-subtle)', marginBottom: 6 }}>
+                License key
+              </label>
+              <input
+                type="text"
+                value={proLicenseInput}
+                onChange={(e) => { setProLicenseInput(e.target.value); setProActivateError(''); }}
+                placeholder="XXXX-XXXX-XXXX-XXXX"
+                style={{
+                  width: '100%', padding: '10px 12px', borderRadius: 'var(--radius-lg)',
+                  border: '1px solid var(--border-default)', background: 'var(--bg-surface)',
+                  color: 'var(--text-primary)', fontSize: 14, boxSizing: 'border-box' as const,
+                  fontFamily: 'monospace',
+                }}
+              />
+              {proActivateError && (
+                <p style={{ fontSize: 12, color: 'var(--destructive)', marginTop: 8 }}>{proActivateError}</p>
+              )}
+            </div>
+
+            <div style={{ marginBottom: 24, padding: '12px 14px', borderRadius: 'var(--radius-lg)', background: 'var(--bg-surface)', border: '1px solid var(--border-default)', fontSize: 12, color: 'var(--text-subtle)', lineHeight: 1.5, textAlign: 'left' }}>
+              Don't have a license yet? Subscribe to Keel Pro, then come back and paste your key above. Or{' '}
+              <button
+                onClick={() => setStep('provider')}
+                style={{ background: 'none', border: 'none', color: 'var(--accent)', fontSize: 'inherit', cursor: 'pointer', padding: 0, fontFamily: 'inherit' }}
+              >
+                go back and use Local Mistral for free
+              </button>.
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'center', gap: 12 }}>
+              <button onClick={() => setStep('provider')} style={secondaryBtn}>Back</button>
+              <button
+                disabled={!proLicenseInput.trim() || proActivating}
+                style={{ ...primaryBtn, opacity: (!proLicenseInput.trim() || proActivating) ? 0.5 : 1, cursor: (!proLicenseInput.trim() || proActivating) ? 'not-allowed' : 'pointer' }}
+                onClick={async () => {
+                  setProActivating(true);
+                  setProActivateError('');
+                  try {
+                    const result = await window.keel.proActivate(proLicenseInput.trim());
+                    if (result.ok) {
+                      setSettings({ ...settings, proLicenseKey: proLicenseInput.trim() });
+                      setStep('api-key');
+                    } else {
+                      setProActivateError(result.error || 'License key not valid. Check it and try again.');
+                    }
+                  } catch {
+                    setProActivateError('Could not verify the license key. Check your internet connection.');
+                  } finally {
+                    setProActivating(false);
+                  }
+                }}
+              >
+                {proActivating ? 'Activating…' : 'Activate'}
               </button>
             </div>
           </>
@@ -796,7 +865,7 @@ export default function Onboarding({ initialSettings, onComplete }: Props) {
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'center', gap: 12 }}>
-              <button onClick={back} style={secondaryBtn}>Back</button>
+              <button onClick={() => setStep('pro-gate')} style={secondaryBtn}>Back</button>
               <button
                 onClick={testApiKey}
                 disabled={getApiKey().length < 5 || testKeyStatus === 'testing'}

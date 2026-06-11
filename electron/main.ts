@@ -249,6 +249,52 @@ async function fetchAiNewsRss(): Promise<NewsItem[]> {
 let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 
+// Tracks the state of an in-progress `ollama pull` (e.g. mistral on first run).
+// Used by the chat handler to give a friendly error while the model downloads,
+// and by the Settings UI to show a progress indicator.
+let ollamaPullState: { modelName: string; pulling: boolean; progress: number; status: string } = {
+  modelName: '',
+  pulling: false,
+  progress: 0,
+  status: '',
+};
+
+function emitOllamaPullProgress(modelName: string, status: string, progress?: number) {
+  ollamaPullState = { modelName, pulling: status !== 'ready' && status !== 'error', progress: progress ?? ollamaPullState.progress, status };
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (!win.isDestroyed()) {
+      win.webContents.send('keel:ollama-pull-progress', { modelName, status, progress });
+    }
+  }
+}
+
+async function startMistralPullIfNeeded() {
+  const targetModel = settings.ollamaModel || 'mistral';
+  if (settings.provider !== 'ollama' || !targetModel.startsWith('mistral')) return;
+  try {
+    const { Ollama } = await import('ollama');
+    const ollama = new Ollama();
+    const list = await ollama.list();
+    const hasModel = list.models.some((m: any) => m.name.startsWith('mistral'));
+    if (hasModel) return;
+
+    logger.log(`[ollama] "${targetModel}" not found — pulling in background`);
+    emitOllamaPullProgress(targetModel, 'Starting download...', 0);
+
+    const stream = await ollama.pull({ model: targetModel, stream: true });
+    for await (const chunk of (stream as AsyncIterable<any>)) {
+      const pct = chunk.total ? Math.round((chunk.completed / chunk.total) * 100) : undefined;
+      emitOllamaPullProgress(targetModel, chunk.status || 'Downloading...', pct);
+    }
+    emitOllamaPullProgress(targetModel, 'ready', 100);
+    logger.log(`[ollama] "${targetModel}" pull complete`);
+  } catch (err) {
+    // Ollama not installed or not running — silently skip; user can install later
+    logger.warn('[ollama] Auto-pull skipped (Ollama not available):', err);
+    ollamaPullState = { modelName: '', pulling: false, progress: 0, status: '' };
+  }
+}
+
 let updateState: UpdateState = {
   status: 'idle',
   version: null,
@@ -1280,6 +1326,19 @@ function registerIpcHandlers() {
     const normalizedRequest = normalizeChatRequest(request);
     const abortController = new AbortController();
     activeStreamControllers.set(streamRequestId, abortController);
+
+    // Friendly gate: if the local model is mid-download, tell the user to wait
+    // rather than letting Ollama return a cryptic "model not found" error.
+    if (settings.provider === 'ollama' && ollamaPullState.pulling) {
+      const pct = ollamaPullState.progress ? ` (${ollamaPullState.progress}%)` : '';
+      const msg = `Local Mistral is still downloading${pct}. Please wait a moment and try again.`;
+      if (!sender.isDestroyed()) {
+        sender.send('keel:chat-stream-error', { requestId: streamRequestId, error: msg });
+      }
+      activeStreamControllers.delete(streamRequestId);
+      return;
+    }
+
     const emitThinking = (step: string) => {
       if (!sender.isDestroyed()) {
         sender.send('keel:thinking-step', { requestId: streamRequestId, step });
@@ -2987,6 +3046,45 @@ function registerIpcHandlers() {
     }
   });
 
+  ipcMain.handle('keel:ollama-model-status', async (_event, modelName: string) => {
+    if (ollamaPullState.pulling && ollamaPullState.modelName === modelName) {
+      return { ready: false, pulling: true, progress: ollamaPullState.progress, status: ollamaPullState.status };
+    }
+    try {
+      const { Ollama } = await import('ollama');
+      const ollama = new Ollama();
+      const list = await ollama.list();
+      const ready = list.models.some((m: any) => m.name === modelName || m.name.startsWith(modelName.split(':')[0]));
+      return { ready, pulling: false, progress: ready ? 100 : 0 };
+    } catch {
+      return { ready: false, pulling: false, progress: 0 };
+    }
+  });
+
+  ipcMain.handle('keel:ollama-pull-model', async (event, modelName: string) => {
+    if (ollamaPullState.pulling) {
+      return { ok: false, error: `Already pulling ${ollamaPullState.modelName}` };
+    }
+    try {
+      const { Ollama } = await import('ollama');
+      const ollama = new Ollama();
+      emitOllamaPullProgress(modelName, 'Starting download...', 0);
+      const stream = await ollama.pull({ model: modelName, stream: true });
+      for await (const chunk of (stream as AsyncIterable<any>)) {
+        const pct = chunk.total ? Math.round((chunk.completed / chunk.total) * 100) : undefined;
+        emitOllamaPullProgress(modelName, chunk.status || 'Downloading...', pct);
+        if (event.sender.isDestroyed()) break;
+      }
+      emitOllamaPullProgress(modelName, 'ready', 100);
+      return { ok: true };
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      emitOllamaPullProgress(modelName, 'error', undefined);
+      ollamaPullState = { modelName: '', pulling: false, progress: 0, status: '' };
+      return { ok: false, error: msg };
+    }
+  });
+
   ipcMain.handle('keel:test-llm-key', async (_event, provider: 'claude' | 'openai' | 'openrouter' | 'ollama', apiKey?: string) => {
     // A small, cheap call against the provider to confirm the key works and
     // the account has access. Called from onboarding before the user moves
@@ -3440,6 +3538,13 @@ app.whenReady().then(async () => {
 
   // Start file watcher
   startFileWatcher();
+
+  // If Ollama is the active provider and the configured model (default: mistral) is
+  // not yet downloaded, pull it silently in the background so first-time users
+  // don't have to run `ollama pull` manually.
+  startMistralPullIfNeeded().catch((err) => {
+    logger.warn('[ollama] Background pull failed:', err);
+  });
 
   // Start KB auto-refresh watcher (per-project source folders)
   startKBAutoRefreshWatcher().catch((err) => {

@@ -746,6 +746,9 @@ export interface KeelAPI {
   openrouterListModels: () => Promise<OpenRouterListResult>;
   // Ollama
   ollamaListModels: () => Promise<OllamaListResult>;
+  ollamaPullModel: (modelName: string) => Promise<{ ok: boolean; error?: string }>;
+  ollamaModelStatus: (modelName: string) => Promise<{ ready: boolean; pulling: boolean; progress?: number; status?: string }>;
+  onOllamaPullProgress: (callback: (payload: { modelName: string; status: string; progress?: number }) => void) => () => void;
   testLlmKey: (provider: 'claude' | 'openai' | 'openrouter' | 'ollama', apiKey?: string) => Promise<{ ok: true } | { ok: false; error: string }>;
   reportBug: (context?: { title?: string; error?: string }) => Promise<{ ok: true }>;
   // Activity

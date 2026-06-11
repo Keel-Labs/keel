@@ -185,7 +185,7 @@ export default function KeelProPanel() {
           </p>
 
           <button
-            onClick={() => window.open('https://keel-labs.org/pro', '_blank')}
+            onClick={() => window.open('https://keel-pro.lemonsqueezy.com/checkout/buy/1c224dc6-5e38-4d05-a068-e8a751a9eefb', '_blank')}
             style={buttonPrimary}
           >
             Upgrade to Pro

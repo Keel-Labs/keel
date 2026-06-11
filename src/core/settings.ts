@@ -33,7 +33,7 @@ export function getDefaultSettings(): Settings {
   return {
     theme: 'system',
     hasCompletedOnboarding: false,
-    provider: 'claude',
+    provider: 'ollama',
     anthropicApiKey: '',
     claudeModel: 'claude-sonnet-4-20250514',
     anthropicBaseUrl: '',
@@ -43,7 +43,7 @@ export function getDefaultSettings(): Settings {
     openrouterApiKey: '',
     openrouterModel: '',
     openrouterBaseUrl: 'https://openrouter.ai/api/v1',
-    ollamaModel: 'llama3.2',
+    ollamaModel: 'mistral',
     personality: 'default',
     brainPath: getDefaultBrainPath(),
     userName: '',

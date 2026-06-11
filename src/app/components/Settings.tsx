@@ -255,6 +255,9 @@ export default function Settings({ onBack, navigation, onSettingsChange }: Props
   const [ollamaError, setOllamaError] = useState<string | null>(null);
   const [ollamaLoading, setOllamaLoading] = useState(false);
   const [ollamaManualEntry, setOllamaManualEntry] = useState(false);
+  const [ollamaPullProgress, setOllamaPullProgress] = useState<number | undefined>(undefined);
+  const [ollamaPullStatus, setOllamaPullStatus] = useState<string>('');
+  const [ollamaPulling, setOllamaPulling] = useState(false);
   const [isCompactLayout, setIsCompactLayout] = useState(
     () => typeof window !== 'undefined' && window.innerWidth < 980
   );
@@ -323,7 +326,17 @@ export default function Settings({ onBack, navigation, onSettingsChange }: Props
     window.keel.getSettings().then((s) => {
       setSettings(s);
       latestSettingsRef.current = s;
-      if (s.provider === 'ollama') fetchOllamaModels();
+      if (s.provider === 'ollama') {
+        fetchOllamaModels();
+        // Check if the configured model is already being pulled (e.g. started at app launch).
+        window.keel.ollamaModelStatus?.(s.ollamaModel || 'mistral').then((status) => {
+          if (status.pulling) {
+            setOllamaPulling(true);
+            setOllamaPullProgress(status.progress);
+            setOllamaPullStatus(status.status || 'Downloading...');
+          }
+        }).catch(() => {});
+      }
       if (s.openaiApiKey) fetchOpenAIModels();
       if (s.openrouterApiKey || s.provider === 'openrouter') fetchOpenRouterModels();
     }).catch(() => {});
@@ -335,7 +348,25 @@ export default function Settings({ onBack, navigation, onSettingsChange }: Props
     window.keel.getAppVersion?.().then(setAppVersion).catch(() => {});
     window.keel.getUpdateState?.().then(setUpdateState).catch(() => {});
     const unsub = window.keel.onUpdateState?.(setUpdateState);
-    return () => { unsub?.(); };
+
+    // Subscribe to background Ollama pull progress events.
+    const unsubPull = window.keel.onOllamaPullProgress?.((payload) => {
+      if (payload.status === 'ready' || payload.status === 'error') {
+        setOllamaPulling(false);
+        setOllamaPullProgress(payload.status === 'ready' ? 100 : undefined);
+        setOllamaPullStatus(payload.status === 'ready' ? 'Ready' : '');
+        if (payload.status === 'ready') fetchOllamaModels();
+      } else {
+        setOllamaPulling(true);
+        setOllamaPullStatus(payload.status);
+        if (payload.progress != null) setOllamaPullProgress(payload.progress);
+      }
+    });
+
+    return () => {
+      unsub?.();
+      unsubPull?.();
+    };
   }, [fetchOllamaModels, fetchOpenAIModels, fetchOpenRouterModels, refreshXStatus]);
 
   useEffect(() => {
@@ -715,33 +746,85 @@ export default function Settings({ onBack, navigation, onSettingsChange }: Props
 
   const renderLocalAi = () => {
     const hasInstalledModel = settings.ollamaModel && ollamaModels.some((model) => model.name === settings.ollamaModel);
-    const ollamaTone = ollamaError ? 'warning' : ollamaModels.length > 0 ? 'success' : 'neutral';
-    const ollamaLabel = ollamaError ? 'Not running' : ollamaModels.length > 0 ? 'Available' : 'No models';
+    const isMistralModel = (settings.ollamaModel || 'mistral').startsWith('mistral');
+    const ollamaTone = ollamaError ? 'warning' : ollamaPulling ? 'accent' : ollamaModels.length > 0 ? 'success' : 'neutral';
+    const ollamaLabel = ollamaError ? 'Not running' : ollamaPulling ? 'Downloading...' : ollamaModels.length > 0 ? 'Available' : 'No models';
 
     return (
       <>
         <StatusPanel
-          title="Ollama status"
+          title="Local AI (Ollama)"
           badge={{ label: ollamaLabel, tone: ollamaTone }}
           description={
-            ollamaError
-              ? (ollamaError.includes('ECONNREFUSED')
-                ? 'Ollama is not running locally. Start it and refresh model status.'
-                : `Could not connect to Ollama: ${ollamaError}`)
-              : ollamaModels.length > 0
-                ? `Found ${ollamaModels.length} local model${ollamaModels.length === 1 ? '' : 's'}.`
-                : 'No local models were found yet.'
+            ollamaPulling
+              ? `Downloading ${settings.ollamaModel || 'mistral'}${ollamaPullProgress != null ? ` — ${ollamaPullProgress}%` : ''}. ${ollamaPullStatus}`
+              : ollamaError
+                ? (ollamaError.includes('ECONNREFUSED')
+                  ? 'Ollama is not running. Install Ollama, then come back — Keel will detect it automatically.'
+                  : `Could not connect to Ollama: ${ollamaError}`)
+                : ollamaModels.length > 0
+                  ? `${ollamaModels.length} local model${ollamaModels.length === 1 ? '' : 's'} ready.`
+                  : 'No local models found. Install Ollama and Keel will auto-download Mistral 7B.'
           }
           actions={(
             <button
               onClick={() => { fetchOllamaModels(); }}
-              disabled={ollamaLoading}
-              style={secondaryButtonStyle(ollamaLoading)}
+              disabled={ollamaLoading || ollamaPulling}
+              style={secondaryButtonStyle(ollamaLoading || ollamaPulling)}
             >
               {ollamaLoading ? 'Checking...' : 'Refresh'}
             </button>
           )}
         />
+
+        {/* Download progress bar */}
+        {ollamaPulling && ollamaPullProgress != null && (
+          <div style={{ margin: '0 0 16px', padding: '12px 14px', borderRadius: 'var(--radius-lg)', background: 'var(--accent-bg)', border: '1px solid var(--accent-border)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 12, color: 'var(--text-subtle)' }}>
+              <span>Downloading {settings.ollamaModel || 'mistral'}…</span>
+              <span>{ollamaPullProgress}%</span>
+            </div>
+            <div style={{ height: 6, borderRadius: 3, background: 'var(--border-default)', overflow: 'hidden' }}>
+              <div style={{ height: '100%', width: `${ollamaPullProgress}%`, background: 'var(--accent)', borderRadius: 3, transition: 'width 0.3s ease' }} />
+            </div>
+          </div>
+        )}
+
+        {/* Ollama not installed — guide user */}
+        {ollamaError?.includes('ECONNREFUSED') && !ollamaPulling && (
+          <div style={{ margin: '0 0 16px', padding: '12px 14px', borderRadius: 'var(--radius-lg)', background: 'var(--bg-surface)', border: '1px solid var(--border-default)', fontSize: 12, color: 'var(--text-subtle)' }}>
+            <strong style={{ color: 'var(--text-primary)', display: 'block', marginBottom: 4 }}>Install Ollama to use local AI</strong>
+            Download the free Ollama app, then reopen Keel. Mistral 7B (~4 GB) will download automatically.{' '}
+            <a
+              href="https://ollama.com/download"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ color: 'var(--accent)' }}
+              onClick={(e) => { e.preventDefault(); window.keel.openPath?.('https://ollama.com/download'); }}
+            >
+              Download Ollama
+            </a>
+          </div>
+        )}
+
+        {/* Manual pull button — Ollama running but model not downloaded yet */}
+        {!ollamaError && !ollamaPulling && isMistralModel && !hasInstalledModel && ollamaModels.length === 0 && (
+          <div style={{ margin: '0 0 16px', padding: '12px 14px', borderRadius: 'var(--radius-lg)', background: 'var(--bg-surface)', border: '1px solid var(--border-default)', fontSize: 12, color: 'var(--text-subtle)' }}>
+            <strong style={{ color: 'var(--text-primary)', display: 'block', marginBottom: 6 }}>Mistral 7B not downloaded yet</strong>
+            <button
+              onClick={async () => {
+                const model = settings.ollamaModel || 'mistral';
+                setOllamaPulling(true);
+                setOllamaPullProgress(0);
+                setOllamaPullStatus('Starting...');
+                await window.keel.ollamaPullModel?.(model);
+              }}
+              style={{ ...secondaryButtonStyle(false), fontSize: 12, padding: '6px 12px' }}
+            >
+              Download Mistral 7B (~4 GB)
+            </button>
+          </div>
+        )}
 
         <SectionCard
           title="Installed Models"
@@ -778,7 +861,7 @@ export default function Settings({ onBack, navigation, onSettingsChange }: Props
                 type="text"
                 value={settings.ollamaModel}
                 onChange={(e) => update({ ollamaModel: e.target.value })}
-                placeholder="e.g. llama3.2, mistral, gemma2"
+                placeholder="e.g. mistral, llama3.2, gemma2"
                 style={inputStyle}
               />
               {ollamaModels.length > 0 && (
@@ -801,7 +884,21 @@ export default function Settings({ onBack, navigation, onSettingsChange }: Props
           )}
 
           <InlineNote>
-            Install a model with <code style={inlineCodeStyle}>ollama pull llama3.2</code>.
+            Install additional models with <code style={inlineCodeStyle}>ollama pull &lt;model&gt;</code>. Want higher quality? Switch to{' '}
+            <button
+              onClick={() => update({ provider: 'claude' })}
+              style={{ background: 'none', border: 'none', color: 'var(--accent)', fontSize: 'inherit', cursor: 'pointer', padding: 0, fontFamily: 'inherit' }}
+            >
+              Claude
+            </button>
+            {' '}or{' '}
+            <button
+              onClick={() => update({ provider: 'openai' })}
+              style={{ background: 'none', border: 'none', color: 'var(--accent)', fontSize: 'inherit', cursor: 'pointer', padding: 0, fontFamily: 'inherit' }}
+            >
+              OpenAI
+            </button>
+            {' '}(API key required).
           </InlineNote>
         </SectionCard>
       </>

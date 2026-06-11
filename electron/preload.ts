@@ -218,6 +218,13 @@ const api: KeelAPI = {
   openaiListModels: () => ipcRenderer.invoke('keel:openai-list-models'),
   openrouterListModels: () => ipcRenderer.invoke('keel:openrouter-list-models'),
   ollamaListModels: () => ipcRenderer.invoke('keel:ollama-list-models'),
+  ollamaPullModel: (modelName: string) => ipcRenderer.invoke('keel:ollama-pull-model', modelName),
+  ollamaModelStatus: (modelName: string) => ipcRenderer.invoke('keel:ollama-model-status', modelName),
+  onOllamaPullProgress: (callback) => {
+    const handler = (_event: Electron.IpcRendererEvent, payload: { modelName: string; status: string; progress?: number }) => callback(payload);
+    ipcRenderer.on('keel:ollama-pull-progress', handler);
+    return () => ipcRenderer.off('keel:ollama-pull-progress', handler);
+  },
   testLlmKey: (provider, apiKey) => ipcRenderer.invoke('keel:test-llm-key', provider, apiKey),
   reportBug: (context) => ipcRenderer.invoke('keel:report-bug', context),
   getRecentActivity: (limit?: number) => ipcRenderer.invoke('keel:get-recent-activity', limit),
