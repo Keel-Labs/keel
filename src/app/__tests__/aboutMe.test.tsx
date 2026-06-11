@@ -9,8 +9,11 @@ import AboutMe from '../components/AboutMe';
 let container: HTMLDivElement;
 let root: Root;
 
-function setKeel(readFile: (p: string) => Promise<string>) {
-  (window as unknown as { keel: { readFile: typeof readFile } }).keel = { readFile };
+function setKeel(readFile: (p: string) => Promise<string>, isPro = true) {
+  (window as unknown as { keel: { readFile: typeof readFile; proStatus: () => Promise<{ isPro: boolean }> } }).keel = {
+    readFile,
+    proStatus: async () => ({ isPro }),
+  };
 }
 
 async function mount() {
@@ -84,15 +87,15 @@ describe('AboutMe', () => {
     });
     await mount();
     const text = container.textContent ?? '';
-    expect(text).toContain('Let Keel learn who you are');
-    expect(text).toContain('Every chat gets more you-aware');
+    expect(text).toContain('Keel Pro');
+    expect(text).toContain('Every chat gets more relevant');
     expect(container.querySelector('.about-me__card')).toBeNull();
   });
 
   it('treats an empty file as no model (teaser)', async () => {
     setKeel(async () => '   \n');
     await mount();
-    expect(container.textContent ?? '').toContain('Let Keel learn who you are');
+    expect(container.textContent ?? '').toContain('Keel Pro');
   });
 
   it('renders an Archive section with the de-emphasized modifier', async () => {
