@@ -85,7 +85,7 @@ describe('AboutMe', () => {
     await mount();
     const text = container.textContent ?? '';
     expect(text).toContain('Let Keel learn who you are');
-    expect(text).toContain('the better it knows you');
+    expect(text).toContain('Every chat gets more you-aware');
     expect(container.querySelector('.about-me__card')).toBeNull();
   });
 
