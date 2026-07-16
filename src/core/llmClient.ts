@@ -6,7 +6,7 @@ import { loadSettings } from './settings';
 import type { ToolDefinition } from './tools/schemas';
 import { toAnthropicTools, toOpenAITools } from './tools/format';
 
-type Provider = 'claude' | 'openai' | 'openrouter' | 'ollama';
+type Provider = 'claude' | 'openai' | 'openrouter' | 'ollama' | 'telnyx';
 
 export interface ToolCallInvocation {
   id: string;
@@ -84,10 +84,12 @@ export class LLMClient {
   private anthropic: Anthropic | null = null;
   private openai: OpenAI | null = null;
   private openrouter: OpenAI | null = null;
+  private telnyx: OpenAI | null = null;
   private ollama: Ollama;
   private claudeModel: string;
   private openaiModel: string;
   private openrouterModel: string;
+  private telnyxModel: string;
   private ollamaModel: string;
 
   constructor() {
@@ -96,6 +98,7 @@ export class LLMClient {
     this.claudeModel = settings.claudeModel || 'claude-sonnet-4-20250514';
     this.openaiModel = settings.openaiModel || 'gpt-4o';
     this.openrouterModel = settings.openrouterModel || '';
+    this.telnyxModel = settings.telnyxModel || 'moonshotai/Kimi-K2.6';
     this.ollamaModel = settings.ollamaModel || 'llama3.2';
     this.ollama = new Ollama();
 
@@ -114,6 +117,12 @@ export class LLMClient {
         settings.openrouterBaseUrl || 'https://openrouter.ai/api/v1'
       );
     }
+    if (settings.telnyxApiKey) {
+      this.telnyx = createOpenAIClient(
+        settings.telnyxApiKey,
+        settings.telnyxBaseUrl || 'https://api.telnyx.com/v2/ai'
+      );
+    }
   }
 
   setProvider(provider: Provider): void {
@@ -126,6 +135,7 @@ export class LLMClient {
     this.claudeModel = settings.claudeModel || 'claude-sonnet-4-20250514';
     this.openaiModel = settings.openaiModel || 'gpt-4o';
     this.openrouterModel = settings.openrouterModel || '';
+    this.telnyxModel = settings.telnyxModel || 'moonshotai/Kimi-K2.6';
     this.ollamaModel = settings.ollamaModel || 'llama3.2';
 
     if (settings.anthropicApiKey) {
@@ -149,6 +159,14 @@ export class LLMClient {
     } else {
       this.openrouter = null;
     }
+    if (settings.telnyxApiKey) {
+      this.telnyx = createOpenAIClient(
+        settings.telnyxApiKey,
+        settings.telnyxBaseUrl || 'https://api.telnyx.com/v2/ai'
+      );
+    } else {
+      this.telnyx = null;
+    }
   }
 
   // For tests / dependency injection.
@@ -163,7 +181,7 @@ export class LLMClient {
   async chat(messages: Message[], systemPrompt: string): Promise<string> {
     const attempts: Provider[] = [this.provider];
     // Add fallbacks
-    for (const p of ['claude', 'openai', 'openrouter', 'ollama'] as Provider[]) {
+    for (const p of ['claude', 'openai', 'openrouter', 'ollama', 'telnyx'] as Provider[]) {
       if (!attempts.includes(p)) attempts.push(p);
     }
 
@@ -173,6 +191,7 @@ export class LLMClient {
           case 'claude': return await this.chatClaude(messages, systemPrompt);
           case 'openai': return await this.chatOpenAI(this.openai, this.openaiModel, messages, systemPrompt);
           case 'openrouter': return await this.chatOpenAI(this.openrouter, this.openrouterModel, messages, systemPrompt);
+          case 'telnyx': return await this.chatOpenAI(this.telnyx, this.telnyxModel, messages, systemPrompt);
           case 'ollama': return await this.chatOllama(messages, systemPrompt);
         }
       } catch {
@@ -189,7 +208,7 @@ export class LLMClient {
     signal?: AbortSignal
   ): Promise<void> {
     const attempts: Provider[] = [this.provider];
-    for (const p of ['claude', 'openai', 'openrouter', 'ollama'] as Provider[]) {
+    for (const p of ['claude', 'openai', 'openrouter', 'ollama', 'telnyx'] as Provider[]) {
       if (!attempts.includes(p)) attempts.push(p);
     }
 
@@ -199,6 +218,7 @@ export class LLMClient {
           case 'claude': return await this.streamClaude(messages, systemPrompt, onChunk, signal);
           case 'openai': return await this.streamOpenAI(this.openai, this.openaiModel, messages, systemPrompt, onChunk, signal);
           case 'openrouter': return await this.streamOpenAI(this.openrouter, this.openrouterModel, messages, systemPrompt, onChunk, signal);
+          case 'telnyx': return await this.streamOpenAI(this.telnyx, this.telnyxModel, messages, systemPrompt, onChunk, signal);
           case 'ollama': return await this.streamOllama(messages, systemPrompt, onChunk, signal);
         }
       } catch {
@@ -236,7 +256,7 @@ export class LLMClient {
     }
 
     const attempts: Provider[] = [this.provider];
-    for (const p of ['claude', 'openai', 'openrouter', 'ollama'] as Provider[]) {
+    for (const p of ['claude', 'openai', 'openrouter', 'ollama', 'telnyx'] as Provider[]) {
       if (!attempts.includes(p)) attempts.push(p);
     }
 
@@ -250,6 +270,8 @@ export class LLMClient {
             return await this.chatOpenAIWithTools(this.openai, this.openaiModel, messages, systemPrompt, options);
           case 'openrouter':
             return await this.chatOpenAIWithTools(this.openrouter, this.openrouterModel, messages, systemPrompt, options);
+          case 'telnyx':
+            return await this.chatOpenAIWithTools(this.telnyx, this.telnyxModel, messages, systemPrompt, options);
           case 'ollama':
             return await this.chatOllamaWithTools(messages, systemPrompt, options);
         }

@@ -19,6 +19,7 @@
  *   - claude (Anthropic API): no training on API data, no opt-out needed
  *   - openai (OpenAI API):    no training on API data, no opt-out needed
  *   - ollama (local):         data never leaves the machine
+ *   - telnyx (Telnyx Inference API): no training on API data, no opt-out needed
  *   - openrouter:             reserves training rights — NOT compatible
  *
  * Re-evaluate this list any time a new provider is added.
@@ -32,6 +33,7 @@ export const GOOGLE_COMPATIBLE_PROVIDERS: ReadonlySet<Provider> = new Set<Provid
   'claude',
   'openai',
   'ollama',
+  'telnyx',
 ]);
 
 /**
@@ -83,6 +85,7 @@ export function providerLabel(provider: Provider): string {
     case 'openai': return 'OpenAI';
     case 'openrouter': return 'OpenRouter';
     case 'ollama': return 'Ollama (local)';
+    case 'telnyx': return 'Telnyx Inference';
   }
 }
 

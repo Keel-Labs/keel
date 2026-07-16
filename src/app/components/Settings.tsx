@@ -72,6 +72,7 @@ const PROVIDERS = [
   { value: 'claude', label: 'Claude', description: 'Anthropic — best reasoning & writing.', isPro: true },
   { value: 'openai', label: 'OpenAI', description: 'GPT models — strong all-rounder.', isPro: true },
   { value: 'openrouter', label: 'OpenRouter', description: 'One key, hundreds of models.', isPro: true },
+  { value: 'telnyx', label: 'Telnyx', description: 'Open-source LLMs on Telnyx GPU infrastructure.', isPro: true },
 ] as const;
 
 export type SettingsSectionId =
@@ -252,6 +253,9 @@ export default function Settings({ onBack, navigation, onSettingsChange }: Props
   const [openrouterModels, setOpenrouterModels] = useState<OpenRouterModelInfo[]>([]);
   const [openrouterModelsLoading, setOpenrouterModelsLoading] = useState(false);
   const [openrouterModelError, setOpenrouterModelError] = useState<string | null>(null);
+  const [telnyxModels, setTelnyxModels] = useState<OpenRouterModelInfo[]>([]);
+  const [telnyxModelsLoading, setTelnyxModelsLoading] = useState(false);
+  const [telnyxModelError, setTelnyxModelError] = useState<string | null>(null);
   const [ollamaError, setOllamaError] = useState<string | null>(null);
   const [ollamaLoading, setOllamaLoading] = useState(false);
   const [ollamaManualEntry, setOllamaManualEntry] = useState(false);
@@ -293,6 +297,21 @@ export default function Settings({ onBack, navigation, onSettingsChange }: Props
       setOpenrouterModelError('Failed to fetch OpenRouter models');
     } finally {
       setOpenrouterModelsLoading(false);
+    }
+  }, []);
+
+  const fetchTelnyxModels = useCallback(async () => {
+    setTelnyxModelsLoading(true);
+    setTelnyxModelError(null);
+    try {
+      const result = await window.keel.telnyxListModels();
+      setTelnyxModels(result.models);
+      setTelnyxModelError(result.error);
+    } catch {
+      setTelnyxModels([]);
+      setTelnyxModelError('Failed to fetch Telnyx models');
+    } finally {
+      setTelnyxModelsLoading(false);
     }
   }, []);
 
@@ -340,6 +359,7 @@ export default function Settings({ onBack, navigation, onSettingsChange }: Props
       }
       if (s.openaiApiKey) fetchOpenAIModels();
       if (s.openrouterApiKey || s.provider === 'openrouter') fetchOpenRouterModels();
+      if (s.telnyxApiKey || s.provider === 'telnyx') fetchTelnyxModels();
     }).catch(() => {});
     window.keel.googleStatus().then((s) => {
       setGoogleConnected(s.connected);
@@ -373,7 +393,7 @@ export default function Settings({ onBack, navigation, onSettingsChange }: Props
       unsubPull?.();
       unsubPro?.();
     };
-  }, [fetchOllamaModels, fetchOpenAIModels, fetchOpenRouterModels, refreshXStatus]);
+  }, [fetchOllamaModels, fetchOpenAIModels, fetchOpenRouterModels, fetchTelnyxModels, refreshXStatus]);
 
   useEffect(() => {
     if (!settings?.openaiApiKey) {
@@ -399,6 +419,16 @@ export default function Settings({ onBack, navigation, onSettingsChange }: Props
     }, 500);
     return () => clearTimeout(timer);
   }, [fetchOpenRouterModels, settings?.openrouterApiKey, settings?.openrouterBaseUrl, settings?.provider]);
+
+  useEffect(() => {
+    if (settings?.provider !== 'telnyx' && !settings?.telnyxApiKey) {
+      return;
+    }
+    const timer = setTimeout(() => {
+      fetchTelnyxModels();
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [fetchTelnyxModels, settings?.telnyxApiKey, settings?.telnyxBaseUrl, settings?.provider]);
 
   useEffect(() => {
     const onResize = () => setIsCompactLayout(window.innerWidth < 980);
@@ -581,6 +611,9 @@ export default function Settings({ onBack, navigation, onSettingsChange }: Props
     if (settings.provider === 'openrouter') {
       return renderApiKeyInput('OpenRouter API Key', settings.openrouterApiKey, 'openrouterApiKey', 'openrouter');
     }
+    if (settings.provider === 'telnyx') {
+      return renderApiKeyInput('Telnyx API Key', settings.telnyxApiKey, 'telnyxApiKey', 'telnyx');
+    }
 
     return (
       <StatusPanel
@@ -731,6 +764,68 @@ export default function Settings({ onBack, navigation, onSettingsChange }: Props
               value={settings.openrouterBaseUrl}
               onChange={(e) => update({ openrouterBaseUrl: e.target.value })}
               placeholder="https://openrouter.ai/api/v1"
+              style={inputStyle}
+            />
+          </FieldRow>
+        </SectionCard>
+      );
+    }
+
+    if (settings.provider === 'telnyx') {
+      const hasLiveList = telnyxModels.length > 0;
+      const selectOptionIds = Array.from(new Set([
+        ...telnyxModels.map((m) => m.id),
+        settings.telnyxModel,
+      ].filter(Boolean)));
+      return (
+        <SectionCard
+          title="Runtime Settings"
+          description="Set the default model and endpoint for your Telnyx Inference provider."
+        >
+          <FieldRow label="Model">
+            {hasLiveList ? (
+              <select
+                value={settings.telnyxModel}
+                onChange={(e) => update({ telnyxModel: e.target.value })}
+                style={selectStyle}
+              >
+                {!settings.telnyxModel && <option value="">Select a model…</option>}
+                {selectOptionIds.map((id) => {
+                  const found = telnyxModels.find((m) => m.id === id);
+                  const label = found && found.name && found.name !== found.id ? `${found.name} (${id})` : id;
+                  return <option key={id} value={id}>{label}</option>;
+                })}
+              </select>
+            ) : (
+              <input
+                type="text"
+                value={settings.telnyxModel}
+                onChange={(e) => update({ telnyxModel: e.target.value })}
+                placeholder="e.g. moonshotai/Kimi-K2.6"
+                style={inputStyle}
+              />
+            )}
+            {telnyxModelsLoading && (
+              <InlineNote>Loading the live Telnyx model list…</InlineNote>
+            )}
+            {telnyxModelError && (
+              <InlineNote>
+                Could not load the live Telnyx model list: {telnyxModelError}. Enter the full model ID, e.g. <code>moonshotai/Kimi-K2.6</code>.
+              </InlineNote>
+            )}
+            {hasLiveList && !telnyxModelsLoading && !telnyxModelError && (
+              <InlineNote>Loaded {telnyxModels.length} Telnyx models.</InlineNote>
+            )}
+          </FieldRow>
+          <FieldRow
+            label="Base URL"
+            description="Advanced: override the OpenAI-compatible API endpoint."
+          >
+            <input
+              type="text"
+              value={settings.telnyxBaseUrl}
+              onChange={(e) => update({ telnyxBaseUrl: e.target.value })}
+              placeholder="https://api.telnyx.com/v2/ai"
               style={inputStyle}
             />
           </FieldRow>
