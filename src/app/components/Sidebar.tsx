@@ -25,6 +25,8 @@ export interface WikiSidebarState {
   branches: WikiSidebarBranch[];
 }
 
+const TASKS_UPDATED_EVENT = 'keel:tasks-updated';
+
 interface Props {
   collapsed: boolean;
   currentSessionId: string;
@@ -279,31 +281,39 @@ export default function Sidebar({
   onWikiCreateBase,
 }: Props) {
   const [sessions, setSessions] = useState<Session[]>([]);
-  const [incomingCount, setIncomingCount] = useState(0);
+  const [openTaskCount, setOpenTaskCount] = useState(0);
 
   useEffect(() => {
     window.keel.listSessions().then(setSessions).catch(() => {});
   }, [refreshSignal, currentSessionId]);
 
-  // Poll the incoming-tasks count so the Inbox/Tasks nav row can show
-  // a badge for unreviewed mobile captures. Refresh on every nav, on
-  // every mobile-capture-routed IPC event, and every 30s as a fallback.
+  // The Tasks nav badge should reflect open tasks, matching the Tasks view.
+  // Refresh after task mutations, memory updates, mobile capture routing, and
+  // every 30s as a fallback for external file edits.
   useEffect(() => {
     let cancelled = false;
     const refresh = () => {
       window.keel
-        .listIncomingTasks()
-        .then((tasks) => {
-          if (!cancelled) setIncomingCount(tasks.length);
+        .listTasks()
+        .then((groups) => {
+          const count = groups.reduce(
+            (sum, group) => sum + group.tasks.filter((task) => !task.completed).length,
+            0,
+          );
+          if (!cancelled) setOpenTaskCount(count);
         })
         .catch(() => {});
     };
     refresh();
-    const unsubscribe = window.keel.onMobileCaptureRouted?.(refresh);
+    const unsubscribeCapture = window.keel.onMobileCaptureRouted?.(refresh);
+    const unsubscribeMemory = window.keel.onMemoryUpdated?.(refresh);
+    window.addEventListener(TASKS_UPDATED_EVENT, refresh);
     const interval = setInterval(refresh, 30_000);
     return () => {
       cancelled = true;
-      unsubscribe?.();
+      unsubscribeCapture?.();
+      unsubscribeMemory?.();
+      window.removeEventListener(TASKS_UPDATED_EVENT, refresh);
       clearInterval(interval);
     };
   }, [activeView]);
@@ -347,7 +357,7 @@ export default function Sidebar({
               icon={item.icon}
               label={item.label}
               onClick={() => onNavigate(item.id)}
-              badge={item.id === 'inbox' ? incomingCount : undefined}
+              badge={item.id === 'inbox' ? openTaskCount : undefined}
             />
           ))}
       </div>

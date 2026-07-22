@@ -6,35 +6,31 @@ import * as entitlementStore from './entitlementStore';
  * Supports offline fallback using local cache.
  */
 
-// LemonSqueezy API configuration.
+// LemonSqueezy License API configuration.
 const LEMONSQUEEZY_API_BASE = 'https://api.lemonsqueezy.com/v1';
+const DEFAULT_PRO_VARIANT_IDS = ['1934811', '1934821'];
 
-// For testing: sandbox environment (can be overridden by env var).
-const LEMONSQUEEZY_API_KEY = process.env.LEMONSQUEEZY_API_KEY || '';
+class LicenseValidationError extends Error {}
 
 /**
  * Response type from LemonSqueezy /licenses/activate endpoint.
  */
 interface LemonSqueezyActivateResponse {
+  activated: boolean;
+  error: string | null;
   license_key: {
-    id: string;
+    id: number;
     key: string;
     status: string;
+    activation_limit: number | null;
+    activation_usage: number;
     expires_at: string | null;
   };
-  license: {
-    id: string;
-    status: string;
-    email: string;
-    expires_at: string | null;
-  };
-  activated: boolean;
   instance: {
     id: string;
     name: string;
   };
-  error?: string;
-  message?: string;
+  meta?: LemonSqueezyLicenseMeta;
 }
 
 /**
@@ -42,13 +38,30 @@ interface LemonSqueezyActivateResponse {
  */
 interface LemonSqueezyValidateResponse {
   valid: boolean;
-  license: {
+  error: string | null;
+  license_key: {
+    id: number;
+    key: string;
     status: string;
-    email: string;
+    activation_limit: number | null;
+    activation_usage: number;
     expires_at: string | null;
   };
-  error?: string;
-  message?: string;
+  instance?: {
+    id: string;
+    name: string;
+  } | null;
+  meta?: LemonSqueezyLicenseMeta;
+}
+
+interface LemonSqueezyLicenseMeta {
+  store_id?: number;
+  product_id?: number;
+  product_name?: string;
+  variant_id?: number;
+  variant_name?: string;
+  customer_email?: string;
+  customer_name?: string;
 }
 
 /**
@@ -56,55 +69,58 @@ interface LemonSqueezyValidateResponse {
  * Returns EntitlementData on success, throws on error.
  */
 export async function activateLicense(licenseKey: string, instanceId: string): Promise<EntitlementData> {
-  // For now, return a mock response until LS account is set up.
-  // TODO: Replace with real LS API call once keys are available.
-  console.log('[pro/licenseValidator] Activating license (mock)', { licenseKey, instanceId });
-
-  // Mock response: 1 year from now.
-  const expiresAt = Math.floor(Date.now() / 1000) + 365 * 24 * 60 * 60;
-  const data: EntitlementData = {
+  const response = await postLicenseApi<LemonSqueezyActivateResponse>('/licenses/activate', {
     license_key: licenseKey,
-    instance_id: instanceId,
-    expires_at: expiresAt,
-    cached_at: Math.floor(Date.now() / 1000),
-    status: 'active',
-    email: 'user@example.com',
-  };
+    instance_name: instanceId,
+  });
 
-  // Cache locally.
+  if (!response.activated || response.error) {
+    throw new LicenseValidationError(response.error || 'License activation failed.');
+  }
+
+  assertExpectedProduct(response.meta);
+
+  const data = toEntitlementData(
+    response.license_key,
+    response.instance.id,
+    response.meta,
+  );
+
   await entitlementStore.save(data);
-
   return data;
 }
 
 /**
  * Validate a license key with LemonSqueezy (refresh).
- * Falls back to local cache if network is unavailable.
+ * Falls back to local cache only when the License API cannot be reached.
  * Returns EntitlementData on success, throws on error.
  */
 export async function validateLicense(licenseKey: string, instanceId: string): Promise<EntitlementData> {
   try {
-    // For now, return a mock response until LS account is set up.
-    // TODO: Replace with real LS API call once keys are available.
-    console.log('[pro/licenseValidator] Validating license (mock)', { licenseKey, instanceId });
-
-    // Mock response: 1 year from now.
-    const expiresAt = Math.floor(Date.now() / 1000) + 365 * 24 * 60 * 60;
-    const data: EntitlementData = {
+    const response = await postLicenseApi<LemonSqueezyValidateResponse>('/licenses/validate', {
       license_key: licenseKey,
       instance_id: instanceId,
-      expires_at: expiresAt,
-      cached_at: Math.floor(Date.now() / 1000),
-      status: 'active',
-      email: 'user@example.com',
-    };
+    });
 
-    // Cache locally.
+    if (!response.valid || response.error) {
+      throw new LicenseValidationError(response.error || 'License validation failed.');
+    }
+
+    assertExpectedProduct(response.meta);
+
+    const data = toEntitlementData(
+      response.license_key,
+      response.instance?.id || instanceId,
+      response.meta,
+    );
+
     await entitlementStore.save(data);
-
     return data;
   } catch (err) {
-    // Network error or validation failure. Fall back to cache.
+    if (err instanceof LicenseValidationError) {
+      throw err;
+    }
+
     console.error('[pro/licenseValidator] Validation failed, checking cache:', err);
     const cached = await entitlementStore.load();
     if (cached) {
@@ -114,36 +130,99 @@ export async function validateLicense(licenseKey: string, instanceId: string): P
   }
 }
 
-/**
- * Utility: Make a call to LemonSqueezy API.
- * TODO: Implement this when API keys are available.
- */
-async function callLemonSqueezy(
-  endpoint: string,
-  method: 'GET' | 'POST' = 'GET',
-  body?: Record<string, unknown>
-): Promise<unknown> {
-  if (!LEMONSQUEEZY_API_KEY) {
-    throw new Error('LEMONSQUEEZY_API_KEY not configured');
-  }
-
-  const url = `${LEMONSQUEEZY_API_BASE}${endpoint}`;
-  const options: RequestInit = {
-    method,
+async function postLicenseApi<T>(
+  endpoint: '/licenses/activate' | '/licenses/validate',
+  body: Record<string, string>,
+): Promise<T> {
+  const response = await fetch(`${LEMONSQUEEZY_API_BASE}${endpoint}`, {
+    method: 'POST',
     headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${LEMONSQUEEZY_API_KEY}`,
+      Accept: 'application/json',
+      'Content-Type': 'application/x-www-form-urlencoded',
     },
-  };
+    body: new URLSearchParams(body),
+  });
 
-  if (body && method !== 'GET') {
-    options.body = JSON.stringify(body);
-  }
-
-  const response = await fetch(url, options);
+  const payload = await response.json().catch(() => null) as ({ error?: string } | null);
   if (!response.ok) {
-    throw new Error(`LS API error: ${response.status} ${response.statusText}`);
+    throw new LicenseValidationError(
+      payload?.error || `Lemon Squeezy License API error: ${response.status} ${response.statusText}`,
+    );
   }
 
-  return response.json();
+  return payload as T;
+}
+
+function toEntitlementData(
+  license: {
+    status: string;
+    key: string;
+    expires_at: string | null;
+  },
+  instanceId: string,
+  meta?: LemonSqueezyLicenseMeta,
+): EntitlementData {
+  const status = normalizeStatus(license.status);
+  if (status !== 'active') {
+    throw new LicenseValidationError(`License is ${license.status}.`);
+  }
+
+  return {
+    license_key: license.key,
+    instance_id: instanceId,
+    expires_at: parseExpiry(license.expires_at),
+    cached_at: Math.floor(Date.now() / 1000),
+    status,
+    email: meta?.customer_email || '',
+  };
+}
+
+function assertExpectedProduct(meta?: LemonSqueezyLicenseMeta) {
+  if (!meta) return;
+
+  const proStoreId = process.env.KEEL_PRO_LEMONSQUEEZY_STORE_ID || '';
+  const proProductIds = parseCsv(process.env.KEEL_PRO_LEMONSQUEEZY_PRODUCT_IDS || '');
+  const proVariantIds = parseCsv(
+    process.env.KEEL_PRO_LEMONSQUEEZY_VARIANT_IDS || DEFAULT_PRO_VARIANT_IDS.join(','),
+  );
+
+  if (proStoreId && String(meta.store_id) !== proStoreId) {
+    throw new LicenseValidationError('License key is not for this Lemon Squeezy store.');
+  }
+
+  if (proProductIds.length > 0 && !proProductIds.includes(String(meta.product_id))) {
+    throw new LicenseValidationError('License key is not for Keel Pro.');
+  }
+
+  if (proVariantIds.length > 0 && !proVariantIds.includes(String(meta.variant_id))) {
+    throw new LicenseValidationError('License key is not for an active Keel Pro plan.');
+  }
+}
+
+function parseExpiry(expiresAt: string | null): number {
+  if (!expiresAt) {
+    // Subscription licenses can be perpetual from the key's perspective while
+    // Lemon Squeezy controls validity through status on subsequent validations.
+    return 4102444800; // 2100-01-01
+  }
+
+  const parsed = Date.parse(expiresAt);
+  if (Number.isNaN(parsed)) {
+    throw new LicenseValidationError('License expiry date is invalid.');
+  }
+  return Math.floor(parsed / 1000);
+}
+
+function normalizeStatus(status: string): EntitlementData['status'] {
+  if (status === 'active' || status === 'inactive' || status === 'expired') {
+    return status;
+  }
+  return 'inactive';
+}
+
+function parseCsv(value: string): string[] {
+  return value
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
 }

@@ -405,6 +405,11 @@ type DialogState =
   | { type: 'delete-project'; slug: string; projectName: string };
 // slug=null means General tasks.md
 type AddingTaskState = { slug: string | null } | null;
+const TASKS_UPDATED_EVENT = 'keel:tasks-updated';
+
+function notifyTasksUpdated() {
+  window.dispatchEvent(new Event(TASKS_UPDATED_EVENT));
+}
 
 export default function Inbox() {
   const [taskGroups, setTaskGroups] = useState<TaskGroup[]>([]);
@@ -444,17 +449,20 @@ export default function Inbox() {
 
   const handleToggle = useCallback(async (filePath: string, text: string, completed: boolean) => {
     await window.keel.toggleTask(filePath, text, completed);
-    fetchAll();
+    await fetchAll();
+    notifyTasksUpdated();
   }, [fetchAll]);
 
   const handleAccept = useCallback(async (id: number) => {
     await window.keel.acceptIncomingTask(id);
-    fetchAll();
+    await fetchAll();
+    notifyTasksUpdated();
   }, [fetchAll]);
 
   const handleDismiss = useCallback(async (id: number) => {
     await window.keel.dismissIncomingTask(id);
-    fetchAll();
+    await fetchAll();
+    notifyTasksUpdated();
   }, [fetchAll]);
 
   // ── Cross-project drop ──
@@ -468,12 +476,14 @@ export default function Inbox() {
 
     if (payload.type === 'incoming') {
       await window.keel.acceptIncomingTask(payload.id);
-      fetchAll();
+      await fetchAll();
+      notifyTasksUpdated();
     } else if (payload.type === 'task') {
       // Only move if going to a different file
       if (payload.filePath !== targetFile) {
         await window.keel.moveTask(payload.filePath, targetFile, payload.text, payload.completed);
-        fetchAll();
+        await fetchAll();
+        notifyTasksUpdated();
       }
     }
   }, [fetchAll]);
@@ -509,14 +519,17 @@ export default function Inbox() {
 
         if (payload.type === 'incoming' && zone === 'open') {
           await window.keel.acceptIncomingTask(payload.id);
-          fetchAll();
+          await fetchAll();
+          notifyTasksUpdated();
         } else if (payload.type === 'task') {
           if (zone === 'completed' && !payload.completed) {
             await window.keel.toggleTask(payload.filePath, payload.text, true);
-            fetchAll();
+            await fetchAll();
+            notifyTasksUpdated();
           } else if (zone === 'open' && payload.completed) {
             await window.keel.toggleTask(payload.filePath, payload.text, false);
-            fetchAll();
+            await fetchAll();
+            notifyTasksUpdated();
           }
         }
       },
@@ -532,7 +545,8 @@ export default function Inbox() {
     setAddingTask(null);
     const filePath = slug ? `projects/${slug}/tasks.md` : 'tasks.md';
     await window.keel.createTask(filePath, text);
-    fetchAll();
+    await fetchAll();
+    notifyTasksUpdated();
   }, [fetchAll]);
 
   // ── Project management ──
@@ -540,18 +554,21 @@ export default function Inbox() {
   const handleAddProject = useCallback(async (name: string) => {
     setDialog(null);
     await window.keel.createProject(name);
-    fetchAll();
+    await fetchAll();
+    notifyTasksUpdated();
   }, [fetchAll]);
 
   const handleRenameProject = useCallback(async (slug: string, newName: string) => {
     await window.keel.renameProject(slug, newName);
-    fetchAll();
+    await fetchAll();
+    notifyTasksUpdated();
   }, [fetchAll]);
 
   const handleDeleteProject = useCallback(async (slug: string, moveTasks: boolean) => {
     setDialog(null);
     await window.keel.deleteProject(slug, moveTasks);
-    fetchAll();
+    await fetchAll();
+    notifyTasksUpdated();
   }, [fetchAll]);
 
   // Separate open and completed tasks

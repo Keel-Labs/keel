@@ -12,6 +12,7 @@ import { useEffect, useState } from 'react';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import type { ProStatus, FileEntry } from '../../shared/types';
+import { openProCheckout } from '../proCheckout';
 
 interface ParsedBrief {
   date: string;
@@ -148,7 +149,7 @@ export default function ProBriefDashboard() {
           </ul>
           <button
             className="button button--primary button--large"
-            onClick={() => window.open('https://keel-pro.lemonsqueezy.com/checkout/buy/1c224dc6-5e38-4d05-a068-e8a751a9eefb', '_blank')}
+            onClick={openProCheckout}
           >
             Upgrade to Pro
           </button>

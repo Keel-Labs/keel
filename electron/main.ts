@@ -2715,6 +2715,14 @@ function registerIpcHandlers() {
         isPro: true,
         reason: 'active',
       });
+    } else if (result.revoked) {
+      settings.proLicenseKey = undefined;
+      settings.proStatus = 'free';
+      saveSettingsToFile(settings);
+      mainWindow?.webContents.send('keel:pro-status-changed', {
+        isPro: false,
+        reason: 'license-revoked',
+      });
     }
 
     return result;
@@ -3524,10 +3532,22 @@ app.whenReady().then(async () => {
   // Refresh Pro entitlement on app launch (if user has a cached key)
   if (settings.proLicenseKey) {
     const instanceId = require('os').hostname();
-    entitlements.validateProLicense(settings.proLicenseKey, instanceId).catch((err) => {
-      console.error('[pro] Entitlement validation failed on launch:', err);
-      // Don't block app startup on network error; local cache still works
-    });
+    entitlements.validateProLicense(settings.proLicenseKey, instanceId)
+      .then((result) => {
+        if (result.revoked) {
+          settings.proLicenseKey = undefined;
+          settings.proStatus = 'free';
+          saveSettingsToFile(settings);
+          mainWindow?.webContents.send('keel:pro-status-changed', {
+            isPro: false,
+            reason: 'license-revoked',
+          });
+        }
+      })
+      .catch((err) => {
+        console.error('[pro] Entitlement validation failed on launch:', err);
+        // Don't block app startup on network error; local cache still works
+      });
   }
 
   if (app.isPackaged) {
