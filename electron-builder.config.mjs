@@ -41,6 +41,7 @@ export default {
     // better-sqlite3 ships ~9 MB of C source we don't need at runtime.
     '!**/node_modules/better-sqlite3/deps/**',
     '!**/node_modules/better-sqlite3/src/**',
+    '!**/node_modules/better-sqlite3/build/Release/test_extension.node',
     // Generic dead weight inside transitive node_modules.
     '!**/node_modules/*/{test,tests,__tests__,docs,doc,example,examples}/**',
     '!**/node_modules/**/*.md',
