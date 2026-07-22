@@ -11,6 +11,7 @@
 
 import { useEffect, useState } from 'react';
 import type { ProStatus } from '../../shared/types';
+import { openProCheckout } from '../proCheckout';
 
 interface State {
   isLoading: boolean;
@@ -78,6 +79,16 @@ export default function KeelProPanel() {
         const status = await window.keel.proStatus();
         if (!cancelled) {
           setState((prev) => ({ ...prev, status, isLoading: false }));
+        }
+        if (status.isPro) {
+          const validation = await window.keel.proValidate();
+          if (!cancelled && validation.revoked) {
+            setState((prev) => ({
+              ...prev,
+              status: { isPro: false, reason: 'license-revoked' },
+              error: validation.error || 'Your Keel Pro license is no longer active.',
+            }));
+          }
         }
       } catch (err) {
         if (!cancelled) {
@@ -183,7 +194,7 @@ export default function KeelProPanel() {
       {!isPro && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <button
-            onClick={() => window.open('https://keel-pro.lemonsqueezy.com/checkout/buy/1c224dc6-5e38-4d05-a068-e8a751a9eefb', '_blank')}
+            onClick={openProCheckout}
             style={buttonPrimary}
           >
             Get Keel Pro

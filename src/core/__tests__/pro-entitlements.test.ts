@@ -82,6 +82,16 @@ describe('pro/entitlements', () => {
       expect(result.ok).toBe(false);
       expect(result.error).toBeDefined();
     });
+
+    it('returns a friendly error when Lemon Squeezy cannot find the key', async () => {
+      vi.spyOn(licenseValidator, 'activateLicense').mockRejectedValue(new Error('license_key not found.'));
+
+      const result = await entitlements.activateProLicense('BAD-KEY', 'instance-1');
+      expect(result).toEqual({
+        ok: false,
+        error: "We couldn't find that license key. Check the key from your Lemon Squeezy receipt and try again.",
+      });
+    });
   });
 
   describe('validateProLicense', () => {
@@ -95,18 +105,102 @@ describe('pro/entitlements', () => {
         email: 'test@example.com',
       };
 
+      vi.spyOn(entitlementStore, 'load').mockResolvedValue(null);
       vi.spyOn(licenseValidator, 'validateLicense').mockResolvedValue(data);
 
       const result = await entitlements.validateProLicense('KEEL-TEST-1234', 'instance-1');
       expect(result.ok).toBe(true);
     });
 
+    it('validates against the cached Lemon Squeezy instance after activation', async () => {
+      const data: EntitlementData = {
+        license_key: 'KEEL-TEST-1234',
+        instance_id: 'lemon-instance-id',
+        expires_at: Math.floor(Date.now() / 1000) + 100 * 24 * 60 * 60,
+        cached_at: Math.floor(Date.now() / 1000),
+        status: 'active',
+        email: 'test@example.com',
+      };
+
+      vi.spyOn(entitlementStore, 'load').mockResolvedValue(data);
+      const validateSpy = vi.spyOn(licenseValidator, 'validateLicense').mockResolvedValue(data);
+
+      const result = await entitlements.validateProLicense('KEEL-TEST-1234', 'hostname-fallback');
+      expect(result.ok).toBe(true);
+      expect(validateSpy).toHaveBeenCalledWith('KEEL-TEST-1234', 'lemon-instance-id');
+    });
+
     it('returns error on validation failure', async () => {
+      vi.spyOn(entitlementStore, 'load').mockResolvedValue(null);
       vi.spyOn(licenseValidator, 'validateLicense').mockRejectedValue(new Error('Network error'));
 
       const result = await entitlements.validateProLicense('KEEL-TEST-1234', 'instance-1');
       expect(result.ok).toBe(false);
       expect(result.error).toBeDefined();
+      expect(result.revoked).toBe(false);
+    });
+
+    it('revokes cached entitlement when Lemon Squeezy says the license expired', async () => {
+      const data: EntitlementData = {
+        license_key: 'KEEL-TEST-1234',
+        instance_id: 'lemon-instance-id',
+        expires_at: Math.floor(Date.now() / 1000) + 100 * 24 * 60 * 60,
+        cached_at: Math.floor(Date.now() / 1000),
+        status: 'active',
+        email: 'test@example.com',
+      };
+
+      vi.spyOn(entitlementStore, 'load').mockResolvedValue(data);
+      const clearSpy = vi.spyOn(entitlementStore, 'clear').mockResolvedValue();
+      vi.spyOn(licenseValidator, 'validateLicense').mockRejectedValue(new Error('License is expired.'));
+
+      const result = await entitlements.validateProLicense('KEEL-TEST-1234', 'hostname-fallback');
+      expect(result.ok).toBe(false);
+      expect(result.revoked).toBe(true);
+      expect(clearSpy).toHaveBeenCalled();
+    });
+
+    it('revokes cached entitlement when Lemon Squeezy says the activation instance is gone', async () => {
+      const data: EntitlementData = {
+        license_key: 'KEEL-TEST-1234',
+        instance_id: 'lemon-instance-id',
+        expires_at: Math.floor(Date.now() / 1000) + 100 * 24 * 60 * 60,
+        cached_at: Math.floor(Date.now() / 1000),
+        status: 'active',
+        email: 'test@example.com',
+      };
+
+      vi.spyOn(entitlementStore, 'load').mockResolvedValue(data);
+      const clearSpy = vi.spyOn(entitlementStore, 'clear').mockResolvedValue();
+      vi.spyOn(licenseValidator, 'validateLicense').mockRejectedValue(new Error('instance_id not found.'));
+
+      const result = await entitlements.validateProLicense('KEEL-TEST-1234', 'hostname-fallback');
+      expect(result).toEqual({
+        ok: false,
+        error: 'This Keel Pro activation is no longer valid. Activate again with an active license key.',
+        revoked: true,
+      });
+      expect(clearSpy).toHaveBeenCalled();
+    });
+
+    it('keeps cached entitlement when validation fails for a network reason', async () => {
+      const data: EntitlementData = {
+        license_key: 'KEEL-TEST-1234',
+        instance_id: 'lemon-instance-id',
+        expires_at: Math.floor(Date.now() / 1000) + 100 * 24 * 60 * 60,
+        cached_at: Math.floor(Date.now() / 1000),
+        status: 'active',
+        email: 'test@example.com',
+      };
+
+      vi.spyOn(entitlementStore, 'load').mockResolvedValue(data);
+      const clearSpy = vi.spyOn(entitlementStore, 'clear').mockResolvedValue();
+      vi.spyOn(licenseValidator, 'validateLicense').mockRejectedValue(new Error('fetch failed'));
+
+      const result = await entitlements.validateProLicense('KEEL-TEST-1234', 'hostname-fallback');
+      expect(result.ok).toBe(false);
+      expect(result.revoked).toBe(false);
+      expect(clearSpy).not.toHaveBeenCalled();
     });
   });
 

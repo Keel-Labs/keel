@@ -54,7 +54,7 @@ export async function activateProLicense(licenseKey: string, instanceId: string)
   } catch (err) {
     return {
       ok: false,
-      error: `${err}`,
+      error: formatLicenseError(err),
     };
   }
 }
@@ -63,14 +63,21 @@ export async function activateProLicense(licenseKey: string, instanceId: string)
  * Validate/refresh the cached Pro license.
  * Called periodically (e.g., on app launch) to check if entitlement is still valid.
  */
-export async function validateProLicense(licenseKey: string, instanceId: string): Promise<{ ok: boolean; error?: string }> {
+export async function validateProLicense(licenseKey: string, instanceId: string): Promise<{ ok: boolean; error?: string; revoked?: boolean }> {
   try {
-    await licenseValidator.validateLicense(licenseKey, instanceId);
+    const cached = await entitlementStore.load();
+    await licenseValidator.validateLicense(licenseKey, cached?.instance_id || instanceId);
     return { ok: true };
   } catch (err) {
+    const revoked = isDefinitiveLicenseRejection(err);
+    if (revoked) {
+      await entitlementStore.clear();
+    }
+
     return {
       ok: false,
-      error: `${err}`,
+      error: formatLicenseError(err),
+      revoked,
     };
   }
 }
@@ -89,6 +96,54 @@ export async function cancelProLicense(): Promise<{ ok: boolean; error?: string 
       error: `${err}`,
     };
   }
+}
+
+function formatLicenseError(err: unknown): string {
+  const message = err instanceof Error ? err.message : String(err);
+  const normalized = message.toLowerCase();
+
+  if (normalized.includes('license_key not found') || normalized.includes('license key not found')) {
+    return "We couldn't find that license key. Check the key from your Lemon Squeezy receipt and try again.";
+  }
+
+  if (normalized.includes('instance_id not found') || normalized.includes('license instance not found')) {
+    return 'This Keel Pro activation is no longer valid. Activate again with an active license key.';
+  }
+
+  if (normalized.includes('activation limit')) {
+    return 'This license key has reached its activation limit.';
+  }
+
+  if (normalized.includes('expired')) {
+    return 'This license key has expired.';
+  }
+
+  if (normalized.includes('disabled') || normalized.includes('inactive')) {
+    return 'This license key is not active.';
+  }
+
+  if (normalized.includes('not for')) {
+    return message;
+  }
+
+  return 'Could not verify that license key. Check it and try again.';
+}
+
+function isDefinitiveLicenseRejection(err: unknown): boolean {
+  const message = err instanceof Error ? err.message : String(err);
+  const normalized = message.toLowerCase();
+
+  return (
+    normalized.includes('license_key not found') ||
+    normalized.includes('license key not found') ||
+    normalized.includes('instance_id not found') ||
+    normalized.includes('license instance not found') ||
+    normalized.includes('expired') ||
+    normalized.includes('disabled') ||
+    normalized.includes('inactive') ||
+    normalized.includes('not active') ||
+    normalized.includes('not for')
+  );
 }
 
 /**

@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import ModelInterview from './ModelInterview';
 import type { ProStatus } from '../../shared/types';
+import { openProCheckout } from '../proCheckout';
 
 // About Me renders the model-of-you file (<workspace>/.keel/model-of-me.md).
 // Pro-gated: check both Pro entitlement AND file existence before showing model.
@@ -200,7 +201,7 @@ export default function AboutMe({ onOpenSettings }: AboutMeProps = {}) {
               </ul>
               <button
                 className="about-me__lock-cta"
-                onClick={() => window.open('https://keel-pro.lemonsqueezy.com/checkout/buy/1c224dc6-5e38-4d05-a068-e8a751a9eefb', '_blank')}
+                onClick={openProCheckout}
               >
                 Get Keel Pro
               </button>

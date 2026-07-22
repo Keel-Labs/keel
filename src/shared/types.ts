@@ -727,7 +727,7 @@ export interface KeelAPI {
   // Keel Pro (opt-in paid tier)
   proStatus: () => Promise<ProStatus>;
   proActivate: (licenseKey: string) => Promise<{ ok: boolean; error?: string; subscription?: { email: string; expiresAt: number } }>;
-  proValidate: () => Promise<{ ok: boolean; error?: string }>;
+  proValidate: () => Promise<{ ok: boolean; error?: string; revoked?: boolean }>;
   proCancel: () => Promise<{ ok: boolean; error?: string }>;
   onProStatusChanged: (callback: (status: ProStatus) => void) => () => void;
   // Google Integration

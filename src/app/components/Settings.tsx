@@ -15,6 +15,7 @@ import { BetaBadge } from './BetaBadge';
 import KeelProPanel from './KeelProPanel';
 import KeelCloudPanel from './KeelCloudPanel';
 import { GoogleProviderSwitchModal } from './GoogleProviderSwitchModal';
+import { openProCheckout } from '../proCheckout';
 import {
   canConnectGoogle,
   canSwitchProvider,
@@ -1296,7 +1297,7 @@ export default function Settings({ onBack, navigation, onSettingsChange }: Props
                   <strong style={{ color: '#CF7A5C' }}>Keel Pro required.</strong>{' '}
                   Claude, OpenAI, and OpenRouter require a Keel Pro license.{' '}
                   <button
-                    onClick={() => window.open('https://keel-pro.lemonsqueezy.com/checkout/buy/1c224dc6-5e38-4d05-a068-e8a751a9eefb', '_blank')}
+                    onClick={openProCheckout}
                     style={{ background: 'none', border: 'none', color: '#CF7A5C', cursor: 'pointer', fontSize: 12, padding: 0, fontFamily: 'inherit', textDecoration: 'underline' }}
                   >
                     Get Keel Pro

@@ -3,6 +3,7 @@ import type { ScanFolderResult, Settings } from '../../shared/types';
 import keelLogoUrl from '../assets/keel-logo-transparent.png';
 import { BetaBadge } from './BetaBadge';
 import { isGoogleCompatible } from '../../core/googlePolicy';
+import { PRO_CHECKOUT_URL } from '../proCheckout';
 
 const PROVIDERS = [
   { value: 'ollama' as const, label: 'Local Mistral (via Ollama)', description: 'Mistral 7B — free, private, offline. Install the Ollama app once; the model (~4 GB) downloads automatically after that.', tag: 'Free · No key · Default', keyField: null, signupUrl: 'https://ollama.com/download', isPro: false },
@@ -776,7 +777,7 @@ export default function Onboarding({ initialSettings, onComplete }: Props) {
             <h2 style={headingStyle}>Activate Keel Pro</h2>
             <p style={subtextStyle}>
               Using {selectedProvider?.label} requires a Keel Pro license. Enter your license key below, or{' '}
-              <a href="https://keel-pro.lemonsqueezy.com/checkout/buy/1c224dc6-5e38-4d05-a068-e8a751a9eefb" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)' }}>
+              <a href={PRO_CHECKOUT_URL} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)' }}>
                 get Keel Pro
               </a>.
             </p>
@@ -805,7 +806,7 @@ export default function Onboarding({ initialSettings, onComplete }: Props) {
             <div style={{ marginBottom: 24, padding: '12px 14px', borderRadius: 'var(--radius-lg)', background: 'var(--bg-surface)', border: '1px solid var(--border-default)', fontSize: 12, color: 'var(--text-subtle)', lineHeight: 1.5, textAlign: 'left' }}>
               Don't have a license yet?{' '}
               <a
-                href="https://keel-pro.lemonsqueezy.com/checkout/buy/1c224dc6-5e38-4d05-a068-e8a751a9eefb"
+                href={PRO_CHECKOUT_URL}
                 target="_blank"
                 rel="noopener noreferrer"
                 style={{ color: 'var(--accent)' }}
