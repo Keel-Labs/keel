@@ -217,6 +217,7 @@ const api: KeelAPI = {
   xPublishPost: (request) => ipcRenderer.invoke('keel:x-publish-post', request),
   openaiListModels: () => ipcRenderer.invoke('keel:openai-list-models'),
   openrouterListModels: () => ipcRenderer.invoke('keel:openrouter-list-models'),
+  telnyxListModels: () => ipcRenderer.invoke('keel:telnyx-list-models'),
   ollamaListModels: () => ipcRenderer.invoke('keel:ollama-list-models'),
   ollamaPullModel: (modelName: string) => ipcRenderer.invoke('keel:ollama-pull-model', modelName),
   ollamaModelStatus: (modelName: string) => ipcRenderer.invoke('keel:ollama-model-status', modelName),

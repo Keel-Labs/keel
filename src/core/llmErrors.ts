@@ -3,7 +3,7 @@
 // when we can't recognize the shape — better to show a real message than
 // a generic one.
 
-export type LlmProvider = 'claude' | 'openai' | 'openrouter' | 'ollama';
+export type LlmProvider = 'claude' | 'openai' | 'openrouter' | 'ollama' | 'telnyx';
 
 interface ErrorShape {
   status?: number;
@@ -53,6 +53,7 @@ function providerLabel(p?: LlmProvider): string {
     case 'openai': return 'OpenAI';
     case 'openrouter': return 'OpenRouter';
     case 'ollama': return 'Ollama';
+    case 'telnyx': return 'Telnyx';
     default: return 'your AI provider';
   }
 }
@@ -62,6 +63,7 @@ function billingUrl(p?: LlmProvider): string | null {
     case 'claude': return 'https://console.anthropic.com/settings/billing';
     case 'openai': return 'https://platform.openai.com/account/billing/overview';
     case 'openrouter': return 'https://openrouter.ai/credits';
+    case 'telnyx': return 'https://telnyx.com/';
     default: return null;
   }
 }

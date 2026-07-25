@@ -3054,6 +3054,32 @@ function registerIpcHandlers() {
     }
   });
 
+  ipcMain.handle('keel:telnyx-list-models', async () => {
+    const baseUrl = (settings.telnyxBaseUrl || 'https://api.telnyx.com/v2/ai').replace(/\/$/, '');
+    try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (settings.telnyxApiKey) {
+        headers.Authorization = `Bearer ${settings.telnyxApiKey}`;
+      }
+      const response = await getElectronAwareFetch()(`${baseUrl}/models`, { headers });
+      if (!response.ok) {
+        const body = await response.text();
+        throw new Error(`HTTP ${response.status}: ${body.slice(0, 240)}`);
+      }
+      const data = await response.json() as { data?: Array<{ id: string; name?: string }> };
+      const models = (data.data || [])
+        .filter((m) => typeof m?.id === 'string' && m.id.length > 0)
+        .map((m) => ({ id: m.id, name: m.name || m.id }));
+      return { models, error: null };
+    } catch (err) {
+      console.error('[telnyx-list-models] fetch failed:', err);
+      return {
+        models: [],
+        error: describeLlmError(err, 'telnyx'),
+      };
+    }
+  });
+
   ipcMain.handle('keel:ollama-model-status', async (_event, modelName: string) => {
     if (ollamaPullState.pulling && ollamaPullState.modelName === modelName) {
       return { ready: false, pulling: true, progress: ollamaPullState.progress, status: ollamaPullState.status };
@@ -3093,7 +3119,7 @@ function registerIpcHandlers() {
     }
   });
 
-  ipcMain.handle('keel:test-llm-key', async (_event, provider: 'claude' | 'openai' | 'openrouter' | 'ollama', apiKey?: string) => {
+  ipcMain.handle('keel:test-llm-key', async (_event, provider: 'claude' | 'openai' | 'openrouter' | 'ollama' | 'telnyx', apiKey?: string) => {
     // A small, cheap call against the provider to confirm the key works and
     // the account has access. Called from onboarding before the user moves
     // past the API-key step, so we catch "missing credits" / "bad key" up
@@ -3146,6 +3172,19 @@ function registerIpcHandlers() {
           const err: any = new Error(body.slice(0, 240) || `HTTP ${response.status}`);
           err.status = response.status;
           return { ok: false, error: describeLlmError(err, 'openrouter') };
+        }
+        case 'telnyx': {
+          const key = apiKey || settings.telnyxApiKey;
+          if (!key) return { ok: false, error: 'Enter an API key first.' };
+          const baseUrl = (settings.telnyxBaseUrl || 'https://api.telnyx.com/v2/ai').replace(/\/$/, '');
+          const response = await getElectronAwareFetch()(`${baseUrl}/models`, {
+            headers: { Authorization: `Bearer ${key}` },
+          });
+          if (response.ok) return { ok: true };
+          const body = await response.text();
+          const err: any = new Error(body.slice(0, 240) || `HTTP ${response.status}`);
+          err.status = response.status;
+          return { ok: false, error: describeLlmError(err, 'telnyx') };
         }
         case 'ollama': {
           const { Ollama } = await import('ollama');

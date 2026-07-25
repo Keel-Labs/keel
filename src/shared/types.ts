@@ -56,7 +56,7 @@ export interface ChatRequest {
 export interface Settings {
   theme: 'system' | 'dark' | 'light';
   hasCompletedOnboarding: boolean;
-  provider: 'claude' | 'openai' | 'openrouter' | 'ollama';
+  provider: 'claude' | 'openai' | 'openrouter' | 'ollama' | 'telnyx';
   // Claude
   anthropicApiKey: string;
   claudeModel: string;
@@ -69,6 +69,10 @@ export interface Settings {
   openrouterApiKey: string;
   openrouterModel: string;
   openrouterBaseUrl: string;
+  // Telnyx Inference (OpenAI-compatible)
+  telnyxApiKey: string;
+  telnyxModel: string;
+  telnyxBaseUrl: string;
   // Ollama
   ollamaModel: string;
   // Personality
@@ -506,6 +510,7 @@ export type IpcChannels =
   | 'keel:x-publish-post'
   | 'keel:openai-list-models'
   | 'keel:openrouter-list-models'
+  | 'keel:telnyx-list-models'
   | 'keel:ollama-list-models'
   | 'keel:test-llm-key'
   | 'keel:report-bug'
@@ -749,7 +754,8 @@ export interface KeelAPI {
   ollamaPullModel: (modelName: string) => Promise<{ ok: boolean; error?: string }>;
   ollamaModelStatus: (modelName: string) => Promise<{ ready: boolean; pulling: boolean; progress?: number; status?: string }>;
   onOllamaPullProgress: (callback: (payload: { modelName: string; status: string; progress?: number }) => void) => () => void;
-  testLlmKey: (provider: 'claude' | 'openai' | 'openrouter' | 'ollama', apiKey?: string) => Promise<{ ok: true } | { ok: false; error: string }>;
+  testLlmKey: (provider: 'claude' | 'openai' | 'openrouter' | 'ollama' | 'telnyx', apiKey?: string) => Promise<{ ok: true } | { ok: false; error: string }>;
+  telnyxListModels: () => Promise<OpenRouterListResult>;
   reportBug: (context?: { title?: string; error?: string }) => Promise<{ ok: true }>;
   // Activity
   getRecentActivity: (limit?: number) => Promise<ActivityLogEntry[]>;
