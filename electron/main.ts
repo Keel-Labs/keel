@@ -1633,7 +1633,7 @@ function registerIpcHandlers() {
           const openaiClient = new OpenAI({ apiKey: settings.openaiApiKey, baseURL: settings.openaiBaseUrl || undefined, fetch: getElectronAwareFetch() });
           const result = await openaiClient.audio.transcriptions.create({
             file: await toFile(fs.createReadStream(tmpPath), 'voice.webm', { type: 'audio/webm' }),
-            model: 'whisper-1',
+            model: 'gpt-transcribe',
           });
           return { ok: true, text: (result.text || '').trim() };
         } finally {
@@ -1673,7 +1673,7 @@ function registerIpcHandlers() {
           const openaiClient = new OpenAI({ apiKey: settings.openaiApiKey, baseURL: settings.openaiBaseUrl || undefined, fetch: getElectronAwareFetch() });
           const result = await openaiClient.audio.transcriptions.create({
             file: await toFile(fs.createReadStream(tmpPath), 'recording.webm', { type: 'audio/webm' }),
-            model: 'whisper-1',
+            model: 'gpt-transcribe',
           });
           transcript = result.text.trim();
         } finally {
